@@ -325,6 +325,7 @@ class Segm(BaseTracker):
         if self.segmentation_task or (
             self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
             pred_segm_region = self.segment_target(image, new_pos, self.target_sz)
+
             if pred_segm_region is None:
                 self.pos = new_pos.clone()
         else:
@@ -954,10 +955,10 @@ class Segm(BaseTracker):
 
             # Obtain segmentation prediction
         segm_pred = self.segm_net.segm_predictor(test_feat_segm, self.train_feat_segm, train_masks, test_dist_map)
-
+        # [1,2,384, 384]
         # softmax on the prediction (during training this is done internaly when calculating loss)
         # take only the positive channel as predicted segmentation mask
-        mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy()
+        mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy() # (384,384)
         if self.params.save_mask:
             mask_real = copy.copy(mask)
         mask = (mask > self.params.segm_mask_thr).astype(np.uint8)
