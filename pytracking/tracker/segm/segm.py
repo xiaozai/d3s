@@ -26,10 +26,11 @@ class Segm(BaseTracker):
             self.params.features_filter.initialize()
         self.features_initialized = True
 
-    def initialize(self, image, state, init_mask=None, *args, **kwargs):
+    def initialize(self, image, state, init_mask=None, sequence_name=None, *args, **kwargs):
 
         # Initialize some stuff
         self.frame_num = 1
+        self.sequence_name = sequence_name
 
         if not hasattr(self.params, 'device'):
             self.params.device = 'cuda' if self.params.use_gpu else 'cpu'

@@ -18,6 +18,9 @@ from pytracking.evaluation.got10kdataset import GOT10KDatasetTest, GOT10KDataset
 from pytracking.evaluation.running import run_dataset
 from pytracking.evaluation import Tracker
 
+from pytracking.evaluation.cdtbdataset import CDTBDataset
+from pytracking.evaluation.depthtrackdataset import DepthTrackDatasetTest, DepthTrackDatasetTrain
+from pytracking.evaluation.davisdataset import DavisDataset16, DavisDataset17
 
 def run_tracker(tracker_name, tracker_param, run_id=None, dataset_name='otb', sequence=None, debug=0, threads=0):
     """Run tracker on sequence or dataset.
@@ -54,6 +57,16 @@ def run_tracker(tracker_name, tracker_param, run_id=None, dataset_name='otb', se
         dataset = GOT10KDatasetLTRVal()
     elif dataset_name == 'lasot':
         dataset = LaSOTDataset()
+    elif dataset_name == 'cdtb':
+        dataset = CDTBDataset()
+    elif dataset_name == 'depthtrackv':
+        dataset = DepthTrackDatasetTest()
+    elif dataset_name == 'depthtrackt':
+        dataset = DepthTrackDatasetTrain()
+    elif dataset_name == 'davis16':
+        dataset = DavisDataset16()
+    elif dataset_name == 'davis17':
+        dataset = DavisDataset17()
     else:
         raise ValueError('Unknown dataset name')
 

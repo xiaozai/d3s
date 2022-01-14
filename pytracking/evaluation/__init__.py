@@ -9,3 +9,7 @@ from .mobifacedataset import MobifaceDataset, MobifaceDatasetTrain, MobifaceData
 from .lasotdataset import LaSOTDataset
 from .data import Sequence
 from .tracker import Tracker
+
+from .cdtbdataset import CDTBDataset
+from .depthtrackdataset import DepthTrackDatasetTest, DepthTrackDatasetTrain
+from .davisdataset import DavisDataset16, DavisDataset17

@@ -123,7 +123,7 @@ def parameters():
     params.init_segm_mask_thr = 0.5
     params.segm_mask_thr = 0.5
 
-    params.masks_save_path = ''
+    params.masks_save_path = '/home/yan/Data2/d3s/pytracking/tracking_results/segm/default_params/'
     # params.masks_save_path = 'save-masks-path'
     params.save_mask = False
     if params.masks_save_path != '':

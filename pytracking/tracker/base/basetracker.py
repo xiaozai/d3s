@@ -32,7 +32,10 @@ class BaseTracker:
         times = []
         start_time = time.time()
         #self.sequence_name = sequence.name
-        self.initialize(image, sequence.init_state)
+        if sequence.init_mask is None:
+            self.initialize(image, sequence.init_state, sequence_name=sequence.name) # Song: Add init mask here?
+        else:
+            self.initialize(image, sequence.init_state, init_mask=sequence.init_mask, sequence_name=sequence.name)
         init_time = getattr(self, 'time', time.time() - start_time)
         times.append(init_time)
 
@@ -275,5 +278,9 @@ class BaseTracker:
             plt.waitforbuttonpress()
 
     def _read_image(self, image_file: str):
-        return cv.cvtColor(cv.imread(image_file), cv.COLOR_BGR2RGB)
-
+        # return cv.cvtColor(cv.imread(image_file), cv.COLOR_BGR2RGB)
+        if isinstance(image_file, dict):
+            # For CDTB and DepthTrack RGBD datasets
+            return cv.cvtColor(cv.imread(image_file['color']), cv.COLOR_BGR2RGB)
+        else:
+            return cv.cvtColor(cv.imread(image_file), cv.COLOR_BGR2RGB)

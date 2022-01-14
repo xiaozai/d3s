@@ -17,13 +17,14 @@ class BaseDataset:
 
 class Sequence:
     """Class for the sequence in an evaluation."""
-    def __init__(self, name, frames, ground_truth_rect, object_class=None):
+    def __init__(self, name, frames, ground_truth_rect, object_class=None, init_mask=None):
         self.name = name
         self.frames = frames
         self.ground_truth_rect = ground_truth_rect
         self.init_state = list(self.ground_truth_rect[0,:])
         self.object_class = object_class
 
+        self.init_mask = init_mask
 
 class SequenceList(list):
     """List of sequences. Supports the addition operator to concatenate sequence lists."""
