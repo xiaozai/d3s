@@ -11,3 +11,4 @@ pytracking/networks/
 pytracking/tracking_results/
 pytracking/evaluation/local.py
 pytracking/run_local.py
+images/*
