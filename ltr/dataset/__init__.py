@@ -4,3 +4,4 @@ from .tracking_net import TrackingNet
 from .imagenetvid import ImagenetVID
 from .coco_seq import MSCOCOSeq
 from .vos import Vos
+from .vos_rgbd import Vos_rgbd

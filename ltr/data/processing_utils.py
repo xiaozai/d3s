@@ -23,7 +23,6 @@ def sample_target(im, target_bb, search_area_factor, output_sz=None, pad_val=Non
         cv image - extracted crop
         float - the factor by which the crop has been resized to make the crop size equal output_size
     """
-
     x, y, w, h = target_bb.tolist()
 
     # Crop image
@@ -113,7 +112,7 @@ def jittered_center_crop(frames, box_extract, box_gt, search_area_factor, output
                     image co-ordinates to the crop co-ordinates
         search_area_factor - The area of the extracted crop is search_area_factor^2 times box_extract area
         output_sz - The size to which the extracted crops are resized
-        
+
     returns:
         list - list of image crops
         list - box_gt location in the crop co-ordinates
