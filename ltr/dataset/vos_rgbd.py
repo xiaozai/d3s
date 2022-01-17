@@ -54,7 +54,7 @@ class Vos_rgbd(BaseDataset):
         depth_names_dict = {}
         mask_names_dict = {}
         for seq_name in self.sequence_list:
-            if os.isdir(os.path.join(self.root, 'JPEGImages',dir_name, 'depth')):
+            if os.path.isdir(os.path.join(self.root, 'JPEGImages',dir_name, 'depth')):
                 dir_name = seq_name.split('-')[0]
                 # sequence frames path
                 frames_path = os.path.join(self.root, 'JPEGImages', dir_name)
