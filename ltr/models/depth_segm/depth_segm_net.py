@@ -114,14 +114,15 @@ class DepthSegmNet(nn.Module):
         # pred_ = torch.cat((torch.unsqueeze(pred_pos, -1), torch.unsqueeze(pred_neg, -1)), dim=-1)
         # pred_sm = F.softmax(pred_, dim=-1) # [1, 24, 24, 2]
         print(depth_test.shape)
-        f_test_depth = self.depth_feat_extractor(depth_test)  # [N, 1, H, W] -> [B, 256, H, W]
+        ''' depth test   : batch*1*384*384
+            f_test_depth : batch*256*384*384
+        '''
+        f_test_depth = self.depth_feat_extractor(depth_test)  # [B, 256, 384, 384]
         # f_train_depth = self.depth_feat_extractor(depth_train)
-        print(f_test_depth.shape)
         if test_dist is not None:
             # distance map is give - resize for mixer
             # dist = F.interpolate(test_dist[0], size=(f_train.shape[-2], f_train.shape[-1])) # [1,1,24,24]
-            dist = F.interpolate(test_dist[0], size=(f_test_depth.shape[-2], f_test_depth.shape[-1])) # [1,1,24,24]
-            print('dist : ', dist.shape)
+            dist = F.interpolate(test_dist[0], size=(f_test_depth.shape[-2], f_test_depth.shape[-1])) # [batch,1,384,384]
             # concatenate inputs for mixer
             # softmaxed segmentation, positive segmentation and distance map
             # ''' F + P + L '''
@@ -132,8 +133,7 @@ class DepthSegmNet(nn.Module):
                 1) cat
                 2) channel wise multiplication???
             '''
-            segm_layers = torch.cat((torch.unsqueeze(f_test_depth, dim=1),
-                                     dist), dim=1)
+            segm_layers = torch.cat((f_test_depth, dist), dim=1) # [B, 256+1, 384, 384]
         else:
             # segm_layers = torch.cat((torch.unsqueeze(pred_sm[:, :, :, 0], dim=1), torch.unsqueeze(pred_pos, dim=1)), dim=1)
             segm_layers = f_test_depth
