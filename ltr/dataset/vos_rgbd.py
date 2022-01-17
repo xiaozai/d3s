@@ -54,15 +54,16 @@ class Vos_rgbd(BaseDataset):
         depth_names_dict = {}
         mask_names_dict = {}
         for seq_name in self.sequence_list:
-            dir_name = seq_name.split('-')[0]
-            # sequence frames path
-            frames_path = os.path.join(self.root, 'JPEGImages', dir_name)
-            # sequence masks path
-            masks_path = os.path.join(self.root, 'Annotations', dir_name)
+            if os.isdir(os.path.join(self.root, 'JPEGImages',dir_name, 'depth')):
+                dir_name = seq_name.split('-')[0]
+                # sequence frames path
+                frames_path = os.path.join(self.root, 'JPEGImages', dir_name)
+                # sequence masks path
+                masks_path = os.path.join(self.root, 'Annotations', dir_name)
 
-            frame_names_dict[seq_name] = sorted([file_name for file_name in glob.glob(os.path.join(frames_path, '*.jpg' ))])
-            depth_names_dict[seq_name] = sorted([file_name for file_name in glob.glob(os.path.join(frames_path, 'depth','*.png' ))])
-            mask_names_dict[seq_name] = sorted([file_name for file_name in glob.glob(os.path.join(masks_path, '*.png'))])
+                frame_names_dict[seq_name] = sorted([file_name for file_name in glob.glob(os.path.join(frames_path, '*.jpg' ))])
+                depth_names_dict[seq_name] = sorted([file_name for file_name in glob.glob(os.path.join(frames_path, 'depth','*.png' ))])
+                mask_names_dict[seq_name] = sorted([file_name for file_name in glob.glob(os.path.join(masks_path, '*.png'))])
         return frame_names_dict, depth_names_dict, mask_names_dict
 
 
