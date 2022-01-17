@@ -31,6 +31,7 @@ def normalize_vis_img(x):
 
 class DepthNet(nn.Module):
     def __init__(self):
+        super().__init__()
         self.conv1 = conv(1, 64, kernel_size=1, padding=0)
         self.conv2 = conv(64, 128)
         self.conv3 = conv_no_relu(128, 256)
