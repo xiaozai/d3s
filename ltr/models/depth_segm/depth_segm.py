@@ -29,12 +29,9 @@ class DepthSegmNet(nn.Module):
         Note: If the training is done in sequence mode, that is, test_imgs.dim() == 5, then the batch dimension
         corresponds to the first dimensions. test_imgs is thus of the form [sequence, batch, feature, row, col]
         """
-        print('train_imgs.shape: ', train_imgs.shape)
-        print('train_depths.shape : ', train_depths.shape) # 1 * 1 * H * W
-        print('train_masks: ', train_masks.shape)
 
-        train_feat = self.extract_backbone_features(train_imgs) # 1 * 3 * H * W -> features
-        test_feat = self.extract_backbone_features(test_imgs)   # 1 * 3 * H * W -> features
+        train_feat = self.extract_backbone_features(train_imgs) # B * C * H * W -> B * C * H * W
+        test_feat = self.extract_backbone_features(test_imgs)  
 
         train_feat_segm = [feat for feat in train_feat.values()] # layer 0 - 3
         test_feat_segm = [feat for feat in test_feat.values()]

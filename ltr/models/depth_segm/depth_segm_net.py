@@ -67,7 +67,7 @@ class DepthSegmNet(nn.Module):
         # self.segment0 = conv(segm_input_dim[3], segm_dim[0], kernel_size=1, padding=0)
         # self.segment1 = conv_no_relu(segm_dim[0], segm_dim[1])
         #
-        self.mixer = conv(256, 256)
+        self.mixer = conv(257, 128)
         # self.s3 = conv(segm_inter_dim[3], segm_inter_dim[2])
         #
         # self.s2 = conv(segm_inter_dim[2], segm_inter_dim[2])
@@ -78,7 +78,7 @@ class DepthSegmNet(nn.Module):
         # self.f1 = conv(segm_input_dim[1], segm_inter_dim[1])
         # self.f0 = conv(segm_input_dim[0], segm_inter_dim[0])
         #
-        self.post2 = conv(256, 128)
+        self.post2 = conv(128, 128)
         self.post1 = conv(128, 64)
         self.post0 = conv_no_relu(64, 2)
 
@@ -100,7 +100,6 @@ class DepthSegmNet(nn.Module):
                 Step 2: F + P + L
                 Step 3: Conv -> Up -> segmentation outputs
 
-
             Simple Network 01 : Depth images -> depth feat + dist -> mask ???
         '''
         # f_test = self.segment1(self.segment0(feat_test[3]))    # 1x1x64 conv + 3x3x64 conv -> [1, 1024, 24,24] -> [1, 64, 24, 24]
@@ -113,7 +112,6 @@ class DepthSegmNet(nn.Module):
         #
         # pred_ = torch.cat((torch.unsqueeze(pred_pos, -1), torch.unsqueeze(pred_neg, -1)), dim=-1)
         # pred_sm = F.softmax(pred_, dim=-1) # [1, 24, 24, 2]
-        print(depth_test.shape)
         ''' depth test   : batch*1*384*384
             f_test_depth : batch*256*384*384
         '''
@@ -121,17 +119,15 @@ class DepthSegmNet(nn.Module):
         # f_train_depth = self.depth_feat_extractor(depth_train)
         if test_dist is not None:
             # distance map is give - resize for mixer
-            # dist = F.interpolate(test_dist[0], size=(f_train.shape[-2], f_train.shape[-1])) # [1,1,24,24]
             dist = F.interpolate(test_dist[0], size=(f_test_depth.shape[-2], f_test_depth.shape[-1])) # [batch,1,384,384]
             # concatenate inputs for mixer
             # softmaxed segmentation, positive segmentation and distance map
-            # ''' F + P + L '''
-            # segm_layers = torch.cat((torch.unsqueeze(pred_sm[:, :, :, 0], dim=1),
-            #                          torch.unsqueeze(pred_pos, dim=1),
-            #                          dist), dim=1)
-            ''' How to DepthF + Dist ???
+            # ''' F + P + L ''' in D3S paper
+            ''' We assume that DepthFeat = F+P
+            How to DepthF + Dist ???
                 1) cat
                 2) channel wise multiplication???
+
             '''
             segm_layers = torch.cat((f_test_depth, dist), dim=1) # [B, 256+1, 384, 384]
         else:
