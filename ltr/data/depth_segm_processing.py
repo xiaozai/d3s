@@ -191,14 +191,12 @@ class DepthSegmProcessing(BaseProcessing):
             data[s + '_masks'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_mask] # 1, 1*384*384
 
             ''' Song's comments :
-                depth is normalized when dataset._get_frame()
-                should we normalize it again for the crops?
+                depth is normalized when dataset._get_frame(
+                should we normalize it again for the crops?s
 
                 x [1, H, W, 1]???
             '''
-            data[s + 'depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth] # 1, 1*384*384
-            print('test_depth and test_images : ', len(data[s+'_depths']), data[s+'_depths'][0].shape,
-                                                    len(data[s+'_images']), data[s+'_images'][0].shape)
+            data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth] # 1, 1*384*384
 
             if s == 'train' and random.random() < 0.005:
                 # on random use binary mask generated from axis-aligned bbox
