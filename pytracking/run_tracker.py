@@ -59,9 +59,9 @@ def run_tracker(tracker_name, tracker_param, run_id=None, dataset_name='otb', se
         dataset = LaSOTDataset()
     elif dataset_name == 'cdtb':
         dataset = CDTBDataset()
-    elif dataset_name == 'depthtrackv':
+    elif dataset_name == 'depthtrackval':
         dataset = DepthTrackDatasetTest()
-    elif dataset_name == 'depthtrackt':
+    elif dataset_name == 'depthtracktrain':
         dataset = DepthTrackDatasetTrain()
     elif dataset_name == 'davis16':
         dataset = DavisDataset16()

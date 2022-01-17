@@ -81,7 +81,6 @@ class DepthSegmActor(BaseActor):
 
         masks_gt = data['test_masks'].permute(1, 0, 2, 3) # 1 * 1 * H * W
         masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)
-        print('mask-gt-pair:', masks_gt_pair.shape)
         # Compute loss
         loss = self.objective(masks_pred, masks_gt_pair)
 

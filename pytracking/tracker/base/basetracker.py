@@ -281,6 +281,11 @@ class BaseTracker:
         # return cv.cvtColor(cv.imread(image_file), cv.COLOR_BGR2RGB)
         if isinstance(image_file, dict):
             # For CDTB and DepthTrack RGBD datasets
-            return cv.cvtColor(cv.imread(image_file['color']), cv.COLOR_BGR2RGB)
+            color = cv.cvtColor(cv.imread(image_file['color']), cv.COLOR_BGR2RGB)
+            depth = cv.imread(image_file['depth'], -1)
+            depth = cv2.normalize(depth, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+            depth = np.asarray(depth).expand_dims(-1)
+            images = {'color':color, 'depth':depth}
+            return images
         else:
             return cv.cvtColor(cv.imread(image_file), cv.COLOR_BGR2RGB)
