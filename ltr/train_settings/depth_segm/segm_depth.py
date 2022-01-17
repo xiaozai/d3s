@@ -6,7 +6,7 @@ import torchvision.transforms
 
 from ltr.dataset import Vos_rgbd
 from ltr.data import depth_segm_processing, depth_segm_sampler, LTRLoader
-import ltr.models.segm.segm as segm_models
+import ltr.models.depth_segm.depth_segm as segm_models
 from ltr import actors
 from ltr.trainers import LTRTrainer
 import ltr.data.transforms as dltransforms
@@ -102,7 +102,7 @@ def run(settings):
 
     # Create network
     # resnet50 or resnet18
-    net = segm_models.segm_resnet50(backbone_pretrained=True, topk_pos=settings.segm_topk_pos,
+    net = segm_models.depth_segm_resnet50(backbone_pretrained=True, topk_pos=settings.segm_topk_pos,
                                     topk_neg=settings.segm_topk_neg, mixer_channels=mixer_channels)
 
     # Set objective

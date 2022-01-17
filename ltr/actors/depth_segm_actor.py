@@ -67,16 +67,13 @@ class DepthSegmActor(BaseActor):
         if 'test_dist' in data:
             test_dist = data['test_dist'].permute(1, 0, 2, 3)
 
-        print('actor train_images and depths : ', data['train_images'].shape,
-                                                  data['train_depths'].shape,
-                                                  data['train_masks'].shape,
-                                                  data['test_masks'].shape)
         '''Song's comments:
             Why data['train_images'].permute(1,0,2,3)?
+            Because the LTRLoader is stack at dim 1, data['train_images'].shape = (3*batch*H8w)
         '''
         # Run network to obtain IoU prediction for each proposal in 'test_proposals'
-        masks_pred = self.net(data['train_images'].permute(1, 0, 2, 3), # 1 * 3 * 384 * 384 - > 3 * 1 * 384 * 384 ???/
-                              data['train_depths'].permute(1, 0, 2, 3), # 1 * 1 * H * W - > 1 * 1 * H * W ???/
+        masks_pred = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
+                              data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
                               data['test_images'].permute(1, 0, 2, 3),
                               data['test_depths'].permute(1, 0, 2, 3),
                               data['train_masks'].permute(1, 0, 2, 3),

@@ -56,7 +56,7 @@ class DepthSegmNet(nn.Module):
         return self.feature_extractor(im, layers)
 
 @model_constructor
-def segm_resnet18(segm_input_dim=(256,256), segm_inter_dim=(256,256), backbone_pretrained=True, topk_pos=3, topk_neg=3, mixer_channels=2):
+def depth_segm_resnet18(segm_input_dim=(256,256), segm_inter_dim=(256,256), backbone_pretrained=True, topk_pos=3, topk_neg=3, mixer_channels=2):
     # backbone
     backbone_net = backbones.resnet18(pretrained=backbone_pretrained)
 
@@ -80,7 +80,7 @@ def segm_resnet18(segm_input_dim=(256,256), segm_inter_dim=(256,256), backbone_p
 
 
 @model_constructor
-def segm_resnet50(segm_input_dim=(256,256), segm_inter_dim=(256,256), backbone_pretrained=True, topk_pos=3, topk_neg=3, mixer_channels=2):
+def depth_segm_resnet50(segm_input_dim=(256,256), segm_inter_dim=(256,256), backbone_pretrained=True, topk_pos=3, topk_neg=3, mixer_channels=2):
     # backbone
     backbone_net = backbones.resnet50(pretrained=backbone_pretrained)
 

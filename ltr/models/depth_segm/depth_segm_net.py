@@ -115,10 +115,11 @@ class DepthSegmNet(nn.Module):
         print(depth_test.shape)
         f_test_depth = self.depth_feat_extractor(depth_test)  # [N, 1, H, W] -> [B, 256, H, W]
         # f_train_depth = self.depth_feat_extractor(depth_train)
-
+        print(f_test_depth.shape)
         if test_dist is not None:
             # distance map is give - resize for mixer
-            dist = F.interpolate(test_dist[0], size=(f_train.shape[-2], f_train.shape[-1])) # [1,1,24,24]
+            # dist = F.interpolate(test_dist[0], size=(f_train.shape[-2], f_train.shape[-1])) # [1,1,24,24]
+            dist = F.interpolate(test_dist[0], size=(f_test_depth.shape[-2], f_test_depth.shape[-1])) # [1,1,24,24]
             print('dist : ', dist.shape)
             # concatenate inputs for mixer
             # softmaxed segmentation, positive segmentation and distance map
