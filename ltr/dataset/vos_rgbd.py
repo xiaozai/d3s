@@ -45,7 +45,7 @@ class Vos_rgbd(BaseDataset):
         sequence_list = pandas.read_csv(file_path, header=None, squeeze=True).values.tolist()
         # each entry (sequence name) looks like this: folder_name-object_id
         # this should be parsed later, when sequence is loading
-
+        sequence_list = [seq_name for seq_name in sequence_list if os.path.isdir(os.path.join(self.root, 'JPEGImages',dir_name, 'depth')) ]
         return sequence_list
 
 
@@ -54,16 +54,16 @@ class Vos_rgbd(BaseDataset):
         depth_names_dict = {}
         mask_names_dict = {}
         for seq_name in self.sequence_list:
+            
             dir_name = seq_name.split('-')[0]
-            if os.path.isdir(os.path.join(self.root, 'JPEGImages',dir_name, 'depth')):
-                # sequence frames path
-                frames_path = os.path.join(self.root, 'JPEGImages', dir_name)
-                # sequence masks path
-                masks_path = os.path.join(self.root, 'Annotations', dir_name)
+            # sequence frames path
+            frames_path = os.path.join(self.root, 'JPEGImages', dir_name)
+            # sequence masks path
+            masks_path = os.path.join(self.root, 'Annotations', dir_name)
 
-                frame_names_dict[seq_name] = sorted([file_name for file_name in glob.glob(os.path.join(frames_path, '*.jpg' ))])
-                depth_names_dict[seq_name] = sorted([file_name for file_name in glob.glob(os.path.join(frames_path, 'depth','*.png' ))])
-                mask_names_dict[seq_name] = sorted([file_name for file_name in glob.glob(os.path.join(masks_path, '*.png'))])
+            frame_names_dict[seq_name] = sorted([file_name for file_name in glob.glob(os.path.join(frames_path, '*.jpg' ))])
+            depth_names_dict[seq_name] = sorted([file_name for file_name in glob.glob(os.path.join(frames_path, 'depth','*.png' ))])
+            mask_names_dict[seq_name] = sorted([file_name for file_name in glob.glob(os.path.join(masks_path, '*.png'))])
         return frame_names_dict, depth_names_dict, mask_names_dict
 
 
