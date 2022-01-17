@@ -45,7 +45,7 @@ class Vos_rgbd(BaseDataset):
         sequence_list = pandas.read_csv(file_path, header=None, squeeze=True).values.tolist()
         # each entry (sequence name) looks like this: folder_name-object_id
         # this should be parsed later, when sequence is loading
-        sequence_list = [seq_name for seq_name in sequence_list if os.path.isdir(os.path.join(self.root, 'JPEGImages',dir_name, 'depth')) ]
+        sequence_list = [seq_name for seq_name in sequence_list if os.path.isdir(os.path.join(self.root, 'JPEGImages',seq_name.split('-')[0], 'depth')) ]
         return sequence_list
 
 
@@ -54,7 +54,7 @@ class Vos_rgbd(BaseDataset):
         depth_names_dict = {}
         mask_names_dict = {}
         for seq_name in self.sequence_list:
-            
+
             dir_name = seq_name.split('-')[0]
             # sequence frames path
             frames_path = os.path.join(self.root, 'JPEGImages', dir_name)
