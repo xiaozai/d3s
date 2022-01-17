@@ -78,9 +78,9 @@ class DepthSegmNet(nn.Module):
         # self.f1 = conv(segm_input_dim[1], segm_inter_dim[1])
         # self.f0 = conv(segm_input_dim[0], segm_inter_dim[0])
         #
-        self.post2 = conv(128, 128)
-        self.post1 = conv(128, 64)
-        self.post0 = conv_no_relu(64, 2)
+        self.post2 = conv(128, 64)
+        self.post1 = conv(64, 32)
+        self.post0 = conv_no_relu(32, 2)
 
 
         # Init weights
@@ -132,24 +132,20 @@ class DepthSegmNet(nn.Module):
             segm_layers = torch.cat((f_test_depth, dist), dim=1) # [B, 256+1, 384, 384]
         else:
             # segm_layers = torch.cat((torch.unsqueeze(pred_sm[:, :, :, 0], dim=1), torch.unsqueeze(pred_pos, dim=1)), dim=1)
-            segm_layers = f_test_depth
-
-        print(segm_layers.shape)
+            segm_layers = f_test_depth # [B, 256, 384, 384]
 
         ''' Song's comment :
             segm_layers -> mask
             do we need the upsample ???
         '''
-        out = self.mixer(segm_layers)
-        print('out : ', out.shape)
+        out = self.mixer(segm_layers) # [B, 128, 384, 384]
         # out = self.s3(F.upsample(out, scale_factor=2))
-
 
 
         ''' Do we use the RGB features ???
             e.g. self.f2(feat_test[2]) + self.s2(out)
 
-            1) only depth feature
+            1) only depth feature -> mask
             2) depth + rgb features [layer0, layer1, layer2] more semantic features
 
             3) channel correlation between f_train and f_test
@@ -159,14 +155,11 @@ class DepthSegmNet(nn.Module):
         # out = self.post2(F.upsample(self.f2(feat_test[2]) + self.s2(out), scale_factor=2))
         # out = self.post1(F.upsample(self.f1(feat_test[1]) + self.s1(out), scale_factor=2))
         # out = self.post0(F.upsample(self.f0(feat_test[0]) + self.s0(out), scale_factor=2))
-        out = self.post2(out)
-        print('post02: ', out.shape)
-        out = self.post1(out)
-        print('post01: ', out.shape)
-        out = self.post0(out)
-        print('post0: ', out.shape)
+        out = self.post2(out) # [B, 128, 384, 384]
+        out = self.post1(out) # [B, 64, 384, 384]
+        out = self.post0(out) # [B, 2, 384, 384]
 
-        return out # [1,2,384,384]
+        return out
 
 
     def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg):
