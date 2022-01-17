@@ -14,7 +14,7 @@ class DepthSegmNet(nn.Module):
             segm_layers - List containing the name of the layers from feature_extractor, which are used in segm_predictor
             extractor_grad - Bool indicating whether backbone feature extractor requires gradients
         """
-        super(SegmNet, self).__init__()
+        super(DepthSegmNet, self).__init__()
 
         self.feature_extractor = feature_extractor
         self.segm_predictor = segm_predictor
