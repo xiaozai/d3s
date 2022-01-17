@@ -164,8 +164,11 @@ class DepthSegmNet(nn.Module):
         # out = self.post1(F.upsample(self.f1(feat_test[1]) + self.s1(out), scale_factor=2))
         # out = self.post0(F.upsample(self.f0(feat_test[0]) + self.s0(out), scale_factor=2))
         out = self.post2(out)
+        print('post02: ', out.shape)
         out = self.post1(out)
+        print('post01: ', out.shape)
         out = self.post0(out)
+        print('post0: ', out.shape)
 
         return out # [1,2,384,384]
 
