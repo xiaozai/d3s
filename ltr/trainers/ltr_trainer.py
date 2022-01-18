@@ -49,7 +49,10 @@ class LTRTrainer(BaseTrainer):
 
         for i, data in enumerate(loader, 1):
             # get inputs
-            data = data.to(self.device)
+            try:
+                data = data.to(self.device)
+            except:
+                print(data)
             data['epoch'] = self.epoch
             data['settings'] = self.settings
 

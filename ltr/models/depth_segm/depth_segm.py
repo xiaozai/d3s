@@ -31,7 +31,7 @@ class DepthSegmNet(nn.Module):
         """
 
         train_feat = self.extract_backbone_features(train_imgs) # B * C * H * W -> B * C * H * W
-        test_feat = self.extract_backbone_features(test_imgs)  
+        test_feat = self.extract_backbone_features(test_imgs)
 
         train_feat_segm = [feat for feat in train_feat.values()] # layer 0 - 3
         test_feat_segm = [feat for feat in test_feat.values()]
@@ -41,7 +41,9 @@ class DepthSegmNet(nn.Module):
             test_dist = [test_dist]
 
         # Obtain iou prediction
-        segm_pred = self.segm_predictor(test_feat_segm, test_depths, train_feat_segm, train_depths, train_masks, test_dist)
+        segm_pred = self.segm_predictor(test_feat_segm, test_depths,
+                                        train_feat_segm, train_depths,
+                                        train_masks, test_dist)
         return segm_pred
 
     def extract_backbone_features(self, im, layers=None):
@@ -53,7 +55,8 @@ class DepthSegmNet(nn.Module):
         return self.feature_extractor(im, layers)
 
 @model_constructor
-def depth_segm_resnet18(segm_input_dim=(256,256), segm_inter_dim=(256,256), backbone_pretrained=True, topk_pos=3, topk_neg=3, mixer_channels=2):
+def depth_segm_resnet18(segm_input_dim=(256,256), segm_inter_dim=(256,256),
+                        backbone_pretrained=True, topk_pos=3, topk_neg=3, mixer_channels=2):
     # backbone
     backbone_net = backbones.resnet18(pretrained=backbone_pretrained)
 
@@ -77,7 +80,8 @@ def depth_segm_resnet18(segm_input_dim=(256,256), segm_inter_dim=(256,256), back
 
 
 @model_constructor
-def depth_segm_resnet50(segm_input_dim=(256,256), segm_inter_dim=(256,256), backbone_pretrained=True, topk_pos=3, topk_neg=3, mixer_channels=2):
+def depth_segm_resnet50(segm_input_dim=(256,256), segm_inter_dim=(256,256),
+                        backbone_pretrained=True, topk_pos=3, topk_neg=3, mixer_channels=2):
     # backbone
     backbone_net = backbones.resnet50(pretrained=backbone_pretrained)
 

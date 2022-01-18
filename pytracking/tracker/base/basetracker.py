@@ -40,8 +40,8 @@ class BaseTracker:
         times.append(init_time)
 
         if self.params.visualization:
-            self.init_visualization()
-            self.visualize(image, sequence.init_state)
+            self.init_visualization(vis_rgbd=isinstance(image, dict), vis_mask=self.mask)
+            self.visualize(image, sequence.init_state, mask=self.mask)
 
         # Track
         tracked_bb = [sequence.init_state]
@@ -55,7 +55,10 @@ class BaseTracker:
             tracked_bb.append(state)
 
             if self.params.visualization:
-                self.visualize(image, state)
+                if self.mask is not None:
+                    self.visualize(image, state, mask=self.mask)
+                else:
+                    self.visualize(image, state)
 
         return tracked_bb, times
 
@@ -238,10 +241,20 @@ class BaseTracker:
             self.reset_tracker()
             print("Resetting target pos to gt!")
 
-    def init_visualization(self):
+    def init_visualization(self, vis_rgbd=False, vis_mask=None):
         # plt.ion()
         self.pause_mode = False
-        self.fig, self.ax = plt.subplots(1)
+        self.ax_d = None
+        self.ax_m = None
+        if vis_rgbd and vis_mask is not None:
+            self.fig, (self.ax, self.ax_d, self.ax_m) = plt.subplots(1, 3)
+        elif vis_rgbd:
+            self.fig, (self.ax, self.ax_d) = plt.subplots(1, 2)
+        elif vis_mask is not None:
+            self.fig, (self.ax, self.ax_m) = plt.subplots(1, 2)
+        else:
+            self.fig, self.ax = plt.subplots(1)
+
         # self.fig.canvas.manager.window.move(800, 50)
         self.fig.canvas.manager.window.wm_geometry("+%d+%d" % (100, 50))
 
@@ -249,9 +262,20 @@ class BaseTracker:
         plt.tight_layout()
 
 
-    def visualize(self, image, state):
-        self.ax.cla()
-        self.ax.imshow(image)
+    def visualize(self, image, state, mask=None):
+        if isinstance(image, dict):
+            color, depth = image['color'], image['depth']
+            self.ax.cla()
+            self.ax.imshow(color)
+            self.ax_d.cla()
+            self.ax_d.imshow(depth)
+        else:
+            self.ax.cla()
+            self.ax.imshow(image)
+
+        if mask is not None:
+            self.ax_m.cla()
+            self.ax_m.imshow(mask)
 
         if len(state) == 4:
             pred = patches.Rectangle((state[0], state[1]), state[2], state[3], linewidth=2, edgecolor='r', facecolor='none')
@@ -283,8 +307,10 @@ class BaseTracker:
             # For CDTB and DepthTrack RGBD datasets
             color = cv.cvtColor(cv.imread(image_file['color']), cv.COLOR_BGR2RGB)
             depth = cv.imread(image_file['depth'], -1)
-            depth = cv2.normalize(depth, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-            depth = np.asarray(depth).expand_dims(-1)
+            max_depth = np.median(depth) * 1.5
+            depth[depth > max_depth] = max_depth
+            depth = cv.normalize(depth, None, alpha=0, beta=1, norm_type=cv.NORM_MINMAX, dtype=cv.CV_32F)
+            depth = np.expand_dims(np.asarray(depth), axis=-1)
             images = {'color':color, 'depth':depth}
             return images
         else:

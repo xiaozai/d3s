@@ -21,7 +21,9 @@ def save_debug(data, pred_mask):
     dir_path = data['settings'].env.images_dir
 
     train_img = data['train_images'][:, batch_element, :, :].permute(1, 2, 0)
+    train_depth = data['train_depths'][:, batch_element, :, :].permute(1, 2, 0)
     test_img = data['test_images'][:, batch_element, :, :].permute(1, 2, 0)
+    test_depth = data['test_depths'][:, batch_element, :, :].permute(1, 2, 0)
     test_mask = data['test_masks'][0, batch_element, :, :]
 
     # softmax on the mask prediction (since this is done internaly when calculating loss)
@@ -35,14 +37,18 @@ def save_debug(data, pred_mask):
     test_img = 255 * (test_img * std + mu)
 
     train_img = (train_img.cpu().numpy()).astype(np.uint8)
+    train_depth = (train_depth.cpu().numpy()).astype(np.float32)
     test_img = (test_img.cpu().numpy()).astype(np.uint8)
+    test_depth = (test_depth.cpu().numpy()).astype(np.float32)
     test_mask = (test_mask.cpu().numpy()).astype(np.float32)
     predicted_mask = (mask.cpu().detach().numpy()).astype(np.float32)
 
-    f, ((ax1, ax2), (ax5, ax6)) = plt.subplots(2, 2, figsize=(6, 6))
+    f, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(6, 6))
     draw_axis(ax1, train_img, 'Train image')
-    draw_axis(ax5, test_img, 'Test image')
-    draw_axis(ax2, test_mask, 'Ground-truth')
+    draw_axis(ax4, test_img, 'Test image')
+    draw_axis(ax2, train_depth, 'Train depth')
+    draw_axis(ax5, test_depth, 'Test depth')
+    draw_axis(ax3, test_mask, 'Ground-truth')
     draw_axis(ax6, predicted_mask, 'Prediction', show_minmax=True)
 
     save_path = os.path.join(data['settings'].env.images_dir, '%03d-%04d.png' % (data['epoch'], data['iter']))

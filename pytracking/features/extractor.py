@@ -99,7 +99,7 @@ class MultiResolutionExtractor(ExtractorBase):
     def set_is_color(self, is_color: bool):
         self.is_color = is_color
 
-    def extract(self, im, pos, scales, image_sz):
+    def extract(self, im, pos, scales, image_sz, dp=None):
         """Extract features.
         args:
             im: Image.
@@ -112,11 +112,15 @@ class MultiResolutionExtractor(ExtractorBase):
 
         # Get image patches
         im_patches = torch.cat([sample_patch(im, pos, s*image_sz, image_sz) for s in scales])
-
+        if dp is not None:
+            dp_patches = torch.cat([sample_patch(dp, pos, s*image_sz, image_sz) for s in scales])
         # Compute features
         feature_map = TensorList([f.get_feature(im_patches) for f in self.features]).unroll()
 
-        return feature_map
+        if dp is not None:
+            return feature_map, dp_patches
+        else:
+            return feature_map
 
     def extract_transformed(self, im, pos, scale, image_sz, transforms):
         """Extract features from a set of transformed image samples.

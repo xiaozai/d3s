@@ -156,4 +156,5 @@ class DepthSegmSampler(torch.utils.data.Dataset):
             # Send for processing
             return self.processing(data)
         except:
+            print('\nseq_name: ', dataset.sequence_list[seq_id])
             print('\nseq_id, ', seq_id, 'train_frame_ids: ', train_frame_ids, 'seq-id test:', seq_id, 'test_frame_ids: ', test_frame_ids)

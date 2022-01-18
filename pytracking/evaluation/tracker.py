@@ -28,7 +28,8 @@ class Tracker:
         tracker_module = importlib.import_module('pytracking.tracker.{}'.format(self.name))
 
         self.parameters = self.get_parameters()
-        self.tracker_class = tracker_module.get_tracker_class()
+    
+        self.tracker_class = tracker_module.get_tracker_class() # depth_segm
 
         self.default_visualization = getattr(self.parameters, 'visualization', False)
         self.default_debug = getattr(self.parameters, 'debug', 0)
@@ -107,5 +108,3 @@ class Tracker:
             pickle.dump(params, open(parameter_file, 'wb'))
 
         return params
-
-

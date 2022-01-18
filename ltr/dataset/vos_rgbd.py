@@ -99,13 +99,19 @@ class Vos_rgbd(BaseDataset):
 
 
     def _get_frame(self, frames_path, frame_id):
-        return self.image_loader(frames_path[frame_id]) # H*W*3
+        try:
+            return self.image_loader(frames_path[frame_id]) # H*W*3
+        except:
+            print(frames_path[frame_id])
 
     def _get_depth(self, depths_path, frame_id):
-        depth = cv2.imread(depths_path[frame_id], -1)
-        depth = cv2.normalize(depth, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-        depth = np.asarray(depth, dtype=np.float32)
-        return np.expand_dims(depth, axis=-1) # H*W*1
+        try:
+            depth = cv2.imread(depths_path[frame_id], -1)
+            depth = cv2.normalize(depth, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+            depth = np.asarray(depth, dtype=np.float32)
+            return np.expand_dims(depth, axis=-1) # H*W*1
+        except:
+            print(depths_path[frame_id])
 
     def _get_mask(self, masks_path, frame_id, obj_id):
         m_ = np.asarray(Image.open(masks_path[frame_id])).astype(np.float32)

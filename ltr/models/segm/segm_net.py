@@ -85,13 +85,14 @@ class SegmNet(nn.Module):
             dist = F.interpolate(test_dist[0], size=(f_train.shape[-2], f_train.shape[-1])) # [1,1,24,24]
             # concatenate inputs for mixer
             # softmaxed segmentation, positive segmentation and distance map
-            ''' F + P + L '''
+            ''' F + P + L , segm_layers: [B,3,24,24]'''
             segm_layers = torch.cat((torch.unsqueeze(pred_sm[:, :, :, 0], dim=1),
                                      torch.unsqueeze(pred_pos, dim=1),
                                      dist), dim=1)
         else:
+            ''' F + P , segm_layers: [B,2,24,24]'''
             segm_layers = torch.cat((torch.unsqueeze(pred_sm[:, :, :, 0], dim=1), torch.unsqueeze(pred_pos, dim=1)), dim=1)
-        ''' Song's comment : segm_layers: [1,3,24,24] F+P+L'''
+
         out = self.mixer(segm_layers)
         out = self.s3(F.upsample(out, scale_factor=2))
 

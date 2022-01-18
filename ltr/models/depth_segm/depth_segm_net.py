@@ -30,17 +30,24 @@ def normalize_vis_img(x):
     return (x * 255).astype(np.uint8)
 
 class DepthNet(nn.Module):
-    def __init__(self):
+    def __init__(self, depth_input_dim=1, depth_inter_dim=(64, 128, 256)):
         super().__init__()
-        self.conv1 = conv(1, 64, kernel_size=1, padding=0)
-        self.conv2 = conv(64, 128)
-        self.conv3 = conv_no_relu(128, 256)
+        ''' Depth -> P + F
+        depth image -> 1x1x32? -> 3x3x32? -> 1x1x2? why ?
+        '''
+        self.conv1 = conv(depth_input_dim, depth_inter_dim[0], kernel_size=1, padding=0)
+        self.conv2 = conv(depth_inter_dim[0], depth_inter_dim[1])
+        self.conv3 = conv_no_relu(depth_inter_dim[1], depth_inter_dim[2])
 
+        self.initialize()
+
+    def initialize(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
                 nn.init.kaiming_normal_(m.weight.data, mode='fan_in')
                 if m.bias is not None:
                     m.bias.data.zero_()
+
     def forward(self, dp):
         feat1 = self.conv1(dp)
         feat2 = self.conv2(feat1)
@@ -64,25 +71,15 @@ class DepthSegmNet(nn.Module):
 
         self.depth_feat_extractor = DepthNet()
 
-        # self.segment0 = conv(segm_input_dim[3], segm_dim[0], kernel_size=1, padding=0)
-        # self.segment1 = conv_no_relu(segm_dim[0], segm_dim[1])
-        #
-        self.mixer = conv(257, 128)
-        # self.s3 = conv(segm_inter_dim[3], segm_inter_dim[2])
-        #
-        # self.s2 = conv(segm_inter_dim[2], segm_inter_dim[2])
-        # self.s1 = conv(segm_inter_dim[1], segm_inter_dim[1])
-        # self.s0 = conv(segm_inter_dim[0], segm_inter_dim[0])
-        #
-        # self.f2 = conv(segm_input_dim[2], segm_inter_dim[2])
-        # self.f1 = conv(segm_input_dim[1], segm_inter_dim[1])
-        # self.f0 = conv(segm_input_dim[0], segm_inter_dim[0])
-        #
+        self.mixer = conv(257, 128) # ???? 256 depth feat + 1 dist map ?
+
         self.post2 = conv(128, 64)
         self.post1 = conv(64, 32)
         self.post0 = conv_no_relu(32, 2)
 
+        self.initialize()
 
+    def initialize(self):
         # Init weights
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
@@ -90,10 +87,7 @@ class DepthSegmNet(nn.Module):
                 if m.bias is not None:
                     m.bias.data.zero_()
 
-        # self.topk_pos = topk_pos
-        # self.topk_neg = topk_neg
-
-    def forward(self, feat_test, depth_test, feat_train, depth_train, mask_train, test_dist=None):
+    def forward(self, feat_test_rgb, depth_test_imgs, feat_train_rgb, feat_train_d, mask_train, test_dist=None):
         ''' Song's comments:
             Given feat_test and feat_train and mask_train, and test_dist,
                 Step 1: similarity maps between feat_test and feat_train
@@ -102,21 +96,12 @@ class DepthSegmNet(nn.Module):
 
             Simple Network 01 : Depth images -> depth feat + dist -> mask ???
         '''
-        # f_test = self.segment1(self.segment0(feat_test[3]))    # 1x1x64 conv + 3x3x64 conv -> [1, 1024, 24,24] -> [1, 64, 24, 24]
-        # f_train = self.segment1(self.segment0(feat_train[3]))  # 1x1x64 conv + 3x3x64 conv -> [1, 1024, 24,24] -> [1, 64, 24, 24]
-        # # reshape mask to the feature size
-        # mask_pos = F.interpolate(mask_train[0], size=(f_train.shape[-2], f_train.shape[-1])) # [1,1,384, 384] -> [1,1,24,24]
-        # mask_neg = 1 - mask_pos
-        #
-        # pred_pos, pred_neg = self.similarity_segmentation(f_test, f_train, mask_pos, mask_neg)
-        #
-        # pred_ = torch.cat((torch.unsqueeze(pred_pos, -1), torch.unsqueeze(pred_neg, -1)), dim=-1)
-        # pred_sm = F.softmax(pred_, dim=-1) # [1, 24, 24, 2]
+
         ''' depth test   : batch*1*384*384
             f_test_depth : batch*256*384*384
         '''
-        f_test_depth = self.depth_feat_extractor(depth_test)  # [B, 256, 384, 384]
-        # f_train_depth = self.depth_feat_extractor(depth_train)
+        f_test_depth = self.depth_feat_extractor(depth_test_imgs)  # [B, 256, 384, 384]
+
         if test_dist is not None:
             # distance map is give - resize for mixer
             dist = F.interpolate(test_dist[0], size=(f_test_depth.shape[-2], f_test_depth.shape[-1])) # [batch,1,384,384]
@@ -139,8 +124,6 @@ class DepthSegmNet(nn.Module):
             do we need the upsample ???
         '''
         out = self.mixer(segm_layers) # [B, 128, 384, 384]
-        # out = self.s3(F.upsample(out, scale_factor=2))
-
 
         ''' Do we use the RGB features ???
             e.g. self.f2(feat_test[2]) + self.s2(out)

@@ -95,7 +95,7 @@ def parameters():
 
     params.use_segmentation = True
 
-    params.segm_net_path = '/home/yan/Data2/d3s/checkpoints/depth_segm/depth_segm/SegmNet.pth.tar'
+    params.segm_net_path = '/home/yan/Data2/d3s/pytracking/networks/DepthSegmNet_ep0006.pth.tar'
     params.segm_use_dist = True
     params.segm_normalize_mean = [0.485, 0.456, 0.406]
     params.segm_normalize_std = [0.229, 0.224, 0.225]
@@ -123,7 +123,7 @@ def parameters():
     params.init_segm_mask_thr = 0.5
     params.segm_mask_thr = 0.5
 
-    params.masks_save_path = '' # '/home/yan/Data2/d3s/pytracking/tracking_results/segm/default_params/'
+    params.masks_save_path = '/home/yan/Data2/d3s/pytracking/tracking_results/depth_segm/default_params/'
     # params.masks_save_path = 'save-masks-path'
     params.save_mask = False
     if params.masks_save_path != '':
