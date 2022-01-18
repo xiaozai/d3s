@@ -13,3 +13,5 @@ pytracking/evaluation/local.py
 pytracking/run_local.py
 images/*
 tensorboard/*
+images_rgbd/*
+checkpoints/*
