@@ -140,7 +140,7 @@ class DepthSegmSampler(torch.utils.data.Dataset):
         # Get frames
         train_frames, train_depths, train_masks, train_anno, _ = dataset.get_frames(seq_id, train_frame_ids, anno)
         test_frames, test_depths, test_masks, test_anno, _ = dataset.get_frames(seq_id, test_frame_ids, anno)
-        
+
         # Prepare data
         data = TensorDict({'train_images': train_frames, # 1, H * W * 3
                            'train_depths': train_depths, # 1, H * W * 1
@@ -152,5 +152,8 @@ class DepthSegmSampler(torch.utils.data.Dataset):
                            'train_masks': train_masks,
                            'test_masks': test_masks})
 
-        # Send for processing
-        return self.processing(data)
+        try:
+            # Send for processing
+            return self.processing(data)
+        except:
+            print('\nseq_id, ', seq_id, 'train_frame_ids: ', train_frame_ids, 'seq-id test:', seq_id, 'test_frame_ids: ', test_frame_ids)
