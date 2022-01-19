@@ -110,40 +110,42 @@ class DepthSegmNet(nn.Module):
         ''' Song's comments:
             depth test   : batch*1*384*384
             f_test_depth : batch*256*384*384
+            feat_test_rgb layer0 : [8, 64, 192, 192]
+                          layer1 : [8, 256, 96, 96]
+                          layer2 : [8, 512, 48, 48]
         '''
         f_test_depth = self.depth_feat_extractor(depth_test_imgs)  # [B, 2, 384, 384]
         # pred_sm = F.softmax(f_test_depth, dim=1)  # ????
         ''' We assume that DepthFeat = F+P, concatenate with dist (location) map
-            1) cat  2) channel wise multiplication???
+            how about channel wise multiplication???
         '''
         if test_dist is not None:
             # distance map is give - resize for mixer
-            dist = F.interpolate(test_dist[0], size=(f_test_depth.shape[-2], f_test_depth.shape[-1])) # [batch,1,384,384]
             # concatenate inputs for mixer
-            segm_layers = torch.cat((f_test_depth, dist), dim=1) # [B, C+1, 384, 384]
+            dist = F.interpolate(test_dist[0], size=(f_test_depth.shape[-2], f_test_depth.shape[-1])) # [batch,1,384,384]
+            segm_layers = torch.cat((f_test_depth, dist), dim=1)                                      # [B, C+1, 384, 384]
         else:
-            segm_layers = torch.cat((f_test_depth, f_test_depth[:, 0, :, :]), dim=1) # [B, 2, 384, 384]
+            segm_layers = torch.cat((f_test_depth, f_test_depth[:, 0, :, :]), dim=1) # [B, 3, 384, 384]
 
         # Mix DepthFeat and Location Map
         out_mix = self.mixer(segm_layers) # [B, 32, 384, 384]
 
         ''' Song's comment:
-            Do we use the RGB features ??? e.g. self.f2(feat_test[2]) + self.s2(out)
-
-            1) only depth feature -> mask
+            Do we use the RGB features ??? Yes
+            1) only depth feature -> mask ! when depth is missing or can not distinguish background and target
             2) depth + rgb features [layer0, layer1, layer2] more semantic features
 
                feat_train_rgb ? + train_masks -> pooling ?
 
-               feat_test_rgb layer0 : [8, 64, 192, 192]
-                             layer1 : [8, 256, 96, 96]
-                             layer2 : [8, 512, 48, 48]
+
 
             3) channel correlation between f_train and f_test
 
             4) similarity between test and train, same as D3S ???? == D3S + Depth branch ???
         '''
-        out = self.post2(F.upsample(self.f2(feat_test_rgb[2]), scale_factor=8) + out_mix)
+        out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]), scale_factor=8) + out_mix)
+        out2 = self.post1(F.upsample(self.f1(feat_test_rgb[1]), scale_factor=4) + out1)
+        out3 = self.post0(F.upsample(self.f0(feat_test_rgb[0]), scale_factor=2) + out2)
 
         '''Song wants to see visualization of featmap '''
         if self.id % 50 == 0:
@@ -151,7 +153,7 @@ class DepthSegmNet(nn.Module):
             depthimg = (depth_test_imgs[0, 0, :, :].cpu().detach().numpy()).astype(np.float32).squeeze()
             mixfeat = (out_mix[0, 0, :, :].cpu().detach().numpy()).astype(np.float32).squeeze()
             rgbfeat = (feat_test_rgb[2][0, 0, :, :].cpu().detach().numpy()).astype(np.float32).squeeze()
-            rgbdfeat = (out[0, 0, :, :].cpu().detach().numpy()).astype(np.float32).squeeze()
+            rgbdfeat = (out1[0, 0, :, :].cpu().detach().numpy()).astype(np.float32).squeeze()
             print('max rgbd feat : ', np.max(rgbdfeat))
             f, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(6, 6))
             draw_axis(ax1, depthfeat[0, :, :].squeeze(), 'depth feat 0')
@@ -164,9 +166,5 @@ class DepthSegmNet(nn.Module):
             plt.savefig(save_path)
             plt.close(f)
         self.id += 1
-
-
-        out = self.post1(F.upsample(self.f1(feat_test_rgb[1]), scale_factor=4) + out)
-        out = self.post0(F.upsample(self.f0(feat_test_rgb[0]), scale_factor=2) + out)
 
         return out
