@@ -167,4 +167,4 @@ class DepthSegmNet(nn.Module):
             plt.close(f)
         self.id += 1
 
-        return out
+        return out3

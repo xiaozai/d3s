@@ -767,7 +767,9 @@ class DepthSegm(BaseTracker):
         y_ = np.linspace(1, width, width) - cy
         X, Y = np.meshgrid(x_, y_)
 
-        return np.sqrt(np.square(X) + np.square(Y)).astype(np.float32)
+        D = np.sqrt(np.square(X) + np.square(Y)).astype(np.float32)
+        D = 1 - D / np.max(D) # Song : dist map value is too large compared to feat map
+        return D
 
     def create_dist_gauss(self, map_sz, w, h, cx=None, cy=None, p=4, sz_weight=0.7):
         # create a square-shaped distance map with a Gaussian function which can be interpreted as a distance
@@ -783,7 +785,8 @@ class DepthSegm(BaseTracker):
         y_ = np.linspace(1, map_sz, map_sz) - 1 - cy
         X, Y = np.meshgrid(x_, y_)
         # 1 - is needed since we need distance-like map (not Gaussian function)
-        return 1 - np.exp(-((np.power(X, p) / (sz_weight * w ** p)) + (np.power(Y, p) / (sz_weight * h ** p))))
+        # return 1 - np.exp(-((np.power(X, p) / (sz_weight * w ** p)) + (np.power(Y, p) / (sz_weight * h ** p))))
+        return np.exp(-((np.power(X, p) / (sz_weight * w ** p)) + (np.power(Y, p) / (sz_weight * h ** p)))) # Song Yan edited it 
 
     def init_segmentation(self, color, depth, bb, init_mask=None):
 

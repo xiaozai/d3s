@@ -28,7 +28,7 @@ def save_debug(data, pred_mask):
 
     # softmax on the mask prediction (since this is done internaly when calculating loss)
     mask = F.softmax(pred_mask, dim=1)[batch_element, 0, :, :]
-
+    mask = mask[mask > 0.5]
 
     mu = torch.Tensor(data['settings'].normalize_mean).to(torch.device('cuda')).view(1, 1, 3)
     std = torch.Tensor(data['settings'].normalize_std).to(torch.device('cuda')).view(1, 1, 3)
