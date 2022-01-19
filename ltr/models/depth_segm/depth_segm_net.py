@@ -92,11 +92,11 @@ class DepthSegmNet(nn.Module):
 
         self.post2 = conv(32, 32)
         self.post1 = conv(32, 32)
-        self.post0 = conv_no_relu(32, 2)
+        self.post0 = conv_no_relu(32, 2) # GT is the pair of Foreground and Background segmentations
 
         self.initialize()
 
-        self.id = 0
+        self.id = 0 # only for visualization
 
     def initialize(self):
         # Init weights
@@ -114,18 +114,18 @@ class DepthSegmNet(nn.Module):
                           layer1 : [8, 256, 96, 96]
                           layer2 : [8, 512, 48, 48]
         '''
-        f_test_depth = self.depth_feat_extractor(depth_test_imgs)  # [B, 2, 384, 384]
+        f_test_depth = self.depth_feat_extractor(depth_test_imgs)  # [B, 2, 384, 384] = F+B
         # pred_sm = F.softmax(f_test_depth, dim=1)  # ????
         ''' We assume that DepthFeat = F+P, concatenate with dist (location) map
             how about channel wise multiplication???
         '''
         if test_dist is not None:
-            # distance map is give - resize for mixer
-            # concatenate inputs for mixer
-            dist = F.interpolate(test_dist[0], size=(f_test_depth.shape[-2], f_test_depth.shape[-1])) # [batch,1,384,384]
+            '''Song: we change the test_dist map into Guassian map instead of distance map '''
+            # distance map is give - resize for mixer # concatenate inputs for mixer
+            dist = F.interpolate(test_dist[0], size=(f_test_depth.shape[-2], f_test_depth.shape[-1])) # [B,1,384,384]
             segm_layers = torch.cat((f_test_depth, dist), dim=1)                                      # [B, C+1, 384, 384]
         else:
-            segm_layers = torch.cat((f_test_depth, f_test_depth[:, 0, :, :]), dim=1) # [B, 3, 384, 384]
+            segm_layers = torch.cat((f_test_depth, f_test_depth[:, 0, :, :]), dim=1)                  # [B, 3, 384, 384]
 
         # Mix DepthFeat and Location Map
         out_mix = self.mixer(segm_layers) # [B, 32, 384, 384]
@@ -134,14 +134,15 @@ class DepthSegmNet(nn.Module):
             Do we use the RGB features ??? Yes
             1) only depth feature -> mask ! when depth is missing or can not distinguish background and target
             2) depth + rgb features [layer0, layer1, layer2] more semantic features
-
-               feat_train_rgb ? + train_masks -> pooling ?
-
-
-
             3) channel correlation between f_train and f_test
-
-            4) similarity between test and train, same as D3S ???? == D3S + Depth branch ???
+               or similarity between test and train, same as D3S ???? == D3S + Depth branch ???  D3S used the layer3 features, 24*24
+                   1)
+                   similarity_rgb = cos(feat_train_rgb * feat_test_rgb) * train_mask
+                   similarity_d   = cos(feat_train_d * feat_test_d) * train_mask
+                   similarity = max(similarity_rgb, similarity_d)
+                   2) 
+                   feat_test_rgb = softmax(similarity_rgb) * feat_test_rgb
+                   feat_test_d = softmax(similarity_d) * feat_test_d
         '''
         out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]), scale_factor=8) + out_mix)
         out2 = self.post1(F.upsample(self.f1(feat_test_rgb[1]), scale_factor=4) + out1)
