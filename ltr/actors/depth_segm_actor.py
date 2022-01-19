@@ -27,8 +27,8 @@ def save_debug(data, pred_mask):
     test_mask = data['test_masks'][0, batch_element, :, :]
 
     # softmax on the mask prediction (since this is done internaly when calculating loss)
-    mask = F.softmax(pred_mask, dim=1)[batch_element, 0, :, :]
-    mask = mask[mask > 0.5]
+    mask = F.softmax(pred_mask, dim=1)[batch_element, 0, :, :].cpu().detach().numpy().astype(np.float32)
+    predicted_mask = (mask > 0.5).astype(np.float32) * mask
 
     mu = torch.Tensor(data['settings'].normalize_mean).to(torch.device('cuda')).view(1, 1, 3)
     std = torch.Tensor(data['settings'].normalize_std).to(torch.device('cuda')).view(1, 1, 3)
@@ -41,7 +41,7 @@ def save_debug(data, pred_mask):
     test_img = (test_img.cpu().numpy()).astype(np.uint8)
     test_depth = (test_depth.cpu().numpy()).astype(np.float32)
     test_mask = (test_mask.cpu().numpy()).astype(np.float32)
-    predicted_mask = (mask.cpu().detach().numpy()).astype(np.float32)
+    # predicted_mask = mask.astype(np.float32)
 
     f, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(6, 6))
     draw_axis(ax1, train_img, 'Train image')
