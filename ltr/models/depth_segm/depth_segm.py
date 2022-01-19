@@ -66,12 +66,7 @@ def depth_segm_resnet18(segm_input_dim=(256,256), segm_inter_dim=(256,256),
     segm_dim = (64, 64)  # convolutions before cosine similarity
 
     # segmentation
-    segm_predictor = segmmodels.DepthSegmNet(segm_input_dim=segm_input_dim,
-                                             segm_inter_dim=segm_inter_dim,
-                                             segm_dim=segm_dim,
-                                             topk_pos=topk_pos,
-                                             topk_neg=topk_neg,
-                                             mixer_channels=mixer_channels)
+    segm_predictor = segmmodels.DepthSegmNet()
 
     net = DepthSegmNet(feature_extractor=backbone_net, segm_predictor=segm_predictor,
                        segm_layers=['conv1', 'layer1', 'layer2', 'layer3'], extractor_grad=False)
@@ -91,12 +86,7 @@ def depth_segm_resnet50(segm_input_dim=(256,256), segm_inter_dim=(256,256),
     segm_dim = (64, 64)  # convolutions before cosine similarity
 
     # segmentation
-    segm_predictor = segmmodels.DepthSegmNet(segm_input_dim=segm_input_dim,
-                                            segm_inter_dim=segm_inter_dim,
-                                            segm_dim=segm_dim,
-                                            topk_pos=topk_pos,
-                                            topk_neg=topk_neg,
-                                            mixer_channels=mixer_channels)
+    segm_predictor = segmmodels.DepthSegmNet()
 
     net = DepthSegmNet(feature_extractor=backbone_net, segm_predictor=segm_predictor,
                        segm_layers=['conv1', 'layer1', 'layer2', 'layer3'], extractor_grad=False)  # extractor_grad=False

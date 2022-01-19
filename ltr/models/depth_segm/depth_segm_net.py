@@ -30,14 +30,15 @@ def normalize_vis_img(x):
     return (x * 255).astype(np.uint8)
 
 class DepthNet(nn.Module):
-    def __init__(self, depth_input_dim=1, depth_inter_dim=(64, 128, 256), kernel_sizes=(1,3,3)):
+    def __init__(self, depth_input_dim=1, depth_inter_dim=(64, 128, 256), kernel_sizes=(1,3,3), pads=(0, 1, 0)):
         super().__init__()
-        ''' Depth -> P + F
-        depth image -> 1x1x32? -> 3x3x32? -> 1x1x2? why ?
+        ''' Assume that DepthFeat == P + F
+            1) simple attempt : self.depth_feat_extractor = DepthNet(depth_input_dim=1, depth_inter_dim=(64, 128, 256), kernel_sizes=(1,3,3), pads=(0, 1, 1))
+            2) 1x1x32 -> 3x3x32 -> 1x1x2 ?
         '''
-        self.conv1 = conv(depth_input_dim, depth_inter_dim[0], kernel_size=kernel_sizes[0], padding=0)
-        self.conv2 = conv(depth_inter_dim[0], depth_inter_dim[1], kernel_size=kernel_sizes[1])
-        self.conv3 = conv_no_relu(depth_inter_dim[1], depth_inter_dim[2], kernel_size=kernel_sizes[2])
+        self.conv1 = conv(depth_input_dim, depth_inter_dim[0], kernel_size=kernel_sizes[0], padding=pads[0])
+        self.conv2 = conv(depth_inter_dim[0], depth_inter_dim[1], kernel_size=kernel_sizes[1], padding=pads[1])
+        self.conv3 = conv_no_relu(depth_inter_dim[1], depth_inter_dim[2], kernel_size=kernel_sizes[2], padding=pads[2])
 
         self.initialize()
 
@@ -66,15 +67,19 @@ class DepthSegmNet(nn.Module):
         segm_dim = (64, 64)  # convolutions before cosine similarity
 
     """
-    def __init__(self, segm_input_dim=(128,256), segm_inter_dim=(256,256), segm_dim=(64, 64), mixer_channels=2, topk_pos=3, topk_neg=3):
+    def __init__(self):
         super().__init__()
 
-        self.depth_feat_extractor = DepthNet(depth_input_dim=1, depth_inter_dim=(64, 128, 256), kernel_sizes=(1,3,3))
+        self.depth_feat_extractor = DepthNet(depth_input_dim=1, depth_inter_dim=(32, 32, 2), kernel_sizes=(1,3,1), pads=(0, 1, 0))
 
-        self.mixer = conv(257, 128) # ???? 256 depth feat + 1 dist map ?
+        '''
+        1) simple : depth feat + L 256+1 -> mixer 3x3x128 -> 3x3x64 -> 3x3x32 -> 3x3x2, train loss = 0.048
+        2)        : depth feat + L 2+1   -> mixer 1x1x32  -> 3x3x32 -> 3x3x32 -> 3x3x2
+        '''
+        self.mixer = conv(3, 32, kernel_size=1, padding=0) # ???? 256 depth feat + 1 dist map ?
 
-        self.post2 = conv(128, 64)
-        self.post1 = conv(64, 32)
+        self.post2 = conv(32, 32)
+        self.post1 = conv(32, 32)
         self.post0 = conv_no_relu(32, 2)
 
         self.initialize()
@@ -128,6 +133,12 @@ class DepthSegmNet(nn.Module):
             1) only depth feature -> mask
             2) depth + rgb features [layer0, layer1, layer2] more semantic features
 
+               feat_train_rgb ? + train_masks -> pooling ?
+
+               feat_test_rgb layer0 : [8, 64, 192, 192]
+                             layer1 : [8, 256, 96, 96]
+                             layer2 : [8, 512, 48, 48]
+                             
             3) channel correlation between f_train and f_test
 
             4) similarity between test and train, same as D3S ???? == D3S + Depth branch ???
