@@ -30,14 +30,14 @@ def normalize_vis_img(x):
     return (x * 255).astype(np.uint8)
 
 class DepthNet(nn.Module):
-    def __init__(self, depth_input_dim=1, depth_inter_dim=(64, 128, 256)):
+    def __init__(self, depth_input_dim=1, depth_inter_dim=(64, 128, 256), kernel_sizes=(1,3,3)):
         super().__init__()
         ''' Depth -> P + F
         depth image -> 1x1x32? -> 3x3x32? -> 1x1x2? why ?
         '''
-        self.conv1 = conv(depth_input_dim, depth_inter_dim[0], kernel_size=1, padding=0)
-        self.conv2 = conv(depth_inter_dim[0], depth_inter_dim[1])
-        self.conv3 = conv_no_relu(depth_inter_dim[1], depth_inter_dim[2])
+        self.conv1 = conv(depth_input_dim, depth_inter_dim[0], kernel_size=kernel_sizes[0], padding=0)
+        self.conv2 = conv(depth_inter_dim[0], depth_inter_dim[1], kernel_size=kernel_sizes[1])
+        self.conv3 = conv_no_relu(depth_inter_dim[1], depth_inter_dim[2], kernel_size=kernel_sizes[2])
 
         self.initialize()
 
@@ -69,7 +69,7 @@ class DepthSegmNet(nn.Module):
     def __init__(self, segm_input_dim=(128,256), segm_inter_dim=(256,256), segm_dim=(64, 64), mixer_channels=2, topk_pos=3, topk_neg=3):
         super().__init__()
 
-        self.depth_feat_extractor = DepthNet()
+        self.depth_feat_extractor = DepthNet(depth_input_dim=1, depth_inter_dim=(64, 128, 256), kernel_sizes=(1,3,3))
 
         self.mixer = conv(257, 128) # ???? 256 depth feat + 1 dist map ?
 
@@ -94,7 +94,8 @@ class DepthSegmNet(nn.Module):
                 Step 2: F + P + L
                 Step 3: Conv -> Up -> segmentation outputs
 
-            Simple Network 01 : Depth images -> depth feat + dist -> mask ???
+            Simple Network 01 : depth -> 1x1x64 -> 3x3x128 -> 3x3x256 -> depth feat + Location map = Bx(256+1)xHxW
+                                -> 3x3x128 -> 3x3x64 -> 3x3x32 -> 3x3x2 -> mask
         '''
 
         ''' depth test   : batch*1*384*384
@@ -112,17 +113,13 @@ class DepthSegmNet(nn.Module):
             How to DepthF + Dist ???
                 1) cat
                 2) channel wise multiplication???
-
             '''
             segm_layers = torch.cat((f_test_depth, dist), dim=1) # [B, 256+1, 384, 384]
         else:
             # segm_layers = torch.cat((torch.unsqueeze(pred_sm[:, :, :, 0], dim=1), torch.unsqueeze(pred_pos, dim=1)), dim=1)
             segm_layers = f_test_depth # [B, 256, 384, 384]
 
-        ''' Song's comment :
-            segm_layers -> mask
-            do we need the upsample ???
-        '''
+        # Mix DepthFeat and Location Map
         out = self.mixer(segm_layers) # [B, 128, 384, 384]
 
         ''' Do we use the RGB features ???
@@ -143,33 +140,3 @@ class DepthSegmNet(nn.Module):
         out = self.post0(out) # [B, 2, 384, 384]
 
         return out
-
-
-    def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg):
-        '''Song's comments:
-            f_test / f_train: [1,64,24,24]
-            mask_pos / mask_neg: [1,1,24,24] for each pixel, it belongs to foreground or background
-            sim_resh : [1,24,24,576]
-            sim_pos / sim_neg: [1,24,24,576] for each pixel, the similarity of f_test and f_train
-            pos_map / pos_neg: [1,24,24]     for each pixel, the averaged TopK similarity score
-
-            cosine similarity between normalized train and test features,
-            which is exactly same as transformer:
-                similarity = softmax(norm(Q) * norm(K))
-            for example : TREG's code, softmax(layernorm(1x1conv(softmax(QK)*V)+V))
-        '''
-        # first normalize train and test features to have L2 norm 1
-        # cosine similarity and reshape last two dimensions into one
-        sim = torch.einsum('ijkl,ijmn->iklmn',
-                           F.normalize(f_test, p=2, dim=1),
-                           F.normalize(f_train, p=2, dim=1))
-        sim_resh = sim.view(sim.shape[0], sim.shape[1], sim.shape[2], sim.shape[3] * sim.shape[4])
-        # reshape masks into vectors for broadcasting [B x 1 x 1 x w * h]
-        # re-weight samples (take out positive ang negative samples)
-        sim_pos = sim_resh * mask_pos.view(mask_pos.shape[0], 1, 1, -1) # [1,24,24,576] * [1,1,1,576] -> [1,24,24,576]
-        sim_neg = sim_resh * mask_neg.view(mask_neg.shape[0], 1, 1, -1)
-        # take top k positive and negative examples
-        # mean over the top positive and negative examples
-        pos_map = torch.mean(torch.topk(sim_pos, self.topk_pos, dim=-1).values, dim=-1)
-        neg_map = torch.mean(torch.topk(sim_neg, self.topk_neg, dim=-1).values, dim=-1)
-        return pos_map, neg_map

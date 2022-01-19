@@ -26,12 +26,12 @@ class DepthSegm(BaseTracker):
             self.params.features_filter.initialize()
         self.features_initialized = True
 
-    def initialize(self, image, state, init_mask=None, sequence_name=None, frame_name=None, *args, **kwargs):
+    def initialize(self, image, state, init_mask=None, *args, **kwargs):
 
         # Initialize some stuff
         self.frame_num = 1
-        self.sequence_name = sequence_name
-        self.frame_name = frame_name
+        # self.sequence_name = sequence_name
+        self.frame_name = '%08d' % self.frame_num
 
         if not hasattr(self.params, 'device'):
             self.params.device = 'cuda' if self.params.use_gpu else 'cpu'
@@ -142,6 +142,10 @@ class DepthSegm(BaseTracker):
         dp = numpy_to_torch(depth)
         self.im = im  # For debugging only
         self.dp = dp
+        # self.raw_mask = numpy_to_torch(init_mask)
+        # self.mask = numpy_to_torch(init_mask)
+        self.raw_mask = None
+        self.mask = None
 
         # Setup scale bounds
         self.image_sz = torch.Tensor([im.shape[2], im.shape[3]])
@@ -207,13 +211,13 @@ class DepthSegm(BaseTracker):
             # Initialize optimizer
             analyze_convergence = getattr(self.params, 'analyze_convergence', False)
             if optimizer == 'GaussNewtonCG':
-                self.joint_optimizer = GaussNewtonCG(self.joint_problem, joint_var, plotting=(self.params.debug >= 3),
+                self.joint_optimizer = GaussNewtonCG(self.joint_problem, joint_var, plotting=(self.params.debug == 3), # SY >= 3 -> == 3
                                                      analyze=analyze_convergence, fig_num=(12, 13, 14))
             elif optimizer == 'GradientDescentL2':
                 self.joint_optimizer = GradientDescentL2(self.joint_problem, joint_var,
                                                          self.params.optimizer_step_length,
                                                          self.params.optimizer_momentum,
-                                                         plotting=(self.params.debug >= 3), debug=analyze_convergence,
+                                                         plotting=(self.params.debug == 3), debug=analyze_convergence, # SY >= 3 -> == 3
                                                          fig_num=(12, 13))
 
             # Do joint optimization
@@ -247,10 +251,10 @@ class DepthSegm(BaseTracker):
             self.filter_optimizer = ConjugateGradient(self.conv_problem, self.filter,
                                                       fletcher_reeves=self.params.fletcher_reeves,
                                                       direction_forget_factor=self.params.direction_forget_factor,
-                                                      debug=(self.params.debug >= 3), fig_num=(12, 13))
+                                                      debug=(self.params.debug == 3), fig_num=(12, 13))
         elif optimizer == 'GradientDescentL2':
             self.filter_optimizer = GradientDescentL2(self.conv_problem, self.filter, self.params.optimizer_step_length,
-                                                      self.params.optimizer_momentum, debug=(self.params.debug >= 3),
+                                                      self.params.optimizer_momentum, debug=(self.params.debug == 3),
                                                       fig_num=12)
 
         # Transfer losses from previous optimization
@@ -334,12 +338,17 @@ class DepthSegm(BaseTracker):
         if new_pos[1] >= color.shape[1]:
             new_pos[1] = color.shape[1] - 1
 
+        print('frame: ', self.frame_name, ' uncert_score : ', uncert_score, 'vs ', self.params.uncertainty_segment_thr)
         pred_segm_region = None
         if self.segmentation_task or (
             self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
+            '''Song's comment:
+               update self.pos by using segmentation
+            '''
             pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
 
             if pred_segm_region is None:
+                print('pred_segm_region is None ....')
                 self.pos = new_pos.clone()
         else:
             self.pos = new_pos.clone()
@@ -896,6 +905,12 @@ class DepthSegm(BaseTracker):
                 mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy()
                 mask = (mask > self.params.init_segm_mask_thr).astype(np.float32)
 
+
+                '''------------------------------------------------------------'''
+                self.raw_mask = mask
+                self.contours = mask
+                '''-----------------------------------------------------------'''
+
                 if hasattr(self, 'gt_poly'):
                     # dilate polygon-based mask
                     # dilate only if given mask is made from polygon, not from axis-aligned bb (since rotated bb is much tighter)
@@ -905,6 +920,8 @@ class DepthSegm(BaseTracker):
                     mask = mask * mask_dil
                 else:
                     mask = mask * init_mask_patch_np
+
+                self.mask = mask # Song
 
                 target_pixels = np.sum((mask > 0.5).astype(np.float32))
                 self.segm_init_target_pixels = target_pixels
@@ -935,6 +952,7 @@ class DepthSegm(BaseTracker):
             self.dist_map = dist_map
 
         self.mask_pixels = np.array([np.sum(mask)])
+        print('self.mask_pixels : ', self.mask_pixels)
         self.mask = mask
 
     def segment_target(self, color, depth, pos, sz):
@@ -997,21 +1015,44 @@ class DepthSegm(BaseTracker):
         # softmax on the prediction (during training this is done internaly when calculating loss)
         # take only the positive channel as predicted segmentation mask
         mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy() # [1,2,384, 384] -> [384,384]
+        self.raw_mask = mask # Song : the mask not clear
+        ''' Song wants to see the mask before contour'''
+        if self.params.save_mask:
+            save_mask(None, mask, segm_crop_sz, bb, color.shape[1], color.shape[0],
+                      self.params.masks_save_path, self.sequence_name+'_raw', self.frame_name)
+
         if self.params.save_mask:
             mask_real = copy.copy(mask)
+        '''Song's comment : mask > 0.5 ???  maybe it is too high and mask = zeros '''
         mask = (mask > self.params.segm_mask_thr).astype(np.uint8)
         self.mask = mask
 
+        ''' Song's comment :
+            it seems that after cv2.findContours, mask becomes zeros ...
+        '''
         if cv2.__version__[-5] == '4':
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         else:
             _, contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         cnt_area = [cv2.contourArea(cnt) for cnt in contours]
 
+        '''---------------------------------------------------------------'''
+        print('cnt_area : ', cnt_area, 'contours : ', len(contours), 'max cnt_area : ', np.max(cnt_area))
+
+        ''' Song wants to see the mask before contour'''
+        if self.params.save_mask:
+            save_mask(None, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
+                      self.params.masks_save_path, self.sequence_name+'_real', self.frame_name)
+
+        cts = np.zeros(mask.shape, dtype=np.uint8)
+        print(np.argmax(cnt_area))
+        cv2.drawContours(cts, contours, np.argmax(cnt_area), 1, thickness=2)
+        self.contours = cts
+        '''---------------------------------------------------------------'''
+
         if self.segmentation_task:
             mask = np.zeros(mask.shape, dtype=np.uint8)
             cv2.drawContours(mask, contours, -1, 1, thickness=-1)
-
             # save mask to disk
             # Note: move this below if evaluating on VOT
             if self.params.save_mask:
@@ -1019,6 +1060,7 @@ class DepthSegm(BaseTracker):
                           self.params.masks_save_path, self.sequence_name, self.frame_name)
 
         if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 50:  # 1000:
+            print('find a good cnt_area in the mask.....')
             contour = contours[np.argmax(cnt_area)]  # use max area polygon
             polygon = contour.reshape(-1, 2)
 

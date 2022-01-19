@@ -31,17 +31,14 @@ class BaseTracker:
 
         times = []
         start_time = time.time()
-        #self.sequence_name = sequence.name
-        if sequence.init_mask is None:
-            self.initialize(image, sequence.init_state, sequence_name=sequence.name) # Song: Add init mask here?
-        else:
-            self.initialize(image, sequence.init_state, init_mask=sequence.init_mask, sequence_name=sequence.name)
+        self.sequence_name = sequence.name
+        self.initialize(image, sequence.init_state, init_mask=sequence.init_mask)
         init_time = getattr(self, 'time', time.time() - start_time)
         times.append(init_time)
 
         if self.params.visualization:
-            self.init_visualization(vis_rgbd=isinstance(image, dict), vis_mask=self.mask)
-            self.visualize(image, sequence.init_state, mask=self.mask)
+            self.init_visualization()
+            self.visualize(image, sequence.init_state)
 
         # Track
         tracked_bb = [sequence.init_state]
@@ -55,10 +52,7 @@ class BaseTracker:
             tracked_bb.append(state)
 
             if self.params.visualization:
-                if self.mask is not None:
-                    self.visualize(image, state, mask=self.mask)
-                else:
-                    self.visualize(image, state)
+                self.visualize(image, state)
 
         return tracked_bb, times
 
@@ -241,18 +235,25 @@ class BaseTracker:
             self.reset_tracker()
             print("Resetting target pos to gt!")
 
-    def init_visualization(self, vis_rgbd=False, vis_mask=None):
+    def init_visualization(self):
         # plt.ion()
+        '''
+        debug 1: vis RGB and bbox
+              2: vis RGB and Correlation map
+              3: vis RGB, Correlation Map, GaussianNewtonCG
+              4: vis RGB, Depth,
+              5: vis RGB, depth, mask
+        '''
         self.pause_mode = False
-        self.ax_d = None
-        self.ax_m = None
-        if vis_rgbd and vis_mask is not None:
+
+        if self.params.debug == 5:
             self.fig, (self.ax, self.ax_d, self.ax_m) = plt.subplots(1, 3)
-        elif vis_rgbd:
+        elif self.params.debug == 4:
+            self.ax_m = None
             self.fig, (self.ax, self.ax_d) = plt.subplots(1, 2)
-        elif vis_mask is not None:
-            self.fig, (self.ax, self.ax_m) = plt.subplots(1, 2)
         else:
+            self.ax_d = None
+            self.ax_m = None
             self.fig, self.ax = plt.subplots(1)
 
         # self.fig.canvas.manager.window.move(800, 50)
@@ -262,8 +263,8 @@ class BaseTracker:
         plt.tight_layout()
 
 
-    def visualize(self, image, state, mask=None):
-        if isinstance(image, dict):
+    def visualize(self, image, state):
+        if isinstance(image, dict) and self.params.debug >= 4:
             color, depth = image['color'], image['depth']
             self.ax.cla()
             self.ax.imshow(color)
@@ -273,9 +274,10 @@ class BaseTracker:
             self.ax.cla()
             self.ax.imshow(image)
 
-        if mask is not None:
+        if self.params.debug == 5:
             self.ax_m.cla()
-            self.ax_m.imshow(mask)
+            # self.ax_m.imshow(self.mask)
+            self.ax_m.imshow(self.mask)
 
         if len(state) == 4:
             pred = patches.Rectangle((state[0], state[1]), state[2], state[3], linewidth=2, edgecolor='r', facecolor='none')

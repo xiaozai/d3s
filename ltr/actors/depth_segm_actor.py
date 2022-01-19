@@ -73,10 +73,6 @@ class DepthSegmActor(BaseActor):
         if 'test_dist' in data:
             test_dist = data['test_dist'].permute(1, 0, 2, 3)
 
-        '''Song's comments:
-            Why data['train_images'].permute(1,0,2,3)?
-            Because the LTRLoader is stack at dim 1, data['train_images'].shape = (3*batch*H8w)
-        '''
         # Run network to obtain IoU prediction for each proposal in 'test_proposals'
         masks_pred = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
                               data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
@@ -85,8 +81,8 @@ class DepthSegmActor(BaseActor):
                               data['train_masks'].permute(1, 0, 2, 3),
                               test_dist)
 
-        masks_gt = data['test_masks'].permute(1, 0, 2, 3) # 1 * 1 * H * W
-        masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)
+        masks_gt = data['test_masks'].permute(1, 0, 2, 3)            # B * 1 * H * W
+        masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)   # B * 2 * H * W
         # Compute loss
         loss = self.objective(masks_pred, masks_gt_pair)
 
