@@ -58,10 +58,16 @@ class DepthNet(nn.Module):
                     m.bias.data.zero_()
 
     def forward(self, dp):
-        feat1 = self.conv1(dp)
-        feat2 = self.conv2(feat1)
-        feat3 = self.conv3(feat2)
-        # out = F.softmax(feat3, dim=1)  # ????
+        feat1 = self.conv1(dp)     # [B, 1, 384, 384] -> [B, C, 384, 384]
+        feat1 = F.interpolate(feat1, size=(192, 192))
+
+        feat2 = self.conv2(feat1)  # [B, C, 384, 384] -> [B, C, 384, 384]
+        feat2 = F.interpolate(feat2, size=(96, 96))
+
+        feat3 = self.conv3(feat2)  # [B, C, 384, 384] -> [B, C, 384, 384]
+        feat3 = F.interpolate(feat3, size=(48, 48))
+
+        feat3 = F.softmax(feat3, dim=1)  #
         return feat3
 
 class DepthSegmNet(nn.Module):
@@ -115,8 +121,9 @@ class DepthSegmNet(nn.Module):
         '''
         f_test_d = self.depth_feat_extractor(depth_test_imgs)  # [B, 2, 384, 384] = F+B
         #
-        # mask_pos_depth = F.interpolate(mask_train[0], size=(feat_train_d.shape[-2], feat_train_d.shape[-1])) # [B,1,H, W] -> [B,1,H',W']
-        # f_test_d = self.similarity_segmentation(f_test_d, feat_train_d, mask_pos_depth)
+        # [B, 2, 384, 384] too large ?????
+        mask_pos_depth = F.interpolate(mask_train[0], size=(feat_train_d.shape[-2], feat_train_d.shape[-1])) # [B,1,H, W] -> [B,1,H',W']
+        f_test_d = self.similarity_segmentation(f_test_d, feat_train_d, mask_pos_depth)
 
         ''' We assume that DepthFeat = F+P, concatenate with dist (location) map
             how about channel wise multiplication???
@@ -146,7 +153,16 @@ class DepthSegmNet(nn.Module):
                    feat_test_rgb = softmax(similarity_rgb) * feat_test_rgb
                    feat_test_d = softmax(similarity_d) * feat_test_d
         '''
-        out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]), scale_factor=8) + out_mix)
+        # out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]), scale_factor=8) + out_mix)
+        # out2 = self.post1(F.upsample(self.f1(feat_test_rgb[1]), scale_factor=4) + out1)
+        # out3 = self.post0(F.upsample(self.f0(feat_test_rgb[0]), scale_factor=2) + out2)
+
+        mask_pos_rgb = F.interpolate(mask_train[0], size=(feat_train_rgb[2].shape[-2], feat_train_rgb[2].shape[-1])) # [B,1,H, W] -> [B,1,H',W']
+        feat_test_rgb[2] = self.similarity_segmentation(feat_test_rgb[2], feat_train_rgb[2], mask_pos_rgb)
+
+
+        # out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]), scale_factor=8) + F.upsample(out_mix, scale_factor=8))
+        out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]) + out_mix, scale_factor=8))
         out2 = self.post1(F.upsample(self.f1(feat_test_rgb[1]), scale_factor=4) + out1)
         out3 = self.post0(F.upsample(self.f0(feat_test_rgb[0]), scale_factor=2) + out2)
 
