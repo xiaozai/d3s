@@ -2,14 +2,14 @@ import torch.nn as nn
 import torch
 import torch.nn.functional as F
 import numpy as np
-
-import matplotlib.pyplot as plt
-def draw_axis(ax, img, title, show_minmax=False):
-    ax.imshow(img)
-    if show_minmax:
-        minval_, maxval_, _, _ = cv2.minMaxLoc(img)
-        title = '%s \n min=%.2f max=%.2f' % (title, minval_, maxval_)
-    ax.set_title(title, fontsize=9)
+#
+# import matplotlib.pyplot as plt
+# def draw_axis(ax, img, title, show_minmax=False):
+#     ax.imshow(img)
+#     if show_minmax:
+#         minval_, maxval_, _, _ = cv2.minMaxLoc(img)
+#         title = '%s \n min=%.2f max=%.2f' % (title, minval_, maxval_)
+#     ax.set_title(title, fontsize=9)
 
 
 def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1):
@@ -26,16 +26,16 @@ def conv_no_relu(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dila
             nn.BatchNorm2d(out_planes))
 
 
-def valid_roi(roi: torch.Tensor, image_size: torch.Tensor):
-    valid = all(0 <= roi[:, 1]) and all(0 <= roi[:, 2]) and all(roi[:, 3] <= image_size[0]-1) and \
-            all(roi[:, 4] <= image_size[1]-1)
-    return valid
+# def valid_roi(roi: torch.Tensor, image_size: torch.Tensor):
+#     valid = all(0 <= roi[:, 1]) and all(0 <= roi[:, 2]) and all(roi[:, 3] <= image_size[0]-1) and \
+#             all(roi[:, 4] <= image_size[1]-1)
+#     return valid
 
 
-def normalize_vis_img(x):
-    x = x - np.min(x)
-    x = x / np.max(x)
-    return (x * 255).astype(np.uint8)
+# def normalize_vis_img(x):
+#     x = x - np.min(x)
+#     x = x / np.max(x)
+#     return (x * 255).astype(np.uint8)
 
 class DepthNet(nn.Module):
     def __init__(self, input_dim=1, dims=(64, 128, 256), kernels=(1,3,3), pads=(0, 1, 0)):
@@ -96,8 +96,6 @@ class DepthSegmNet(nn.Module):
 
         self.initialize()
 
-        self.id = 0 # only for visualization
-
     def initialize(self):
         # Init weights
         for m in self.modules():
@@ -140,32 +138,12 @@ class DepthSegmNet(nn.Module):
                    similarity_rgb = cos(feat_train_rgb * feat_test_rgb) * train_mask
                    similarity_d   = cos(feat_train_d * feat_test_d) * train_mask
                    similarity = max(similarity_rgb, similarity_d)
-                   2) 
+                   2)
                    feat_test_rgb = softmax(similarity_rgb) * feat_test_rgb
                    feat_test_d = softmax(similarity_d) * feat_test_d
         '''
         out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]), scale_factor=8) + out_mix)
         out2 = self.post1(F.upsample(self.f1(feat_test_rgb[1]), scale_factor=4) + out1)
         out3 = self.post0(F.upsample(self.f0(feat_test_rgb[0]), scale_factor=2) + out2)
-
-        '''Song wants to see visualization of featmap '''
-        if self.id % 50 == 0:
-            depthfeat = (f_test_depth[0, :, :, :].cpu().detach().numpy()).astype(np.float32).squeeze()
-            depthimg = (depth_test_imgs[0, 0, :, :].cpu().detach().numpy()).astype(np.float32).squeeze()
-            mixfeat = (out_mix[0, 0, :, :].cpu().detach().numpy()).astype(np.float32).squeeze()
-            rgbfeat = (feat_test_rgb[2][0, 0, :, :].cpu().detach().numpy()).astype(np.float32).squeeze()
-            rgbdfeat = (out1[0, 0, :, :].cpu().detach().numpy()).astype(np.float32).squeeze()
-            print('max rgbd feat : ', np.max(rgbdfeat))
-            f, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(6, 6))
-            draw_axis(ax1, depthfeat[0, :, :].squeeze(), 'depth feat 0')
-            draw_axis(ax2, depthfeat[1, :, :].squeeze(), 'depth feat 1')
-            draw_axis(ax3, depthimg, 'depth images')
-            draw_axis(ax4, mixfeat, 'mix featmap')
-            draw_axis(ax5, rgbfeat, 'RGB featmap')
-            draw_axis(ax6, rgbdfeat, 'D+L+RGB featmap')
-            save_path = '/home/yan/Data2/d3s/images_featmap/%08d.png'%self.id
-            plt.savefig(save_path)
-            plt.close(f)
-        self.id += 1
 
         return out3
