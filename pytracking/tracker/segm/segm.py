@@ -28,6 +28,8 @@ class Segm(BaseTracker):
 
     def initialize(self, image, state, init_mask=None, *args, **kwargs):
 
+        if isinstance(image, dict):
+            image = image['color']
         # Initialize some stuff
         self.frame_num = 1
         # self.sequence_name = sequence_name
@@ -263,7 +265,9 @@ class Segm(BaseTracker):
             del self.joint_problem, self.joint_optimizer
 
     def track(self, image):
-
+        if isinstance(image, dict):
+            image = image['color']
+            
         self.frame_num += 1
 
         self.frame_name = '%08d' % self.frame_num

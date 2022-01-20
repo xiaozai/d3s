@@ -27,7 +27,7 @@ class BaseTracker:
         """Run tracker on a sequence."""
 
         # Initialize
-        image = self._read_image(sequence.frames[0])
+        image = self._read_image(sequence.frames[0], max_depth=sequence.max_depth)
 
         times = []
         start_time = time.time()
@@ -43,7 +43,7 @@ class BaseTracker:
         # Track
         tracked_bb = [sequence.init_state]
         for frame in sequence.frames[1:]:
-            image = self._read_image(frame)
+            image = self._read_image(frame, max_depth=sequence.max_depth)
 
             start_time = time.time()
             state = self.track(image)
@@ -247,7 +247,7 @@ class BaseTracker:
         self.pause_mode = False
 
         if self.params.debug == 5:
-            self.fig, (self.ax, self.ax_d, self.ax_m) = plt.subplots(1, 3)
+            self.fig, ((self.ax, self.ax_d, self.ax_initmask), (self.ax_m, self.ax_mrgb, self.ax_initmrgb)) = plt.subplots(2, 3)
         elif self.params.debug == 4:
             self.ax_m = None
             self.fig, (self.ax, self.ax_d) = plt.subplots(1, 2)
@@ -271,13 +271,27 @@ class BaseTracker:
             self.ax_d.cla()
             self.ax_d.imshow(depth)
         else:
+            if isinstance(image, dict):
+                image = image['color']
             self.ax.cla()
             self.ax.imshow(image)
 
         if self.params.debug == 5:
             self.ax_m.cla()
-            # self.ax_m.imshow(self.mask)
             self.ax_m.imshow(self.mask)
+            self.ax_m.set_title('predicted mask')
+
+            self.ax_mrgb.cla()
+            self.ax_mrgb.imshow(self.masked_img)
+            self.ax_mrgb.set_title('predicted mask over rgb')
+
+            self.ax_initmask.cla()
+            self.ax_initmask.imshow(self.init_mask)
+            self.ax_initmask.set_title('init mask')
+
+            # self.ax_initmrgb.cla()
+            # self.ax_initmrgb.imshow(self.init_masked_img)
+            # self.ax_initmrgb.set_title('init mask over rgb')
 
         if len(state) == 4:
             pred = patches.Rectangle((state[0], state[1]), state[2], state[3], linewidth=2, edgecolor='r', facecolor='none')
@@ -303,13 +317,12 @@ class BaseTracker:
         if self.pause_mode:
             plt.waitforbuttonpress()
 
-    def _read_image(self, image_file: str):
+    def _read_image(self, image_file: str, max_depth=1000):
         # return cv.cvtColor(cv.imread(image_file), cv.COLOR_BGR2RGB)
         if isinstance(image_file, dict):
             # For CDTB and DepthTrack RGBD datasets
             color = cv.cvtColor(cv.imread(image_file['color']), cv.COLOR_BGR2RGB)
             depth = cv.imread(image_file['depth'], -1)
-            max_depth = np.median(depth) * 1.5
             depth[depth > max_depth] = max_depth
             depth = cv.normalize(depth, None, alpha=0, beta=1, norm_type=cv.NORM_MINMAX, dtype=cv.CV_32F)
             depth = np.expand_dims(np.asarray(depth), axis=-1)

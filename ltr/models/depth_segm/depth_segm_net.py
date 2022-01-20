@@ -61,6 +61,7 @@ class DepthNet(nn.Module):
         feat1 = self.conv1(dp)
         feat2 = self.conv2(feat1)
         feat3 = self.conv3(feat2)
+        # out = F.softmax(feat3, dim=1)  # ????
         return feat3
 
 class DepthSegmNet(nn.Module):
@@ -112,18 +113,21 @@ class DepthSegmNet(nn.Module):
                           layer1 : [8, 256, 96, 96]
                           layer2 : [8, 512, 48, 48]
         '''
-        f_test_depth = self.depth_feat_extractor(depth_test_imgs)  # [B, 2, 384, 384] = F+B
-        # pred_sm = F.softmax(f_test_depth, dim=1)  # ????
+        f_test_d = self.depth_feat_extractor(depth_test_imgs)  # [B, 2, 384, 384] = F+B
+        #
+        # mask_pos_depth = F.interpolate(mask_train[0], size=(feat_train_d.shape[-2], feat_train_d.shape[-1])) # [B,1,H, W] -> [B,1,H',W']
+        # f_test_d = self.similarity_segmentation(f_test_d, feat_train_d, mask_pos_depth)
+
         ''' We assume that DepthFeat = F+P, concatenate with dist (location) map
             how about channel wise multiplication???
         '''
         if test_dist is not None:
             '''Song: we change the test_dist map into Guassian map instead of distance map '''
             # distance map is give - resize for mixer # concatenate inputs for mixer
-            dist = F.interpolate(test_dist[0], size=(f_test_depth.shape[-2], f_test_depth.shape[-1])) # [B,1,384,384]
-            segm_layers = torch.cat((f_test_depth, dist), dim=1)                                      # [B, C+1, 384, 384]
+            dist = F.interpolate(test_dist[0], size=(f_test_d.shape[-2], f_test_d.shape[-1])) # [B,1,384,384]
+            segm_layers = torch.cat((f_test_d, dist), dim=1)                                      # [B, C+1, 384, 384]
         else:
-            segm_layers = torch.cat((f_test_depth, f_test_depth[:, 0, :, :]), dim=1)                  # [B, 3, 384, 384]
+            segm_layers = torch.cat((f_test_d, f_test_d[:, 0, :, :]), dim=1)                  # [B, 3, 384, 384]
 
         # Mix DepthFeat and Location Map
         out_mix = self.mixer(segm_layers) # [B, 32, 384, 384]
@@ -147,3 +151,25 @@ class DepthSegmNet(nn.Module):
         out3 = self.post0(F.upsample(self.f0(feat_test_rgb[0]), scale_factor=2) + out2)
 
         return out3
+
+    def similarity_segmentation(self, f_test, f_train, mask_pos, topk=3):
+        '''Song's comments:
+            same as D3S similarity_segmentation,
+            but out = f_test * pos_similarity_map
+        '''
+        # first normalize train and test features to have L2 norm 1
+        # cosine similarity and reshape last two dimensions into one
+        sim = torch.einsum('ijkl,ijmn->iklmn',
+                           F.normalize(f_test, p=2, dim=1),
+                           F.normalize(f_train, p=2, dim=1))
+        sim_resh = sim.view(sim.shape[0], sim.shape[1], sim.shape[2], sim.shape[3] * sim.shape[4]) # [B, 24, 24, 24, 24] -> [B,24,24,576]
+        # reshape masks into vectors for broadcasting [B x 1 x 1 x w * h]
+        # re-weight samples (take out positive ang negative samples)
+        sim_pos = sim_resh * mask_pos.view(mask_pos.shape[0], 1, 1, -1) # [B,24,24,576] * [B,1,1,576] -> [1,24,24,576]
+        # take top k positive and negative examples
+        # mean over the top positive and negative examples
+        sim_pos = F.softmax(sim_pos, dim=-1)                            # [B, H, W, MN]
+        pos_map = torch.mean(torch.topk(sim_pos, topk, dim=-1).values, dim=-1) # [B, H, W, MN] -> [B, H, W, topk] -> [B, H, W, 1]
+        pos_map = torch.unsqueeze(torch.squeeze(pos_map), dim=1) # [B, 1, H, W]
+        out = f_test * pos_map # [B, C, H, W] * [B, 1, H, W] = [B, C, H, W]
+        return out

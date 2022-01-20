@@ -77,6 +77,7 @@ class DepthSegm(BaseTracker):
             # Get position and size
             self.pos = torch.Tensor([state[1] + state[3] / 2, state[0] + state[2] / 2])
             self.pos_prev = [state[1] + state[3] / 2, state[0] + state[2] / 2]
+            ''' Song : in RGBD long term the target_sz changes '''
             self.target_sz = torch.Tensor([state[3], state[2]])
             self.gt_poly = np.array([state[0], state[1],
                                      state[0] + state[2] - 1, state[1],
@@ -138,14 +139,9 @@ class DepthSegm(BaseTracker):
         self.init_learning()
 
         # Convert image
-        im = numpy_to_torch(color)
-        dp = numpy_to_torch(depth)
-        self.im = im  # For debugging only
-        self.dp = dp
-        # self.raw_mask = numpy_to_torch(init_mask)
-        # self.mask = numpy_to_torch(init_mask)
-        self.raw_mask = None
-        self.mask = None
+        im, dp = numpy_to_torch(color), numpy_to_torch(depth)
+        self.im, self.dp = im, dp  # For debugging only
+        self.raw_mask, self.mask = None, None
 
         # Setup scale bounds
         self.image_sz = torch.Tensor([im.shape[2], im.shape[3]])
@@ -338,7 +334,6 @@ class DepthSegm(BaseTracker):
         if new_pos[1] >= color.shape[1]:
             new_pos[1] = color.shape[1] - 1
 
-        print('frame: ', self.frame_name, ' uncert_score : ', uncert_score, 'vs ', self.params.uncertainty_segment_thr)
         pred_segm_region = None
         if self.segmentation_task or (
             self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
@@ -348,7 +343,6 @@ class DepthSegm(BaseTracker):
             pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
 
             if pred_segm_region is None:
-                print('pred_segm_region is None ....')
                 self.pos = new_pos.clone()
         else:
             self.pos = new_pos.clone()
@@ -749,6 +743,7 @@ class DepthSegm(BaseTracker):
         # Update scale
         if new_scale is not None:
             self.target_scale = new_scale.clamp(self.min_scale_factor, self.max_scale_factor)
+            ''' Song in LT tracking, target_sz changes too much'''
             self.target_sz = self.base_target_sz * self.target_scale
 
         # Update pos
@@ -786,7 +781,7 @@ class DepthSegm(BaseTracker):
         X, Y = np.meshgrid(x_, y_)
         # 1 - is needed since we need distance-like map (not Gaussian function)
         # return 1 - np.exp(-((np.power(X, p) / (sz_weight * w ** p)) + (np.power(Y, p) / (sz_weight * h ** p))))
-        return np.exp(-((np.power(X, p) / (sz_weight * w ** p)) + (np.power(Y, p) / (sz_weight * h ** p)))) # Song Yan edited it 
+        return np.exp(-((np.power(X, p) / (sz_weight * w ** p)) + (np.power(Y, p) / (sz_weight * h ** p)))) # Song Yan edited it
 
     def init_segmentation(self, color, depth, bb, init_mask=None):
 
@@ -893,6 +888,7 @@ class DepthSegm(BaseTracker):
         test_feat_segm_rgb = [feat for feat in train_feat_rgb.values()]
         train_masks = [init_mask_patch]
 
+        # Song : extract depth features
         train_feat_segm_d = segm_net.segm_predictor.depth_feat_extractor(init_patch_d)
 
         if init_mask is None:
@@ -907,7 +903,6 @@ class DepthSegm(BaseTracker):
                 # take only the positive channel as predicted segmentation mask
                 mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy()
                 mask = (mask > self.params.init_segm_mask_thr).astype(np.float32)
-
 
                 '''------------------------------------------------------------'''
                 self.raw_mask = mask
@@ -924,10 +919,17 @@ class DepthSegm(BaseTracker):
                 else:
                     mask = mask * init_mask_patch_np
 
-                self.mask = mask # Song
 
+                ''' Song : check init_mask from segm_net is correct or not '''
                 target_pixels = np.sum((mask > 0.5).astype(np.float32))
+                if target_pixels / (bb[2]*bb[3]*(patch_factor_init*patch_factor_init)+0.1) < 0.3:
+                    mask = (init_mask_patch_np > 0.1).astype(np.float32)
+                    target_pixels = np.sum((mask > 0.5).astype(np.float32))
+
+                self.mask = mask # Song
                 self.segm_init_target_pixels = target_pixels
+
+
 
                 if self.params.save_mask:
                     segm_crop_sz = math.ceil(math.sqrt(bb[2] * bb[3]) * self.params.segm_search_area_factor)
@@ -940,6 +942,7 @@ class DepthSegm(BaseTracker):
                 iters += 1
         else:
             init_mask_patch_np = (init_mask_patch_np > 0.1).astype(np.float32)
+            self.mask = init_mask_patch_np
             target_pixels = np.sum((init_mask_patch_np).astype(np.float32))
             self.segm_init_target_pixels = target_pixels
 
@@ -954,9 +957,11 @@ class DepthSegm(BaseTracker):
         if self.params.segm_use_dist:
             self.dist_map = dist_map
 
+        self.init_mask = mask
         self.mask_pixels = np.array([np.sum(mask)])
-        print('self.mask_pixels : ', self.mask_pixels)
         self.mask = mask
+        self.masked_img = init_patch_crop_rgb * np.expand_dims(mask, axis=-1)
+        self.init_masked_img = init_patch_crop_rgb * np.expand_dims(mask, axis=-1)
 
     def segment_target(self, color, depth, pos, sz):
         # pos and sz are in the image coordinates
@@ -1018,7 +1023,7 @@ class DepthSegm(BaseTracker):
         # softmax on the prediction (during training this is done internaly when calculating loss)
         # take only the positive channel as predicted segmentation mask
         mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy() # [1,2,384, 384] -> [384,384]
-        self.raw_mask = mask # Song : the mask not clear
+        self.raw_mask = mask # Song : the mask not clear , the area is sooo small???
         ''' Song wants to see the mask before contour'''
         if self.params.save_mask:
             save_mask(None, mask, segm_crop_sz, bb, color.shape[1], color.shape[0],
@@ -1029,6 +1034,7 @@ class DepthSegm(BaseTracker):
         '''Song's comment : mask > 0.5 ???  maybe it is too high and mask = zeros '''
         mask = (mask > self.params.segm_mask_thr).astype(np.uint8)
         self.mask = mask
+        self.masked_img = patch_rgb * np.expand_dims(mask, axis=-1)
 
         ''' Song's comment :
             it seems that after cv2.findContours, mask becomes zeros ...
@@ -1039,16 +1045,12 @@ class DepthSegm(BaseTracker):
             _, contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         cnt_area = [cv2.contourArea(cnt) for cnt in contours]
 
-        '''---------------------------------------------------------------'''
-        print('cnt_area : ', cnt_area, 'contours : ', len(contours), 'max cnt_area : ', np.max(cnt_area))
-
         ''' Song wants to see the mask before contour'''
         if self.params.save_mask:
             save_mask(None, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
                       self.params.masks_save_path, self.sequence_name+'_real', self.frame_name)
 
         cts = np.zeros(mask.shape, dtype=np.uint8)
-        print(np.argmax(cnt_area))
         cv2.drawContours(cts, contours, np.argmax(cnt_area), 1, thickness=2)
         self.contours = cts
         '''---------------------------------------------------------------'''
@@ -1063,7 +1065,6 @@ class DepthSegm(BaseTracker):
                           self.params.masks_save_path, self.sequence_name, self.frame_name)
 
         if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 50:  # 1000:
-            print('find a good cnt_area in the mask.....')
             contour = contours[np.argmax(cnt_area)]  # use max area polygon
             polygon = contour.reshape(-1, 2)
 

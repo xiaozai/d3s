@@ -1,5 +1,6 @@
 from pytracking.evaluation.environment import env_settings
-
+import cv2
+import numpy as np
 
 class BaseDataset:
     """Base class for all datasets."""
@@ -24,7 +25,21 @@ class Sequence:
         self.init_state = list(self.ground_truth_rect[0,:])
         self.object_class = object_class
 
+
+        ''' Song : added some term for RGBD'''
         self.init_mask = init_mask
+        self.max_depth = None # only for RGBD dataset
+
+        if isinstance(self.frames[0], dict) and ('depth' in self.frames[0]):
+            init_depth = cv2.imread(self.frames[0]['depth'], -1)
+            init_bbox = self.ground_truth_rect[0]
+            if len(init_bbox) == 4:
+                xywh = [int(float(b)) for b in init_bbox]
+                depth_crop = init_depth[xywh[1]:xywh[1]+xywh[3], xywh[0]:xywh[0]+xywh[2]]
+                depth_crop = np.nan_to_num(depth_crop)
+                self.max_depth = np.median(depth_crop[depth_crop>0]) * 1.5
+            else:
+                print('not implement for polygon groundtruth in RGBD datasets...')
 
 class SequenceList(list):
     """List of sequences. Supports the addition operator to concatenate sequence lists."""
