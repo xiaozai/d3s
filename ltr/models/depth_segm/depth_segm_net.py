@@ -49,9 +49,10 @@ class DepthNet(nn.Module):
         self.conv2 = conv(dims[0], dims[1], kernel_size=kernels[1], padding=pads[1])
         self.conv3 = conv_no_relu(dims[1], dims[2], kernel_size=kernels[2], padding=pads[2])
 
-        # self.pool1 = nn.AvgPool2d(2, stride=2)
-        # self.pool2 = nn.AvgPool2d(2, stride=2)
-        # self.pool3 = nn.AvgPool2d(2, stride=2)
+        # AvgPool2d , more smooth, MaxPool2d, more sharp
+        self.pool1 = nn.MaxPool2d(2, stride=2)
+        self.pool2 = nn.MaxPool2d(2, stride=2)
+        self.pool3 = nn.MaxPool2d(2, stride=2)
 
         self.initialize()
 
@@ -63,19 +64,19 @@ class DepthNet(nn.Module):
                     m.bias.data.zero_()
 
     def forward(self, dp):
-        feat1 = self.conv1(dp)     # [B, 1, 384, 384] -> [B, C, 384, 384]
-        feat1 = F.interpolate(feat1, size=(192, 192))
-        # feat1 = self.pool1(feat1)                  # B, C, 192, 192
+        feat1 = self.conv1(dp)     # [B, C, 384, 384]
+        # feat1 = F.interpolate(feat1, size=(192, 192))
+        feat1 = self.pool1(feat1)  # B, C, 192, 192
 
-        feat2 = self.conv2(feat1)  # [B, C, 384, 384] -> [B, C, 384, 384]
-        feat2 = F.interpolate(feat2, size=(96, 96))
-        # feat2 = self.pool2(feat2)                  # B, C, 96, 96
+        feat2 = self.conv2(feat1)
+        # feat2 = F.interpolate(feat2, size=(96, 96))
+        feat2 = self.pool2(feat2)  # B, C, 96, 96
 
-        feat3 = self.conv3(feat2)  # [B, C, 384, 384] -> [B, C, 384, 384]
-        feat3 = F.interpolate(feat3, size=(48, 48))
-        # feat3 = self.pool3(feat3)                  # B, C, 48, 48
+        feat3 = self.conv3(feat2)
+        # feat3 = F.interpolate(feat3, size=(48, 48))
+        feat3 = self.pool3(feat3)  # B, C, 48, 48
 
-        feat3 = F.softmax(feat3, dim=1)  # ?
+        # feat3 = F.softmax(feat3, dim=1)  # ?
 
         return feat3
 
@@ -116,10 +117,9 @@ class DepthSegmNet(nn.Module):
         self.post1 = conv(32, 32)
         self.post0 = conv_no_relu(32, 2)      # GT is the pair of Foreground and Background segmentations
 
-        self.initialize()
+        self.initialize_weights()
 
-    def initialize(self):
-        # Init weights
+    def initialize_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
                 nn.init.kaiming_normal_(m.weight.data, mode='fan_in')
@@ -161,8 +161,8 @@ class DepthSegmNet(nn.Module):
         # out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]) + out, scale_factor=8))
         # out2 = self.post1(F.upsample(self.f1(feat_test_rgb[1]), scale_factor=4) + out1)
         # out3 = self.post0(F.upsample(self.f0(feat_test_rgb[0]), scale_factor=2) + out2)
-        out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]) + out0, scale_factor=2))  # 48 -> 96
-        out2 = self.post1(F.upsample(self.f1(feat_test_rgb[1]) + out1, scale_factor=2)) # 96 -> 192
+        out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]) + out0, scale_factor=2))  # 48 ->  96
+        out2 = self.post1(F.upsample(self.f1(feat_test_rgb[1]) + out1, scale_factor=2)) #  96 -> 192
         out3 = self.post0(F.upsample(self.f0(feat_test_rgb[0]) + out2, scale_factor=2)) # 192 -> 384
 
         return out3
@@ -200,10 +200,7 @@ class DepthSegmNet(nn.Module):
         p = torch.cat((torch.unsqueeze(pos_map, -1), torch.unsqueeze(neg_map, -1)), dim=-1) # [B, H, W, 2]
         p = F.softmax(p, dim=-1)                                                # [1, 24, 24, 2]
 
-        ''' feat * similarity '''
-        # out_pos = f_test * torch.unsqueeze(pos_map, dim=1)                    # [B, C, H, W]
-        # out_neg = f_test * torch.unsqueeze(neg_map, dim=1)                    # [B, C, H, W]
-        #
-        # out = torch.cat((out_pos, out_neg), dim=1) # [B, 2*C, H, W]
-        out = f_test * torch.unsqueeze(p[:, :, :, 0] , dim=1)
-        return out
+        ''' feat * similarity of foreground '''
+        out_pos = f_test * torch.unsqueeze(p[:, :, :, 0], dim=1)
+        # out_neg = f_test * torch.unsqueeze(p[:, :, :, 1], dim=1)
+        return out_pos
