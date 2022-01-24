@@ -74,7 +74,7 @@ class DepthSegm(BaseTracker):
             state[0] -= 1
             state[1] -= 1
             # Get position and size
-            self.pos = torch.Tensor([state[1] + state[3] / 2, state[0] + state[2] / 2])
+            self.pos = torch.Tensor([state[1] + state[3] / 2, state[0] + state[2] / 2]) # [cy, cx]
             self.pos_prev = [state[1] + state[3] / 2, state[0] + state[2] / 2]
             ''' Song : in RGBD long term the target_sz changes '''
             self.target_sz = torch.Tensor([state[3], state[2]])
@@ -305,27 +305,31 @@ class DepthSegm(BaseTracker):
             del self.joint_problem, self.joint_optimizer
 
     def track(self, image):
-        self.debug_info = {}
+
+        self.debug_info = {} # added for redetection
 
         self.frame_num += 1
         self.frame_name = '%08d' % self.frame_num
         self.debug_info['frame_num'] = self.frame_num
 
-        self.pos_prev = [copy.copy(self.pos[0].item()), copy.copy(self.pos[1].item())]
+        self.pos_prev = [copy.copy(self.pos[0].item()), copy.copy(self.pos[1].item())] # [cy, cx]
+
+        # DAL LT settings
+        self.flag = 'noaction'
+        self.valid_d = True
+        self.tracker_fail = False
 
         # Convert image
         color, depth = image['color'], image['depth']
         im, dp = numpy_to_torch(color), numpy_to_torch(depth)
         self.im, self.dp = im, dp  # For debugging only
 
-        # DAL LT settings
-        self.flag = 'noaction'
-        self.valid_d = True
-        self.dimpfail_thistime = False
 
+        ''' Song :
+            normal progress : localization -> update
+            redetection     : redetection -> check -> update
+        '''
         # ------- LOCALIZATION ------- #
-        ''' Song : if not in redetection mode, proceed normal DCF localization,
-                        if found target, update self.pos '''
         if not self.redetection_mode:
             # Get sample
             sample_pos = copy.deepcopy(self.pos)
@@ -336,78 +340,69 @@ class DepthSegm(BaseTracker):
             scores_raw = self.apply_filter(test_x_rgb)
             translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
             new_pos = sample_pos + translation_vec
+            self.translation_vec = translation_vec
 
-            # just a sanity check so that it does not get out of image
-            if new_pos[0] < 0:
-                new_pos[0] = 0
-            if new_pos[1] < 0:
-                new_pos[1] = 0
-            if new_pos[0] >= color.shape[0]:
-                new_pos[0] = color.shape[0] - 1
-            if new_pos[1] >= color.shape[1]:
-                new_pos[1] = color.shape[1] - 1
+            # Localization uncertainty
+            max_score = torch.max(s).item()
+            uncert_score = 0
+            if self.frame_num > 5:
+                uncert_score = np.mean(self.scores) / max_score
 
+            self.uncert_score = uncert_score
+
+            if uncert_score < self.params.tracking_uncertainty_thr:
+                self.scores = np.append(self.scores, max_score)
+                if self.scores.size > self.params.response_budget_sz:
+                    self.scores = np.delete(self.scores, 0)
+
+            if flag == 'not_found':
+                uncert_score = 100
 
             # DAL LT settings
             self.debug_info['flag'] = flag
             self.flag = flag
 
-            # Update position and scale
+            # Song: we found the target, and will reset the pos
             if flag != 'not_found':
-                # Localization uncertainty
-                max_score = torch.max(s).item()
-                uncert_score = 0
-                if self.frame_num > 5:
-                    uncert_score = np.mean(self.scores) / max_score
 
-                self.uncert_score = uncert_score
-
+                # Update position and scale
                 if uncert_score < self.params.tracking_uncertainty_thr:
-                    self.scores = np.append(self.scores, max_score)
-                    if self.scores.size > self.params.response_budget_sz:
-                        self.scores = np.delete(self.scores, 0)
+                    if getattr(self.params, 'use_classifier', True):
+                        self.update_state(new_pos, sample_scales[scale_ind])
 
-            elif flag == 'not_found':
-                uncert_score = 100
+                # just a sanity check so that it does not get out of image
+                new_pos = self.pos_sanity_check(new_pos, color)
 
-            if uncert_score < self.params.tracking_uncertainty_thr:
-                if getattr(self.params, 'use_classifier', True):
-                    self.update_state(new_pos, sample_scales[scale_ind])
+                pred_segm_region = None
+                if self.segmentation_task or (
+                    self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
+                    pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
 
-
-            '''Song's comment: update self.pos by using segmentation'''
-            pred_segm_region = None
-            if self.segmentation_task or (
-                self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
-                pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
-
-                if pred_segm_region is None:
+                    if pred_segm_region is None:
+                        self.pos = new_pos.clone()
+                else:
                     self.pos = new_pos.clone()
-            else:
-                self.pos = new_pos.clone()
 
-
-            ''' Visualization '''
-            # if self.params.debug >= 2:
-            # if self.params.debug == 2:
-            #     show_tensor(s[scale_ind, ...], 5, title='Max score = {:.2f}'.format(torch.max(s[scale_ind, ...]).item()))
-
-            # Song
+            # Song : we need score_map for visualization and redetection
             self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy()
 
-        # End of Localization of DCF -------------------------------------------
+        # ----------- End of Localization -----------------------------#
 
 
-        ''' DAL LT settings '''
-        #measure the average depth
-        new_state = torch.cat((self.pos[[1,0]] - (self.target_sz[[1,0]]-1)/2, self.target_sz[[1,0]]))
-        dimp_bbox = new_state.tolist()
-        new_d     = self.avg_depth(depth[:,:,0], dimp_bbox)
-        self.valid_d   = self.valid_depth(new_d, self.history_info['depth'][-1])
 
-        new_dhist = self.hist_depth(depth[:,:,0], dimp_bbox)
+        ''' DAL LT settings
+            - depth
+            - dhist
+            - bhatta depth
+            - ratio
+        '''
+        # measure the average depth
+        new_bbox = torch.cat((self.pos[[1,0]] - (self.target_sz[[1,0]]-1)/2, self.target_sz[[1,0]])).tolist()
+        new_d = self.avg_depth(depth[:,:,0], new_bbox)
+        self.valid_d = self.valid_depth(new_d, self.history_info['depth'][-1])
+
+        new_dhist = self.hist_depth(depth[:,:,0], new_bbox)
         new_bhatta_depth=self.bhatta(new_dhist, self.history_info['depth_hist'][-1])
-        # self.valid_d   = new_bhatta_depth>=self.params.threshold_bhatta
         self.valid_d = np.all([self.bhatta(new_dhist,dhist)>=self.params.threshold_bhatta for dhist in self.history_info['depth_hist']])
 
         new_ratio = self.target_sz[0]/self.target_sz[1]
@@ -418,15 +413,16 @@ class DepthSegm(BaseTracker):
         change_ratio = abs(new_ratio-mean_historyratios)/mean_historyratios
 
         if change_ratio>0.50:#some bug?
-            self.target_sz=torch.FloatTensor(mean_target_sz)#self.history_info['target_sz'][-1]
+            self.target_sz=torch.FloatTensor(mean_target_sz)
 
         if self.frame_num<self.params.frames_true_validd:
             self.valid_d=True
 
-        if self.params.debug>=1:
+        if self.params.debug == 5:
             print(self.frame_num, 'score',self.score_map.max(),'bhatta_depth', new_bhatta_depth,'average depth', new_d, 'history_depth', self.history_info['depth'][-1], 'valid_d', self.valid_d)
             print('target_sz', self.target_sz, 'ratio_bbox', self.target_sz[0]/self.target_sz[1], 'base_target_sz', self.base_target_sz, 'target_scale', self.target_scale)
 
+        # update redetection parameters
         if (self.score_map.max()>=self.params.threshold_updatedepth) or (self.score_map.max()>=self.params.target_not_found_threshold and self.valid_d):
             self.history_info['depth'].append(new_d)
             if len(self.history_info['depth'])>self.params.num_history:#5:
@@ -451,11 +447,15 @@ class DepthSegm(BaseTracker):
 
         if (self.score_map.max()<self.params.threshold_force_redetection) or (self.flag=='not_found' and self.valid_d==False):
             self.redetection_mode=True
-            self.dimpfail_thistime=True
-            if self.params.debug>=1:
+            self.tracker_fail=True
+            if self.params.debug==5:
                 print('.........attention! next iter entering redetection model', self.frame_num, self.score_map.max())
 
-        # ------- redetection module ------- #
+
+
+
+        ''' redetection : use larget search scale '''
+        # ------------------- redetection module -------------- #
         if  self.redetection_mode:
             print('In redetection Mode.....')
             self.target_scale_redetection=self.target_scale_redetection*1.05 #slowing enlarge this area to the object
@@ -472,36 +472,49 @@ class DepthSegm(BaseTracker):
             new_pos_re = sample_pos_re + translation_vec
 
             # just a sanity check so that it does not get out of image
-            if new_pos_re[0] < 0:
-                new_pos_re[0] = 0
-            if new_pos_re[1] < 0:
-                new_pos_re[1] = 0
-            if new_pos_re[0] >= color.shape[0]:
-                new_pos_re[0] = color.shape[0] - 1
-            if new_pos_re[1] >= color.shape[1]:
-                new_pos_re[1] = color.shape[1] - 1
+            new_pos_re = self.pos_sanity_check(new_pos_re, color)
 
-            # Update position and scale
-            if flag != 'not_found':
-                # Localization uncertainty
-                max_score = torch.max(s).item()
-                uncert_score = 0
-                if self.frame_num > 5:
-                    uncert_score = np.mean(self.scores) / max_score
 
-                self.uncert_score = uncert_score
+            # Localization uncertainty
+            max_score = torch.max(s).item()
+            uncert_score = 0
+            if self.frame_num > 5:
+                uncert_score = np.mean(self.scores) / max_score
 
-                if uncert_score < self.params.tracking_uncertainty_thr:
-                    self.scores = np.append(self.scores, max_score)
-                    if self.scores.size > self.params.response_budget_sz:
-                        self.scores = np.delete(self.scores, 0)
-
-            elif flag == 'not_found':
-                uncert_score = 100
+            self.uncert_score = uncert_score
 
             if uncert_score < self.params.tracking_uncertainty_thr:
-                if getattr(self.params, 'use_classifier', True):
-                    self.update_state(new_pos, sample_scales[scale_ind])
+                self.scores = np.append(self.scores, max_score)
+                if self.scores.size > self.params.response_budget_sz:
+                    self.scores = np.delete(self.scores, 0)
+
+            if flag == 'not_found':
+                uncert_score = 100
+
+            # DAL LT settings
+            self.debug_info['flag'] = flag
+            self.flag = flag
+
+            # Song: target found, and will reset the pos
+            if flag != 'not_found':
+
+                # Update position and scale
+                if uncert_score < self.params.tracking_uncertainty_thr:
+                    if getattr(self.params, 'use_classifier', True):
+                        self.update_state(new_pos, sample_scales[scale_ind])
+
+                # just a sanity check so that it does not get out of image
+                new_pos = self.pos_sanity_check(new_pos, color)
+
+                pred_segm_region = None
+                if self.segmentation_task or (
+                    self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
+                    pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
+
+                    if pred_segm_region is None:
+                        self.pos = new_pos.clone()
+                else:
+                    self.pos = new_pos.clone()
 
 
             self.redetection_mode=True
@@ -511,6 +524,8 @@ class DepthSegm(BaseTracker):
                 self.redetection_mode=False
 
 
+
+            ''' target refound '''
             if self.redetection_mode==False: #target refound
                 if self.params.debug>=1:
                     print('.........attention!, target refound, next iter moving to dimp tracking',scores_re.max(), self.target_scale_redetection)
@@ -524,59 +539,52 @@ class DepthSegm(BaseTracker):
                 translation_vec2, scale_ind2, s2, flag2 = self.localize_target(scores_re2)
                 new_pos_re2 = sample_pos_re2 + translation_vec2
 
-
                 # just a sanity check so that it does not get out of image
-                if new_pos_re2[0] < 0:
-                    new_pos_re2[0] = 0
-                if new_pos_re2[1] < 0:
-                    new_pos_re2[1] = 0
-                if new_pos_re2[0] >= color.shape[0]:
-                    new_pos_re2[0] = color.shape[0] - 1
-                if new_pos_re2[1] >= color.shape[1]:
-                    new_pos_re2[1] = color.shape[1] - 1
+                new_pos_re2 = self.pos_sanity_check(new_pos_re2, color)
 
-                # Update position and scale
+
+                # Localization uncertainty
+                max_score = torch.max(s2).item()
+                uncert_score = 0
+                if self.frame_num > 5:
+                    uncert_score = np.mean(self.scores) / max_score
+
+                self.uncert_score = uncert_score
+
+                if uncert_score < self.params.tracking_uncertainty_thr:
+                    self.scores = np.append(self.scores, max_score)
+                    if self.scores.size > self.params.response_budget_sz:
+                        self.scores = np.delete(self.scores, 0)
+
+                if flag2 == 'not_found':
+                    uncert_score = 100
+
+                # Song: we found the target, and will reset the pos
                 if flag2 != 'not_found':
-                    # Localization uncertainty
-                    max_score2 = torch.max(s2).item()
-                    uncert_score2 = 0
-                    if self.frame_num > 5:
-                        uncert_score2 = np.mean(self.scores) / max_score2
 
-                    self.uncert_score = uncert_score2
+                    # Update position and scale
+                    if uncert_score < self.params.tracking_uncertainty_thr:
+                        if getattr(self.params, 'use_classifier', True):
+                            self.update_state(new_pos_re2, sample_scales2[scale_ind])
 
-                    if uncert_score2 < self.params.tracking_uncertainty_thr:
-                        self.scores = np.append(self.scores, max_score2)
-                        if self.scores.size > self.params.response_budget_sz:
-                            self.scores = np.delete(self.scores, 0)
+                    # just a sanity check so that it does not get out of image
+                    new_pos_re2 = self.pos_sanity_check(new_pos_re2, color)
 
-                elif flag == 'not_found':
-                    uncert_score2 = 100
+                    pred_segm_region = None
+                    if self.segmentation_task or (
+                        self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
+                        pred_segm_region = self.segment_target(color, depth, new_pos_re2, self.target_sz)
 
-                if uncert_score2 < self.params.tracking_uncertainty_thr:
-                    if getattr(self.params, 'use_classifier', True):
-                        self.update_state(new_pos_re2, sample_scales2[scale_ind2])
+                        if pred_segm_region is None:
+                            self.pos = new_pos_re2.clone()
+                    else:
+                        self.pos = new_pos_re2.clone()
 
 
-                '''Song's comment: update self.pos by using segmentation'''
-                pred_segm_region = None
-                if self.segmentation_task or (
-                    self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
-                    pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
-
-                    if pred_segm_region is None:
-                        self.pos = new_pos.clone()
-                else:
-                    self.pos = new_pos.clone()
 
                 # # Song
                 self.score_map = s2[scale_ind2, ...].squeeze().cpu().detach().numpy()
 
-
-                #update_scale_flag_re2 = getattr(self.params, 'update_scale_when_uncertain', True) or flag_re2 != 'uncertain'
-                #self.refine_target_box(backbone_feat_re2, sample_pos_re2[scale_ind_re2,:], sample_scales_re2[scale_ind_re2], scale_ind_re2, update_scale_flag_re2)
-
-                #print('redetectin 2: reset target_scale_redes', self.target_scale_redetection, self.target_scale)
                 self.target_scale_redetection=self.first_target_scale
                 self.target_scale=self.first_target_scale
                 self.redetection_mode=False
@@ -610,7 +618,7 @@ class DepthSegm(BaseTracker):
             # Update memory
             self.update_memory(train_x_rgb, train_y, learning_rate)
 
-        ''' Song update DCG '''
+        ''' Song update DCF '''
         # Train filter
         if hard_negative:
             self.filter_optimizer.run(self.params.hard_negative_CG_iter)
@@ -1411,6 +1419,19 @@ class DepthSegm(BaseTracker):
         w = s * (x2 - x1) + 1
         h = s * (y2 - y1) + 1
         return np.array([cx - w / 2, cy - h / 2, w, h])
+
+
+    def pos_sanity_check(self, new_pos, color):
+        # just a sanity check so that it does not get out of image
+        if new_pos[0] < 0:
+            new_pos[0] = 0
+        if new_pos[1] < 0:
+            new_pos[1] = 0
+        if new_pos[0] >= color.shape[0]:
+            new_pos[0] = color.shape[0] - 1
+        if new_pos[1] >= color.shape[1]:
+            new_pos[1] = color.shape[1] - 1
+        return new_pos
 
     def avg_depth(self, depth_im, bbox):
         #bbox [x0,y0,w,h]
