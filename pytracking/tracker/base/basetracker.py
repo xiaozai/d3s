@@ -247,7 +247,8 @@ class BaseTracker:
         self.pause_mode = False
 
         if self.params.debug == 5:
-            self.fig, ((self.ax, self.ax_d, self.ax_initmask), (self.ax_m, self.ax_mrgb, self.ax_initmrgb)) = plt.subplots(2, 3)
+            self.fig, ((self.ax, self.ax_d, self.ax_initmask), (self.ax_m, self.ax_mrgb, self.ax_score)) = plt.subplots(2, 3)
+
         elif self.params.debug == 4:
             self.ax_m = None
             self.fig, (self.ax, self.ax_d) = plt.subplots(1, 2)
@@ -289,9 +290,10 @@ class BaseTracker:
             self.ax_initmask.imshow(self.init_mask)
             self.ax_initmask.set_title('init mask')
 
-            # self.ax_initmrgb.cla()
-            # self.ax_initmrgb.imshow(self.init_masked_img)
-            # self.ax_initmrgb.set_title('init mask over rgb')
+            if self.score_map is not None:
+                self.ax_score.cla()
+                self.ax_score.imshow(self.score_map)
+                self.ax_score.set_title('score map')
 
         if len(state) == 4:
             pred = patches.Rectangle((state[0], state[1]), state[2], state[3], linewidth=2, edgecolor='r', facecolor='none')

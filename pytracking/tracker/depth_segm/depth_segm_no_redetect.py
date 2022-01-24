@@ -85,28 +85,6 @@ class DepthSegm(BaseTracker):
 
             self.rotated_bbox = False
 
-
-        ''' Long-term settings from DAL '''
-        init_bbox = state.copy()
-        init_bbox[0] = init_bbox[0] - 0.5 * init_bbox[2]
-        init_bbox[1] = init_bbox[1] - 0.5 * init_bbox[3]
-        depth_init = self.avg_depth(depth[:,:,0], init_bbox)   # depth H * W * 1
-        depth_hist_init=self.hist_depth(depth[:,:,0], init_bbox)
-
-        self.history_info = {'depth':[depth_init],\
-                             'depth_hist':[depth_hist_init], \
-                             'velocity':[0.0], \
-                             'ratio_bbox':[self.target_sz[0]/self.target_sz[1]],\
-                             'target_sz':[self.target_sz],\
-                             'pos':[self.pos] \
-                            }
-
-        print('init depth', depth_init,
-              'bhatta_depth', self.bhatta(depth_hist_init,depth_hist_init),
-              'ratio_bbox',self.history_info['ratio_bbox'][-1] )
-
-
-
         # Set search area
         self.target_scale = 1.0
         search_area = torch.prod(self.target_sz * self.params.search_area_scale).item()
@@ -114,14 +92,6 @@ class DepthSegm(BaseTracker):
             self.target_scale = math.sqrt(search_area / self.params.max_image_sample_size)
         elif search_area < self.params.min_image_sample_size:
             self.target_scale = math.sqrt(search_area / self.params.min_image_sample_size)
-
-
-        # Song use the redetection mode
-        self.first_target_scale=self.target_scale
-        self.target_scale_redetection=self.target_scale
-        self.redetection_mode=False
-
-
 
         # Target size in base scale
         self.base_target_sz = self.target_sz / self.target_scale
@@ -145,11 +115,6 @@ class DepthSegm(BaseTracker):
         self.feature_sz = self.params.features_filter.size(self.img_sample_sz)
         self.output_sz = self.params.score_upsample_factor * self.img_support_sz  # Interpolated size of the output
         self.kernel_size = self.fparams.attribute('kernel_size')
-
-
-
-
-
 
         # Optimization options
         self.params.precond_learning_rate = self.fparams.attribute('learning_rate')
@@ -305,11 +270,8 @@ class DepthSegm(BaseTracker):
             del self.joint_problem, self.joint_optimizer
 
     def track(self, image):
-        self.debug_info = {}
-
         self.frame_num += 1
         self.frame_name = '%08d' % self.frame_num
-        self.debug_info['frame_num'] = self.frame_num
 
         self.pos_prev = [copy.copy(self.pos[0].item()), copy.copy(self.pos[1].item())]
 
@@ -318,276 +280,85 @@ class DepthSegm(BaseTracker):
         im, dp = numpy_to_torch(color), numpy_to_torch(depth)
         self.im, self.dp = im, dp  # For debugging only
 
-        # DAL LT settings
-        self.flag = 'noaction'
-        self.valid_d = True
-        self.dimpfail_thistime = False
-
         # ------- LOCALIZATION ------- #
-        ''' Song : if not in redetection mode, proceed normal DCF localization,
-                        if found target, update self.pos '''
-        if not self.redetection_mode:
-            # Get sample
-            sample_pos = copy.deepcopy(self.pos)
-            sample_scales = self.target_scale * self.params.scale_factors
-            test_x_rgb, test_x_d = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
+        # Get sample
+        sample_pos = copy.deepcopy(self.pos)
+        sample_scales = self.target_scale * self.params.scale_factors
+        test_x_rgb, test_x_d = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
 
-            # Compute scores
-            scores_raw = self.apply_filter(test_x_rgb)
-            translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
-            new_pos = sample_pos + translation_vec
+        # Compute scores
+        scores_raw = self.apply_filter(test_x_rgb)
+        translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
+        new_pos = sample_pos + translation_vec
 
-            # just a sanity check so that it does not get out of image
-            if new_pos[0] < 0:
-                new_pos[0] = 0
-            if new_pos[1] < 0:
-                new_pos[1] = 0
-            if new_pos[0] >= color.shape[0]:
-                new_pos[0] = color.shape[0] - 1
-            if new_pos[1] >= color.shape[1]:
-                new_pos[1] = color.shape[1] - 1
-
-
-            # DAL LT settings
-            self.debug_info['flag'] = flag
-            self.flag = flag
-
-            # Update position and scale
-            if flag != 'not_found':
-                # Localization uncertainty
-                max_score = torch.max(s).item()
-                uncert_score = 0
-                if self.frame_num > 5:
-                    uncert_score = np.mean(self.scores) / max_score
-
-                self.uncert_score = uncert_score
-
-                if uncert_score < self.params.tracking_uncertainty_thr:
-                    self.scores = np.append(self.scores, max_score)
-                    if self.scores.size > self.params.response_budget_sz:
-                        self.scores = np.delete(self.scores, 0)
-
-            elif flag == 'not_found':
-                uncert_score = 100
-
-            if uncert_score < self.params.tracking_uncertainty_thr:
+        # Update position and scale
+        if flag != 'not_found':
+            #we found the target, we reset the s
+            self.target_scale_redetection=self.target_scale
+            if getattr(self.params, 'use_iou_net', True):
+                update_scale_flag = getattr(self.params, 'update_scale_when_uncertain', True) or flag != 'uncertain'
                 if getattr(self.params, 'use_classifier', True):
-                    self.update_state(new_pos, sample_scales[scale_ind])
+                    self.update_state(new_pos)
+                self.net.bb_regressor.test_depths=patches_d
+                self.refine_target_box(backbone_feat, sample_pos[scale_ind,:], sample_scales[scale_ind], scale_ind, update_scale_flag)
+            elif getattr(self.params, 'use_classifier', True):
+                self.update_state(new_pos, sample_scales[scale_ind])
 
+        # Localization uncertainty
+        max_score = torch.max(s).item()
+        uncert_score = 0
+        if self.frame_num > 5:
+            uncert_score = np.mean(self.scores) / max_score
 
-            '''Song's comment: update self.pos by using segmentation'''
-            pred_segm_region = None
-            if self.segmentation_task or (
-                self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
-                pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
+        self.uncert_score = uncert_score
 
-                if pred_segm_region is None:
-                    self.pos = new_pos.clone()
-            else:
-                self.pos = new_pos.clone()
+        if uncert_score < self.params.tracking_uncertainty_thr:
+            self.scores = np.append(self.scores, max_score)
+            if self.scores.size > self.params.response_budget_sz:
+                self.scores = np.delete(self.scores, 0)
 
+        if flag == 'not_found':
+            uncert_score = 100
 
-            ''' Visualization '''
-            # if self.params.debug >= 2:
-            # if self.params.debug == 2:
-            #     show_tensor(s[scale_ind, ...], 5, title='Max score = {:.2f}'.format(torch.max(s[scale_ind, ...]).item()))
+        # Update position and scale
+        # [AL] Modification
+        # if flag != 'not_found':
+        if uncert_score < self.params.tracking_uncertainty_thr:
+            if getattr(self.params, 'use_classifier', True):
+                self.update_state(new_pos, sample_scales[scale_ind])
 
-            # Song
+        # if self.params.debug >= 2:
+        if self.params.debug == 2:
+            show_tensor(s[scale_ind, ...], 5, title='Max score = {:.2f}'.format(torch.max(s[scale_ind, ...]).item()))
+
+        # Song
+        if self.params.debug == 5:
             self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy()
+        else:
+            self.score_map = None
 
-        # End of Localization of DCF -------------------------------------------
+        # just a sanity check so that it does not get out of image
+        if new_pos[0] < 0:
+            new_pos[0] = 0
+        if new_pos[1] < 0:
+            new_pos[1] = 0
+        if new_pos[0] >= color.shape[0]:
+            new_pos[0] = color.shape[0] - 1
+        if new_pos[1] >= color.shape[1]:
+            new_pos[1] = color.shape[1] - 1
 
+        pred_segm_region = None
+        if self.segmentation_task or (
+            self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
+            '''Song's comment:
+               update self.pos by using segmentation
+            '''
+            pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
 
-        ''' DAL LT settings '''
-        #measure the average depth
-        new_state = torch.cat((self.pos[[1,0]] - (self.target_sz[[1,0]]-1)/2, self.target_sz[[1,0]]))
-        dimp_bbox = new_state.tolist()
-        new_d     = self.avg_depth(depth[:,:,0], dimp_bbox)
-        self.valid_d   = self.valid_depth(new_d, self.history_info['depth'][-1])
-
-        new_dhist = self.hist_depth(depth[:,:,0], dimp_bbox)
-        new_bhatta_depth=self.bhatta(new_dhist, self.history_info['depth_hist'][-1])
-        # self.valid_d   = new_bhatta_depth>=self.params.threshold_bhatta
-        self.valid_d = np.all([self.bhatta(new_dhist,dhist)>=self.params.threshold_bhatta for dhist in self.history_info['depth_hist']])
-
-        new_ratio = self.target_sz[0]/self.target_sz[1]
-        mean_historyratios=np.mean(self.history_info['ratio_bbox'])
-        mean_h =np.mean([bbox[0] for bbox in self.history_info['target_sz']])
-        mean_w =np.mean([bbox[1] for bbox in self.history_info['target_sz']])
-        mean_target_sz=[mean_h, mean_w]
-        change_ratio = abs(new_ratio-mean_historyratios)/mean_historyratios
-
-        if change_ratio>0.50:#some bug?
-            self.target_sz=torch.FloatTensor(mean_target_sz)#self.history_info['target_sz'][-1]
-
-        if self.frame_num<self.params.frames_true_validd:
-            self.valid_d=True
-
-        if self.params.debug>=1:
-            print(self.frame_num, 'score',self.score_map.max(),'bhatta_depth', new_bhatta_depth,'average depth', new_d, 'history_depth', self.history_info['depth'][-1], 'valid_d', self.valid_d)
-            print('target_sz', self.target_sz, 'ratio_bbox', self.target_sz[0]/self.target_sz[1], 'base_target_sz', self.base_target_sz, 'target_scale', self.target_scale)
-
-        if (self.score_map.max()>=self.params.threshold_updatedepth) or (self.score_map.max()>=self.params.target_not_found_threshold and self.valid_d):
-            self.history_info['depth'].append(new_d)
-            if len(self.history_info['depth'])>self.params.num_history:#5:
-                self.history_info['depth']=self.history_info['depth'][-self.params.num_history:]
-
-            self.history_info['depth_hist'].append(new_dhist)
-            if len(self.history_info['depth_hist'])>self.params.num_history:#5:
-                self.history_info['depth_hist']=self.history_info['depth_hist'][-self.params.num_history:]
-
-            self.history_info['target_sz'].append(self.target_sz)
-            if len(self.history_info['target_sz'])>self.params.num_history:#3:
-                self.history_info['target_sz']=self.history_info['target_sz'][-self.params.num_history:]
-
-            new_ratio=self.target_sz[0]/self.target_sz[1]
-            self.history_info['ratio_bbox'].append(new_ratio)
-            if len(self.history_info['ratio_bbox'])>self.params.num_history:#3:
-                self.history_info['ratio_bbox']=self.history_info['ratio_bbox'][-self.params.num_history:]
-
-            self.history_info['pos'].append(self.pos)
-            if len(self.history_info['pos'])>self.params.num_history:#3:
-                self.history_info['pos']=self.history_info['pos'][-self.params.num_history:]
-
-        if (self.score_map.max()<self.params.threshold_force_redetection) or (self.flag=='not_found' and self.valid_d==False):
-            self.redetection_mode=True
-            self.dimpfail_thistime=True
-            if self.params.debug>=1:
-                print('.........attention! next iter entering redetection model', self.frame_num, self.score_map.max())
-
-        # ------- redetection module ------- #
-        if  self.redetection_mode:
-            print('In redetection Mode.....')
-            self.target_scale_redetection=self.target_scale_redetection*1.05 #slowing enlarge this area to the object
-            self.target_scale_redetection=max(self.target_scale_redetection, self.min_scale_factor)
-            self.target_scale_redetection=min(self.target_scale_redetection, 2*self.first_target_scale)
-
-            # Get sample
-            sample_pos_re = deepcopy(self.pos)
-            sample_scales = self.target_scale_redetection*self.params.scale_factors
-            test_x_rgb, test_x_d = self.extract_processed_sample(im, dp, sample_pos_re, sample_scales, self.img_sample_sz)
-            # Compute scores
-            scores_re = self.apply_filter(test_x_rgb)
-            translation_vec, scale_ind, s, flag = self.localize_target(scores_re)
-            new_pos_re = sample_pos_re + translation_vec
-
-            # just a sanity check so that it does not get out of image
-            if new_pos_re[0] < 0:
-                new_pos_re[0] = 0
-            if new_pos_re[1] < 0:
-                new_pos_re[1] = 0
-            if new_pos_re[0] >= color.shape[0]:
-                new_pos_re[0] = color.shape[0] - 1
-            if new_pos_re[1] >= color.shape[1]:
-                new_pos_re[1] = color.shape[1] - 1
-
-            # Update position and scale
-            if flag != 'not_found':
-                # Localization uncertainty
-                max_score = torch.max(s).item()
-                uncert_score = 0
-                if self.frame_num > 5:
-                    uncert_score = np.mean(self.scores) / max_score
-
-                self.uncert_score = uncert_score
-
-                if uncert_score < self.params.tracking_uncertainty_thr:
-                    self.scores = np.append(self.scores, max_score)
-                    if self.scores.size > self.params.response_budget_sz:
-                        self.scores = np.delete(self.scores, 0)
-
-            elif flag == 'not_found':
-                uncert_score = 100
-
-            if uncert_score < self.params.tracking_uncertainty_thr:
-                if getattr(self.params, 'use_classifier', True):
-                    self.update_state(new_pos, sample_scales[scale_ind])
-
-
-            self.redetection_mode=True
-            if scores_re.max()>=self.params.target_refound_threshold and self.valid_d:
-                self.redetection_mode=False
-            if scores_re.max()>=self.params.target_forcerefound_threshold:
-                self.redetection_mode=False
-
-
-            if self.redetection_mode==False: #target refound
-                if self.params.debug>=1:
-                    print('.........attention!, target refound, next iter moving to dimp tracking',scores_re.max(), self.target_scale_redetection)
-
-                # Get sample
-                sample_pos_re = deepcopy(self.pos)
-                sample_scales2 = self.target_scale*self.params.scale_factors
-                test_x_rgb2, test_x_d2 = self.extract_processed_sample(im, dp, sample_pos_re, sample_scales2, self.img_sample_sz)
-                # Compute scores
-                scores_re2 = self.apply_filter(test_x_rgb2)
-                translation_vec2, scale_ind2, s2, flag2 = self.localize_target(scores_re2)
-                new_pos_re2 = sample_pos_re2 + translation_vec2
-
-
-                # just a sanity check so that it does not get out of image
-                if new_pos_re2[0] < 0:
-                    new_pos_re2[0] = 0
-                if new_pos_re2[1] < 0:
-                    new_pos_re2[1] = 0
-                if new_pos_re2[0] >= color.shape[0]:
-                    new_pos_re2[0] = color.shape[0] - 1
-                if new_pos_re2[1] >= color.shape[1]:
-                    new_pos_re2[1] = color.shape[1] - 1
-
-                # Update position and scale
-                if flag2 != 'not_found':
-                    # Localization uncertainty
-                    max_score2 = torch.max(s2).item()
-                    uncert_score2 = 0
-                    if self.frame_num > 5:
-                        uncert_score2 = np.mean(self.scores) / max_score2
-
-                    self.uncert_score = uncert_score2
-
-                    if uncert_score2 < self.params.tracking_uncertainty_thr:
-                        self.scores = np.append(self.scores, max_score2)
-                        if self.scores.size > self.params.response_budget_sz:
-                            self.scores = np.delete(self.scores, 0)
-
-                elif flag == 'not_found':
-                    uncert_score2 = 100
-
-                if uncert_score2 < self.params.tracking_uncertainty_thr:
-                    if getattr(self.params, 'use_classifier', True):
-                        self.update_state(new_pos_re2, sample_scales2[scale_ind2])
-
-
-                '''Song's comment: update self.pos by using segmentation'''
-                pred_segm_region = None
-                if self.segmentation_task or (
-                    self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
-                    pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
-
-                    if pred_segm_region is None:
-                        self.pos = new_pos.clone()
-                else:
-                    self.pos = new_pos.clone()
-
-                # # Song
-                self.score_map = s2[scale_ind2, ...].squeeze().cpu().detach().numpy()
-
-
-                #update_scale_flag_re2 = getattr(self.params, 'update_scale_when_uncertain', True) or flag_re2 != 'uncertain'
-                #self.refine_target_box(backbone_feat_re2, sample_pos_re2[scale_ind_re2,:], sample_scales_re2[scale_ind_re2], scale_ind_re2, update_scale_flag_re2)
-
-                #print('redetectin 2: reset target_scale_redes', self.target_scale_redetection, self.target_scale)
-                self.target_scale_redetection=self.first_target_scale
-                self.target_scale=self.first_target_scale
-                self.redetection_mode=False
-
-
-
-
-
-
-
-
+            if pred_segm_region is None:
+                self.pos = new_pos.clone()
+        else:
+            self.pos = new_pos.clone()
 
         # ------- UPDATE ------- #
 
@@ -595,8 +366,6 @@ class DepthSegm(BaseTracker):
         update_flag = flag not in ['not_found', 'uncertain']
         hard_negative = (flag == 'hard_negative')
         learning_rate = self.params.hard_negative_learning_rate if hard_negative else None
-
-        goodscore_flag = self.score_map.max()>=self.params.threshold_allowupdateclassifer
 
         # [AL] Modification
         # if update_flag:
@@ -610,7 +379,6 @@ class DepthSegm(BaseTracker):
             # Update memory
             self.update_memory(train_x_rgb, train_y, learning_rate)
 
-        ''' Song update DCG '''
         # Train filter
         if hard_negative:
             self.filter_optimizer.run(self.params.hard_negative_CG_iter)
