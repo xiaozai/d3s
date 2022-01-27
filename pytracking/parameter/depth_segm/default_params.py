@@ -73,7 +73,7 @@ def parameters():
 
     # Advanced localization parameters
     params.advanced_localization = True         # Use this or not
-    params.target_not_found_threshold = -1      # Absolute score threshold to detect target missing
+    params.target_not_found_threshold = 0.25 # -1      # Absolute score threshold to detect target missing
     params.distractor_threshold = 100           # Relative threshold to find distractors
     params.hard_negative_threshold = 0.3        # Relative threshold to find hard negative samples
 
@@ -91,6 +91,7 @@ def parameters():
     params.threshold_updatedepth = 0.80
     params.threshold_force_redetection = 0.20
     params.threshold_allowupdateclassifer = 0.30
+    params.threshold_bhatta = 0.8
 
 
     # Setup the feature extractor (which includes the IoUNet)
