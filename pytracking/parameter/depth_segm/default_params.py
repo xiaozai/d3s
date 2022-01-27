@@ -73,12 +73,12 @@ def parameters():
 
     # Advanced localization parameters
     params.advanced_localization = True         # Use this or not
-    params.target_not_found_threshold = 0.25 # -1      # Absolute score threshold to detect target missing
-    params.distractor_threshold = 0.8 # 100           # Relative threshold to find distractors
-    params.hard_negative_threshold = 0.5 # 0.3        # Relative threshold to find hard negative samples
+    params.target_not_found_threshold = -1      # Absolute score threshold to detect target missing
+    params.distractor_threshold = 100           # Relative threshold to find distractors
+    params.hard_negative_threshold = 0.3        # Relative threshold to find hard negative samples
 
     params.target_neighborhood_scale = 2.2      # Target neighborhood to remove
-    params.dispalcement_scale = 0.8 # 0.7             # Dispacement to consider for distractors
+    params.dispalcement_scale = 0.7             # Dispacement to consider for distractors
     params.hard_negative_learning_rate = 0.02   # Learning rate if hard negative detected
     params.hard_negative_CG_iter = 5            # Number of optimization iterations to use if hard negative detected
     params.update_scale_when_uncertain = False # True   # Update scale or not if distractor is close

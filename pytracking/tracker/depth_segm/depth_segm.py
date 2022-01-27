@@ -450,7 +450,7 @@ class DepthSegm(BaseTracker):
         self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy()
         self.flag = flag
 
-        return score_raw
+        return scores_raw
 
 
 
@@ -1407,7 +1407,7 @@ class DepthSegm(BaseTracker):
         hist,_=np.histogram(depth_inbox, bins=np.arange(0,8,0.1), density=True)
 
         return hist
-        
+
     def valid_depth(self, depth_a, history_depth):
         ''' check depth value is valid or not , check the depth change exceed the percentage'''
         depth_margin = 0.6#600
