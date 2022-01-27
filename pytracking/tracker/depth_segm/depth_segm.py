@@ -522,7 +522,7 @@ class DepthSegm(BaseTracker):
         goodscore_flag = self.score_map.max()>=self.params.threshold_allowupdateclassifer # 0.3
 
         # Song : update train_x and train_y , only if it is suitable to update
-        if uncert_score < self.params.tracking_uncertainty_thr \
+        if self.uncert_score < self.params.tracking_uncertainty_thr \
            and update_flag \
            and goodscore_flag \
            and self.redetection_mode==False \
