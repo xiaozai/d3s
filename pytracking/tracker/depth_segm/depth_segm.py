@@ -425,6 +425,8 @@ class DepthSegm(BaseTracker):
         if flag == 'not_found':
             uncert_score = 100
 
+        pred_segm_region = None
+
         # Song: we found the target, and will reset the pos
         if flag != 'not_found':
 
@@ -436,7 +438,6 @@ class DepthSegm(BaseTracker):
             # just a sanity check so that it does not get out of image
             new_pos = self.pos_sanity_check(new_pos, color)
 
-            pred_segm_region = None
             if self.segmentation_task or (
                 self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
                 pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
@@ -450,7 +451,7 @@ class DepthSegm(BaseTracker):
         self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy()
         self.flag = flag
 
-        return scores_raw
+        return scores_raw, pred_segm_region
 
 
 
@@ -474,10 +475,10 @@ class DepthSegm(BaseTracker):
         im, dp = numpy_to_torch(color), numpy_to_torch(depth)
         self.im, self.dp = im, dp  # For debugging only
 
-
+        pred_segm_region = None
         # ------- LOCALIZATION ------- #
         if not self.redetection_mode:
-            score_raw = self.one_pass_track(color, depth, self.target_scale)
+            score_ra, pred_segm_region = self.one_pass_track(color, depth, self.target_scale)
         # ---- End of Localization ----#
 
         # --- check longterm settings ---#
@@ -490,7 +491,7 @@ class DepthSegm(BaseTracker):
             self.target_scale_redetection=max(self.target_scale_redetection, self.min_scale_factor)
             self.target_scale_redetection=min(self.target_scale_redetection, 2*self.first_target_scale)
 
-            scores_re, scale_ind = self.one_pass_track(color, depth, self.target_scale_redetection)
+            scores_re, pred_segm_region = self.one_pass_track(color, depth, self.target_scale_redetection)
 
             self.redetection_mode=True
             # DAL longter settings, target re-detected conditions
@@ -505,7 +506,7 @@ class DepthSegm(BaseTracker):
                 if self.params.debug==5:
                     print('.........attention!, target refound, next iter moving to normal tracking',scores_re.max(), self.target_scale_redetection)
 
-                scores_re2 = self.one_pass_track(color, depth, self.target_scale)
+                scores_re2, pred_segm_region = self.one_pass_track(color, depth, self.target_scale)
 
                 self.target_scale_redetection=self.first_target_scale
                 self.target_scale=self.first_target_scale
