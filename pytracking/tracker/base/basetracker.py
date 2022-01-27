@@ -298,9 +298,11 @@ class BaseTracker:
 
         if len(state) == 4:
             pred = patches.Rectangle((state[0], state[1]), state[2], state[3], linewidth=2, edgecolor='r', facecolor='none')
+            pred_d = patches.Rectangle((state[0], state[1]), state[2], state[3], linewidth=2, edgecolor='r', facecolor='none')
         elif len(state) == 8:
             p_ = np.array(state).reshape((4, 2))
             pred = patches.Polygon(p_, linewidth=2, edgecolor='r', facecolor='none')
+            pred_d = patches.Polygon(p_, linewidth=2, edgecolor='r', facecolor='none')
         else:
             print('Error: Unknown prediction region format.')
             exit(-1)
@@ -308,7 +310,7 @@ class BaseTracker:
         self.ax.add_patch(pred)
 
         if self.params.debug == 5:
-            self.ax_d.add_patch(pred)
+            self.ax_d.add_patch(pred_d)
 
         if hasattr(self, 'gt_state') and False:
             gt_state = self.gt_state
