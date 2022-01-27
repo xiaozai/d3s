@@ -540,7 +540,7 @@ class DepthSegm(BaseTracker):
             # Compute scores
             scores_raw = self.apply_filter(test_x_rgb)
             translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
-            # print('flag when update : ', flag)
+        
             # Get train sample
             train_x_rgb = TensorList([x[scale_ind:scale_ind + 1, ...] for x in test_x_rgb])
 
