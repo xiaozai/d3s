@@ -267,7 +267,7 @@ class Segm(BaseTracker):
     def track(self, image):
         if isinstance(image, dict):
             image = image['color']
-            
+
         self.frame_num += 1
 
         self.frame_name = '%08d' % self.frame_num
@@ -367,7 +367,7 @@ class Segm(BaseTracker):
 
         # Return new state
         new_state = torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]]))
-        return new_state.tolist()
+        return new_state.tolist(), 1
 
     def apply_filter(self, sample_x: TensorList):
         return operation.conv2d(sample_x, self.filter, mode='same')

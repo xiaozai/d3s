@@ -42,19 +42,21 @@ class BaseTracker:
 
         # Track
         tracked_bb = [sequence.init_state]
+        tracked_conf = [1]
         for frame in sequence.frames[1:]:
             image = self._read_image(frame, max_depth=sequence.max_depth)
 
             start_time = time.time()
-            state = self.track(image)
+            state, conf = self.track(image)
             times.append(time.time() - start_time)
 
             tracked_bb.append(state)
+            tracked_conf.append(conf)
 
             if self.params.visualization:
                 self.visualize(image, state)
 
-        return tracked_bb, times
+        return tracked_bb, times, tracked_conf
 
     def track_videofile(self, videofilepath, optional_box=None):
         """Run track with a video file input."""
