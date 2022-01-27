@@ -550,6 +550,28 @@ class DepthSegm(BaseTracker):
             # Update memory
             self.update_memory(train_x_rgb, train_y, learning_rate)
 
+            ''' Song : should we update train rgb and d feat ???
+            when target rotate in the plane, mask does not work
+
+            self.train_feat_segm_rgb, self.train_feat_segm_d,
+
+            train_feat_rgb = segm_net.extract_backbone_features(init_patch_rgb)
+
+            # prepare features in the list (format for the network)
+            train_feat_segm_rgb = [feat for feat in train_feat_rgb.values()]
+            test_feat_segm_rgb = [feat for feat in train_feat_rgb.values()]
+            train_masks = [init_mask_patch]
+
+            # Song : extract depth features
+            train_feat_segm_d = segm_net.segm_predictor.depth_feat_extractor(init_patch_d)
+
+
+            how to merget init mask and tempory mask ? -> iou merge mask ????
+
+            self.train_feat_segm_rgb = self.init_train_feat_segm_rgb * 0.6 + temporay_train_feat_segm_rgb * 0.4？
+
+            '''
+
         # Train filter
         if hard_negative:
             self.filter_optimizer.run(self.params.hard_negative_CG_iter)
@@ -1232,10 +1254,10 @@ class DepthSegm(BaseTracker):
             _, contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         cnt_area = [cv2.contourArea(cnt) for cnt in contours]
 
-        ''' Song wants to see the mask before contour'''
-        if self.params.save_mask:
-            save_mask(None, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
-                      self.params.masks_save_path, self.sequence_name+'_real', self.frame_name)
+        # ''' Song wants to see the mask before contour'''
+        # if self.params.save_mask:
+        #     save_mask(None, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
+        #               self.params.masks_save_path, self.sequence_name+'_real', self.frame_name)
 
         if len(cnt_area):
             cts = np.zeros(mask.shape, dtype=np.uint8)
