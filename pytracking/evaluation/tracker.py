@@ -28,7 +28,7 @@ class Tracker:
         tracker_module = importlib.import_module('pytracking.tracker.{}'.format(self.name))
 
         self.parameters = self.get_parameters()
-    
+
         self.tracker_class = tracker_module.get_tracker_class() # depth_segm
 
         self.default_visualization = getattr(self.parameters, 'visualization', False)
@@ -56,11 +56,12 @@ class Tracker:
 
         tracker = self.tracker_class(self.parameters)
 
-        output_bb, execution_times = tracker.track_sequence(seq)
+        output_bb, execution_times, tracked_conf = tracker.track_sequence(seq)
 
         self.parameters.free_memory()
 
-        return output_bb, execution_times
+        return output_bb, execution_times, tracked_conf
+        
     def run_video(self, videofilepath, optional_box=None, debug=None):
         """Run the tracker with the vieofile.
         args:
