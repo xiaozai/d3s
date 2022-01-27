@@ -642,7 +642,7 @@ class DepthSegm(BaseTracker):
 
         print('localize_advanced : max_score2 vs max_score1 ', max_score2, max_score1)
         print('target_not_found_threshold : ', self.params.target_not_found_threshold)
-        
+
         # Handle the different cases
         if max_score2 > self.params.distractor_threshold * max_score1:
             disp_norm1 = torch.sqrt(torch.sum(target_disp1 ** 2))
@@ -1380,6 +1380,34 @@ class DepthSegm(BaseTracker):
             return -1.
         return avg_depth
 
+    def hist_depth(self, depth_im, bbox):
+        #bbox [x0,y0,w,h]
+        # get center around depth
+        cx, cy = bbox[0]+bbox[2]/2, bbox[1] + bbox[2]/2
+
+        def shrink_box(bbox, mh, mw, r=0.4):
+            w, h = (1-r) * bbox[2], (1-r) * bbox[3]
+            if w<2 or h<2:
+                lx = max(cx-w/2, 0)
+                ly = max(cy-h/2, 0)
+                return [lx, ly, bbox[2], bbox[3]]
+            else:
+                lx = max(cx-w/2, 0)
+                ly = max(cy-h/2, 0)
+                w = min(w, mw - w)
+                h = min(h, mh - h)
+                return [lx, ly, w, h]
+
+        h, w = depth_im.shape
+        shrink_box = shrink_box(bbox, h, w, r=0.4)
+        shrink_box = np.asarray(shrink_box).astype(np.int16)
+        depth_im[np.isnan(depth_im)]=8.0
+        depth_inbox = depth_im[shrink_box[1]:(shrink_box[1]+shrink_box[3]),shrink_box[0]:(shrink_box[0]+shrink_box[2])]
+        depth_inbox = depth_inbox.flatten()
+        hist,_=np.histogram(depth_inbox, bins=np.arange(0,8,0.1), density=True)
+
+        return hist
+        
     def valid_depth(self, depth_a, history_depth):
         ''' check depth value is valid or not , check the depth change exceed the percentage'''
         depth_margin = 0.6#600
