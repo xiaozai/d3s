@@ -75,7 +75,7 @@ class DepthSegm(BaseTracker):
             state[1] -= 1
             # Get position and size
             self.pos = torch.Tensor([state[1] + state[3] / 2, state[0] + state[2] / 2]) # [cy, cx]
-            self.pos_prev = [state[1] + state[3] / 2, state[0] + state[2] / 2]
+            # self.pos_prev = [state[1] + state[3] / 2, state[0] + state[2] / 2]
             ''' Song : in RGBD long term the target_sz changes '''
             self.target_sz = torch.Tensor([state[3], state[2]])
             self.gt_poly = np.array([state[0], state[1],
@@ -101,9 +101,10 @@ class DepthSegm(BaseTracker):
                              'pos':[self.pos] \
                             }
 
-        print('init depth', depth_init,
-              'bhatta_depth', self.bhatta(depth_hist_init,depth_hist_init),
-              'ratio_bbox',self.history_info['ratio_bbox'][-1] )
+        if self.params.debug == 5:
+            print('init depth', depth_init,
+                  'bhatta_depth', self.bhatta(depth_hist_init,depth_hist_init),
+                  'ratio_bbox',self.history_info['ratio_bbox'][-1] )
 
 
 
@@ -310,12 +311,14 @@ class DepthSegm(BaseTracker):
         # measure the average depth
         new_bbox = torch.cat((self.pos[[1,0]] - (self.target_sz[[1,0]]-1)/2, self.target_sz[[1,0]])).tolist()
         new_d = self.avg_depth(depth[:,:,0], new_bbox)
-        self.valid_d = self.valid_depth(new_d, self.history_info['depth'][-1])
+        self.valid_d = self.valid_depth(new_d, self.history_info['depth'][-1]) # what is the meaning of this???
+        print('avg-depth : ', self.valid_d)
 
         new_dhist = self.hist_depth(depth[:,:,0], new_bbox)
         new_bhatta_depth=self.bhatta(new_dhist, self.history_info['depth_hist'][-1])
         self.valid_d = np.all([self.bhatta(new_dhist,dhist)>=self.params.threshold_bhatta for dhist in self.history_info['depth_hist']])
-
+        print('bhatta depth :', self.valid_d)
+        
         new_ratio = self.target_sz[0]/self.target_sz[1]
         mean_historyratios=np.mean(self.history_info['ratio_bbox'])
         mean_h =np.mean([bbox[0] for bbox in self.history_info['target_sz']])
@@ -336,7 +339,9 @@ class DepthSegm(BaseTracker):
                   'base_target_sz', self.base_target_sz, 'target_scale', self.target_scale)
 
         # update redetection parameters
-        if (self.score_map.max()>=self.params.threshold_updatedepth) or (self.score_map.max()>=self.params.target_not_found_threshold and self.valid_d):
+        if (self.score_map.max()>=self.params.threshold_updatedepth) \
+            or (self.score_map.max()>=self.params.target_not_found_threshold and self.valid_d):
+
             self.history_info['depth'].append(new_d)
             if len(self.history_info['depth'])>self.params.num_history:#5:
                 self.history_info['depth']=self.history_info['depth'][-self.params.num_history:]
@@ -359,8 +364,10 @@ class DepthSegm(BaseTracker):
                 self.history_info['pos']=self.history_info['pos'][-self.params.num_history:]
 
         if (self.score_map.max()<self.params.threshold_force_redetection) or (self.flag=='not_found' and self.valid_d==False):
+
             self.redetection_mode=True
-            self.tracker_fail=True
+            # self.tracker_fail=True
+
             if self.params.debug==5:
                 print('.........attention! next iter entering redetection model', self.frame_num, self.score_map.max())
 
@@ -399,10 +406,6 @@ class DepthSegm(BaseTracker):
         if flag == 'not_found':
             uncert_score = 100
 
-        # DAL LT settings
-        self.debug_info['flag'] = flag
-        self.flag = flag
-
         # Song: we found the target, and will reset the pos
         if flag != 'not_found':
 
@@ -426,23 +429,26 @@ class DepthSegm(BaseTracker):
 
         # Song : we need score_map for visualization and redetection
         self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy()
+        self.flag = flag
 
         return score_raw
 
+
+
     def track(self, image):
 
-        self.debug_info = {} # added for redetection
+        # self.debug_info = {} # added for redetection
 
         self.frame_num += 1
         self.frame_name = '%08d' % self.frame_num
-        self.debug_info['frame_num'] = self.frame_num
+        # self.debug_info['frame_num'] = self.frame_num
 
-        self.pos_prev = [copy.copy(self.pos[0].item()), copy.copy(self.pos[1].item())] # [cy, cx]
+        # self.pos_prev = [copy.copy(self.pos[0].item()), copy.copy(self.pos[1].item())] # [cy, cx]
 
         # DAL LT settings
         self.flag = 'noaction'
         self.valid_d = True
-        self.tracker_fail = False
+        # self.tracker_fail = False
 
         # Convert image
         color, depth = image['color'], image['depth']
@@ -1351,13 +1357,14 @@ class DepthSegm(BaseTracker):
         return avg_depth
 
     def valid_depth(self, depth_a, history_depth):
+        ''' check depth value is valid or not , check the depth change exceed the percentage'''
         depth_margin = 0.6#600
-        if depth_a>2:#2000:
+        if depth_a>2:#2000: # why 2, but our input depth is [0, 1]
             depth_percent = depth_margin / depth_a
         else:
             depth_percent = 0.4
         d = np.abs((depth_a-history_depth))
-        if d == 0 or depth_a == 0:
+        if d == 0 or depth_a == 0: # why d == 0?
             return False
         p = d/depth_a
         # if d>depth_margin or p > depth_percent:
