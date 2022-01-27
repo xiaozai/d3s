@@ -330,12 +330,12 @@ class DepthSegm(BaseTracker):
         new_bbox = torch.cat((self.pos[[1,0]] - (self.target_sz[[1,0]]-1)/2, self.target_sz[[1,0]])).tolist()
         new_d = self.avg_depth(depth[:,:,0], new_bbox)
         self.valid_d = self.valid_depth(new_d, self.history_info['depth'][-1]) # what is the meaning of this???
-        print('avg-depth : ', self.valid_d)
+        # print('avg-depth : ', self.valid_d)
 
         new_dhist = self.hist_depth(depth[:,:,0], new_bbox)
         new_bhatta_depth=self.bhatta(new_dhist, self.history_info['depth_hist'][-1])
         self.valid_d = np.all([self.bhatta(new_dhist,dhist)>=self.params.threshold_bhatta for dhist in self.history_info['depth_hist']])
-        print('bhatta depth :', self.valid_d)
+        # print('bhatta depth :', self.valid_d)
 
         new_ratio = self.target_sz[0]/self.target_sz[1]
         mean_historyratios=np.mean(self.history_info['ratio_bbox'])
@@ -486,7 +486,7 @@ class DepthSegm(BaseTracker):
 
         # ----- redetection module --------- #
         if self.redetection_mode:
-            print('In redetection Mode.....')
+            print('....... In redetection Mode.....')
             self.target_scale_redetection=self.target_scale_redetection*1.05 #slowing enlarge this area to the object
             self.target_scale_redetection=max(self.target_scale_redetection, self.min_scale_factor)
             self.target_scale_redetection=min(self.target_scale_redetection, 2*self.first_target_scale)
@@ -504,7 +504,7 @@ class DepthSegm(BaseTracker):
             ''' target refound '''
             if self.redetection_mode==False: #target refound
                 if self.params.debug==5:
-                    print('.........attention!, target refound, next iter moving to normal tracking',scores_re.max(), self.target_scale_redetection)
+                    print('.........attention!, target refound, back to normal tracking',scores_re.max(), self.target_scale_redetection)
 
                 scores_re2, pred_segm_region = self.one_pass_track(color, depth, self.target_scale)
 
@@ -540,7 +540,7 @@ class DepthSegm(BaseTracker):
             # Compute scores
             scores_raw = self.apply_filter(test_x_rgb)
             translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
-            print('flag when update : ', flag)
+            # print('flag when update : ', flag)
             # Get train sample
             train_x_rgb = TensorList([x[scale_ind:scale_ind + 1, ...] for x in test_x_rgb])
 
@@ -653,8 +653,9 @@ class DepthSegm(BaseTracker):
         target_disp2 = max_disp2 - self.output_sz // 2
         translation_vec2 = target_disp2 * (self.img_support_sz / self.output_sz) * self.target_scale
 
-        print('localize_advanced : max_score2 vs max_score1 ', max_score2, max_score1)
-        print('target_not_found_threshold : ', self.params.target_not_found_threshold)
+        # if self.params.debug == 5:
+        #     print('localize_advanced : max_score2 vs max_score1 ', max_score2, max_score1)
+        #     print('target_not_found_threshold : ', self.params.target_not_found_threshold)
 
         # Handle the different cases
         if max_score2 > self.params.distractor_threshold * max_score1:

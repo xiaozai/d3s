@@ -293,7 +293,8 @@ class BaseTracker:
             if self.score_map is not None:
                 self.ax_score.cla()
                 self.ax_score.imshow(self.score_map)
-                self.ax_score.set_title('score map')
+                max_score = np.max(self.score_map)
+                self.ax_score.set_title('score map %f'%max_score)
 
         if len(state) == 4:
             pred = patches.Rectangle((state[0], state[1]), state[2], state[3], linewidth=2, edgecolor='r', facecolor='none')
@@ -305,6 +306,9 @@ class BaseTracker:
             exit(-1)
 
         self.ax.add_patch(pred)
+
+        if self.params.debug == 5:
+            self.ax_d.add_patch(pred)
 
         if hasattr(self, 'gt_state') and False:
             gt_state = self.gt_state
