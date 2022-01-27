@@ -73,14 +73,25 @@ def parameters():
 
     # Advanced localization parameters
     params.advanced_localization = True         # Use this or not
-    params.target_not_found_threshold = -1      # Absolute score threshold to detect target missing
-    params.distractor_threshold = 100           # Relative threshold to find distractors
-    params.hard_negative_threshold = 0.3        # Relative threshold to find hard negative samples
+    params.target_not_found_threshold = 0.25 # -1      # Absolute score threshold to detect target missing
+    params.distractor_threshold = 0.8 # 100           # Relative threshold to find distractors
+    params.hard_negative_threshold = 0.5 # 0.3        # Relative threshold to find hard negative samples
+
     params.target_neighborhood_scale = 2.2      # Target neighborhood to remove
-    params.dispalcement_scale = 0.7             # Dispacement to consider for distractors
+    params.dispalcement_scale = 0.8 # 0.7             # Dispacement to consider for distractors
     params.hard_negative_learning_rate = 0.02   # Learning rate if hard negative detected
     params.hard_negative_CG_iter = 5            # Number of optimization iterations to use if hard negative detected
-    params.update_scale_when_uncertain = True   # Update scale or not if distractor is close
+    params.update_scale_when_uncertain = False # True   # Update scale or not if distractor is close
+
+    # DAL redetection parameters
+    params.num_history = 5
+    params.frames_true_validd = 100
+    params.target_refound_threshold = params.target_not_found_threshold
+    params.target_forcerefound_threshold = params.target_not_found_threshold+0.03 # recover from redetection
+    params.threshold_updatedepth = 0.80
+    params.threshold_force_redetection = 0.20
+    params.threshold_allowupdateclassifer = 0.30
+
 
     # Setup the feature extractor (which includes the IoUNet)
     deep_fparams = FeatureParams(feature_params=[deep_params])

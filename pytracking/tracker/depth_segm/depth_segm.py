@@ -306,8 +306,26 @@ class DepthSegm(BaseTracker):
             del self.joint_problem, self.joint_optimizer
 
 
-    ''' DAL LT settings 0) corresponse map 1）depth 2）dhist 3）bhatta depth 4） target ratio '''
     def update_longterm_params(self, depth):
+        ''' DAL longterm settings :
+        1) the maximum of the DCF correlation response
+            B_{DCF} = {1 : p_{DCF} > theta, 0: otherwise}
+        2) temporal depth consistency， bhattacharyya similarity
+            B_{dep} = {1 : p_{dep} > theta for any i, 0 : otherwise}
+
+        Table 1 in DAL paper :
+
+        state                conditions
+        ------------------------------------------------------------------------
+        target lost          cond1 : 1 - B_{DCF}(tl=0.2)
+                             cond2 : 1 - B_{DCF}(t=0.25) & 1 - B_{dep}(td=0.8)
+        ------------------------------------------------------------------------
+        target re-detected   cond1 : B_{DCF}(th=0.3)
+                             cond2 : B_{DCF}(t=0.25) & B_{dep}(td=0.8)
+        ------------------------------------------------------------------------
+        update mode          cond1 : B_{DCF}(tu=?) & B_{dep}(td=0.8)
+
+        '''
         # measure the average depth
         new_bbox = torch.cat((self.pos[[1,0]] - (self.target_sz[[1,0]]-1)/2, self.target_sz[[1,0]])).tolist()
         new_d = self.avg_depth(depth[:,:,0], new_bbox)
@@ -318,7 +336,7 @@ class DepthSegm(BaseTracker):
         new_bhatta_depth=self.bhatta(new_dhist, self.history_info['depth_hist'][-1])
         self.valid_d = np.all([self.bhatta(new_dhist,dhist)>=self.params.threshold_bhatta for dhist in self.history_info['depth_hist']])
         print('bhatta depth :', self.valid_d)
-        
+
         new_ratio = self.target_sz[0]/self.target_sz[1]
         mean_historyratios=np.mean(self.history_info['ratio_bbox'])
         mean_h =np.mean([bbox[0] for bbox in self.history_info['target_sz']])
@@ -363,6 +381,7 @@ class DepthSegm(BaseTracker):
             if len(self.history_info['pos'])>self.params.num_history:#3:
                 self.history_info['pos']=self.history_info['pos'][-self.params.num_history:]
 
+        # target lost
         if (self.score_map.max()<self.params.threshold_force_redetection) or (self.flag=='not_found' and self.valid_d==False):
 
             self.redetection_mode=True
@@ -474,6 +493,7 @@ class DepthSegm(BaseTracker):
             scores_re = self.one_pass_track(color, depth, self.target_scale_redetection)
 
             self.redetection_mode=True
+            # DAL longter settings, target re-detected conditions
             if scores_re.max()>=self.params.target_refound_threshold and self.valid_d:
                 self.redetection_mode=False
             if scores_re.max()>=self.params.target_forcerefound_threshold:
@@ -497,8 +517,9 @@ class DepthSegm(BaseTracker):
         update_flag = self.flag not in ['not_found', 'uncertain']
         hard_negative = (self.flag == 'hard_negative')
         learning_rate = self.params.hard_negative_learning_rate if hard_negative else None
-        # Song : DAL good flag to update DCF (classifier)
-        goodscore_flag = self.score_map.max()>=self.params.threshold_allowupdateclassifer
+
+        # Song : DAL good flag to update DCF (classifier), update settings
+        goodscore_flag = self.score_map.max()>=self.params.threshold_allowupdateclassifer # 0.3
 
         # Song : update train_x and train_y , only if it is suitable to update
         if uncert_score < self.params.tracking_uncertainty_thr \
@@ -619,6 +640,9 @@ class DepthSegm(BaseTracker):
         target_disp2 = max_disp2 - self.output_sz // 2
         translation_vec2 = target_disp2 * (self.img_support_sz / self.output_sz) * self.target_scale
 
+        print('localize_advanced : max_score2 vs max_score1 ', max_score2, max_score1)
+        print('target_not_found_threshold : ', self.params.target_not_found_threshold)
+        
         # Handle the different cases
         if max_score2 > self.params.distractor_threshold * max_score1:
             disp_norm1 = torch.sqrt(torch.sum(target_disp1 ** 2))
