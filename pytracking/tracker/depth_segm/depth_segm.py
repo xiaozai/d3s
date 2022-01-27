@@ -540,7 +540,7 @@ class DepthSegm(BaseTracker):
             # Compute scores
             scores_raw = self.apply_filter(test_x_rgb)
             translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
-        
+
             # Get train sample
             train_x_rgb = TensorList([x[scale_ind:scale_ind + 1, ...] for x in test_x_rgb])
 
@@ -558,7 +558,7 @@ class DepthSegm(BaseTracker):
 
         if self.params.use_segmentation:
             if pred_segm_region is not None:
-                return pred_segm_region
+                return pred_segm_region, np.max(self.score_map)
 
         # Return new state
         new_state = torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]]))
