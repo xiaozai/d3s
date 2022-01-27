@@ -490,7 +490,7 @@ class DepthSegm(BaseTracker):
             self.target_scale_redetection=max(self.target_scale_redetection, self.min_scale_factor)
             self.target_scale_redetection=min(self.target_scale_redetection, 2*self.first_target_scale)
 
-            scores_re = self.one_pass_track(color, depth, self.target_scale_redetection)
+            scores_re, scale_ind = self.one_pass_track(color, depth, self.target_scale_redetection)
 
             self.redetection_mode=True
             # DAL longter settings, target re-detected conditions
@@ -528,6 +528,18 @@ class DepthSegm(BaseTracker):
            and self.redetection_mode==False \
            and self.valid_d:
 
+            # Get sample
+            sample_pos = copy.deepcopy(self.pos)
+            sample_scales = self.target_scale * self.params.scale_factors
+            test_x_rgb, test_x_d = self.extract_processed_sample(im, dp,
+                                                                 sample_pos,
+                                                                 sample_scales,
+                                                                 self.img_sample_sz)
+
+            # Compute scores
+            scores_raw = self.apply_filter(test_x_rgb)
+            translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
+            print('flag when update : ', flag)
             # Get train sample
             train_x_rgb = TensorList([x[scale_ind:scale_ind + 1, ...] for x in test_x_rgb])
 
