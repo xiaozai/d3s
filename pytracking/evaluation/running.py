@@ -11,9 +11,9 @@ def run_sequence(seq: Sequence, tracker: Tracker, debug=False):
     base_results_path = '{}/{}'.format(tracker.results_dir, seq.name)
     if not os.path.isdir(base_results_path):
         os.mkdir(base_results_path)
-    results_path = '{}/{}.txt'.format(base_results_path, seq.name)
+    results_path = '{}/{}_001.txt'.format(base_results_path, seq.name)
     times_path = '{}/{}_time.value'.format(base_results_path, seq.name)
-    conf_path = '{}/{}_confidence.value'.format(base_results_path, seq.name)
+    conf_path = '{}/{}_001_confidence.value'.format(base_results_path, seq.name)
 
     if os.path.isfile(results_path) and not debug:
         return
