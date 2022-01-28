@@ -363,11 +363,11 @@ class Segm(BaseTracker):
 
         if self.params.use_segmentation:
             if pred_segm_region is not None:
-                return pred_segm_region
+                return pred_segm_region, max_score
 
         # Return new state
         new_state = torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]]))
-        return new_state.tolist(), 1
+        return new_state.tolist(), max_score
 
     def apply_filter(self, sample_x: TensorList):
         return operation.conv2d(sample_x, self.filter, mode='same')
