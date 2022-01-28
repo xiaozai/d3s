@@ -570,6 +570,8 @@ class DepthSegm(BaseTracker):
 
             self.train_feat_segm_rgb = self.init_train_feat_segm_rgb * 0.6 + temporay_train_feat_segm_rgb * 0.4？
 
+            self.train_mask = self.init_train_mask OR self.temporay_train_mask
+
             '''
 
         # Train filter
@@ -1161,8 +1163,11 @@ class DepthSegm(BaseTracker):
 
         # store everything that is needed for later
         self.segm_net = segm_net
-        self.train_feat_segm_rgb = train_feat_segm_rgb # ResNet50 features, in GIM, only train_feat_segm_rgb[3] is used
-        self.train_feat_segm_d = train_feat_segm_d     # feat3 in DepthNet, for future if we use feature correlation
+        self.train_feat_segm_rgb = train_feat_segm_rgb       # ResNet50 features, in GIM, only train_feat_segm_rgb[3] is used
+        self.init_train_feat_segm_rgb = train_feat_segm_rgb
+        self.train_feat_segm_d = train_feat_segm_d           # feat3 in DepthNet, for future if we use feature correlation
+        self.init_train_feat_segm_d = train_feat_segm_d
+        
         self.init_mask_patch = mask_gpu
         if self.params.segm_use_dist:
             self.dist_map = dist_map
