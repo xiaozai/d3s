@@ -128,9 +128,9 @@ class DepthSegmNet(nn.Module):
         # out2 = self.post1(F.upsample(self.w_rgb * self.f1(feat_test_rgb[1]) + self.w_d * self.s1(out1), scale_factor=2)) # 96 -> 192
         # out3 = self.post0(F.upsample(self.w_rgb * self.f0(feat_test_rgb[0]) + self.w_d * self.s0(out2), scale_factor=2)) # 192 -> 384
         out1 = self.post2(self.w_rgb * self.f2(feat_test_rgb[2]) + self.w_d * self.s2(out0))
-        out1 = F.upsample(out1 + out0, scale_factor=2)) # 48 ->  96
+        out1 = F.upsample(out1 + out0, scale_factor=2) # 48 ->  96
         out2 = self.post1(self.w_rgb * self.f1(feat_test_rgb[1]) + self.w_d * self.s1(out1))
-        out2 = F.upsample(out2 + out1, scale_factor=2)) # 96 -> 192
+        out2 = F.upsample(out2 + out1, scale_factor=2) # 96 -> 192
         out3 = self.post0(F.upsample(self.w_rgb * self.f0(feat_test_rgb[0]) + self.w_d * self.s0(out2), scale_factor=2)) # 192 -> 384
 
         return out3
