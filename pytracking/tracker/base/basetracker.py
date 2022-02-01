@@ -341,7 +341,7 @@ class BaseTracker:
             depth = np.nan_to_num(depth)
             # depth[depth > max_depth] = max_depth
             # depth = cv.normalize(depth, None, alpha=0, beta=1, norm_type=cv.NORM_MINMAX, dtype=cv.CV_32F)
-            depth = (depth - min_depth) / (max_depth - min_depth)
+            depth = (depth - min_depth) / (max_depth - min_depth) * 1.0
             depth = np.expand_dims(np.asarray(depth), axis=-1)
             images = {'color':color, 'depth':depth}
             return images
