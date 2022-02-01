@@ -37,7 +37,7 @@ class Sequence:
                 xywh = [int(float(b)) for b in init_bbox]
                 depth_crop = init_depth[xywh[1]:xywh[1]+xywh[3], xywh[0]:xywh[0]+xywh[2]]
                 depth_crop = np.nan_to_num(depth_crop)
-                self.max_depth = np.median(depth_crop[depth_crop>0]) * 1.5
+                self.max_depth = np.median(depth_crop[depth_crop>0]) + 2000 # *1.5
             else:
                 print('not implement for polygon groundtruth in RGBD datasets...')
 
