@@ -79,21 +79,21 @@ class DepthSegmNet(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.depth_feat_extractor = DepthNet(input_dim=1, dims=(16, 32, 64), kernels=(3,3,3), pads=(1,1,1))
+        self.depth_feat_extractor = DepthNet(input_dim=1, dims=(8, 16, 32), kernels=(3,3,3), pads=(1,1,1))
 
-        self.mixer = conv(64, 128, kernel_size=3, padding=1) # ???? 256 depth feat + 1 dist map ?
+        self.mixer = conv(32, 64, kernel_size=3, padding=1) # ???? 256 depth feat + 1 dist map ?
 
-        self.f2 = conv(512, 64, kernel_size=3, padding=1)
-        self.f1 = conv(256, 32, kernel_size=3, padding=1)
-        self.f0 = conv(64, 16, kernel_size=3, padding=1)
+        self.f2 = conv(512, 32, kernel_size=3, padding=1)
+        self.f1 = conv(256, 16, kernel_size=3, padding=1)
+        self.f0 = conv(64, 8, kernel_size=3, padding=1)
 
-        self.s2 = conv(128, 64, kernel_size=3, padding=1)
-        self.s1 = conv(64, 32, kernel_size=3, padding=1)
-        self.s0 = conv(32, 16, kernel_size=3, padding=1)
+        self.s2 = conv(64, 32, kernel_size=3, padding=1)
+        self.s1 = conv(32, 16, kernel_size=3, padding=1)
+        self.s0 = conv(16, 8, kernel_size=3, padding=1)
 
-        self.post2 = conv(64, 64)
-        self.post1 = conv(32, 32)
-        self.post0 = conv_no_relu(16, 2) # GT is the pair of Foreground and Background segmentations
+        self.post2 = conv(32, 32, kernel_size=1, padding=0)
+        self.post1 = conv(16, 16, kernel_size=1, padding=0)
+        self.post0 = conv_no_relu(8, 2) # GT is the pair of Foreground and Background segmentations
 
         self.initialize_weights()
 
