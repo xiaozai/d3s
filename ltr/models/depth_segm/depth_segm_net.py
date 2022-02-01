@@ -110,8 +110,8 @@ class DepthSegmNet(nn.Module):
         feat_test_d = self.feature_correlation(feat_test_d, feat_train_d, mask_train[0]) # [B, 2*2, H, W]
 
         feat_test_rgb[2] = self.feature_correlation(feat_test_rgb[2], feat_train_rgb[2], mask_train[0])
-        feat_test_rgb[1] = self.feature_correlation(feat_test_rgb[1], feat_train_rgb[1], mask_train[0])
-        feat_test_rgb[0] = self.feature_correlation(feat_test_rgb[0], feat_train_rgb[0], mask_train[0])
+        # feat_test_rgb[1] = self.feature_correlation(feat_test_rgb[1], feat_train_rgb[1], mask_train[0]) # no space on cuda :|
+        # feat_test_rgb[0] = self.feature_correlation(feat_test_rgb[0], feat_train_rgb[0], mask_train[0])
 
         # distance map is give - resize for mixer # concatenate inputs for mixer
         dist = F.interpolate(test_dist[0], size=(feat_test_d.shape[-2], feat_test_d.shape[-1]))            # [B, 1, 384,384]
