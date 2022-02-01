@@ -147,7 +147,11 @@ class DepthSegmNet(nn.Module):
         # feat_test_rgb[0] = self.feature_correlation(feat_test_rgb[0], feat_train_rgb[0], mask_train[0])
 
         if test_dist is not None:
-            '''Song: we change the test_dist map into Guassian map instead of distance map '''
+            '''Song: we change the test_dist map into Guassian map instead of distance map
+
+            we should use the depth-wise corrleation,
+                segm_layers = feat_test_d * dist
+            '''
             # distance map is give - resize for mixer # concatenate inputs for mixer
             dist = F.interpolate(test_dist[0], size=(feat_test_d.shape[-2], feat_test_d.shape[-1])) # [B, 1,   384,384]
             segm_layers = torch.cat((feat_test_d, dist), dim=1)                                     # [B, C+1, 384, 384]
@@ -157,6 +161,10 @@ class DepthSegmNet(nn.Module):
         # Mix DepthFeat and Location Map
         out0 = self.mixer(segm_layers) # [B, 32, 384, 384]
 
+        '''
+        we should use the depth-wise corrleation
+            feat = feat_test_rgb * out 
+        '''
         # out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]), scale_factor=8) + F.upsample(out_mix, scale_factor=8))
         # out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]) + out, scale_factor=8))
         # out2 = self.post1(F.upsample(self.f1(feat_test_rgb[1]), scale_factor=4) + out1)
