@@ -334,7 +334,6 @@ class DepthSegm(BaseTracker):
         new_dhist = self.hist_depth(depth[:,:,0], new_bbox)
         new_bhatta_depth=self.bhatta(new_dhist, self.history_info['depth_hist'][-1])
         self.valid_d = np.all([self.bhatta(new_dhist,dhist)>=self.params.threshold_bhatta for dhist in self.history_info['depth_hist']])
-        # print('bhatta depth :', self.valid_d)
 
         new_ratio = self.target_sz[0]/self.target_sz[1]
         mean_historyratios=np.mean(self.history_info['ratio_bbox'])
@@ -343,8 +342,10 @@ class DepthSegm(BaseTracker):
         mean_target_sz=[mean_h, mean_w]
         change_ratio = abs(new_ratio-mean_historyratios)/mean_historyratios
 
-        if change_ratio>0.50:#some bug?
+        ratio_flag = False
+        if change_ratio>0.50:
             self.target_sz=torch.FloatTensor(mean_target_sz)
+            ration_flag = True
 
         if self.frame_num<self.params.frames_true_validd:
             self.valid_d=True
@@ -381,7 +382,7 @@ class DepthSegm(BaseTracker):
                 self.history_info['pos']=self.history_info['pos'][-self.params.num_history:]
 
         # target lost
-        if (self.score_map.max()<self.params.threshold_force_redetection) or (self.flag=='not_found' and self.valid_d==False):
+        if (self.score_map.max()<self.params.threshold_force_redetection) or (self.flag=='not_found' and self.valid_d==False) or (ration_flag):
 
             self.redetection_mode=True
             # self.tracker_fail=True
