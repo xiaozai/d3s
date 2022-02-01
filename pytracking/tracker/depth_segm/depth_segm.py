@@ -94,7 +94,8 @@ class DepthSegm(BaseTracker):
         depth_hist_init=self.hist_depth(depth[:,:,0], init_bbox)
 
         self.init_target_area = state[2]*state[3]
-        
+        self.init_target_sz = self.target_sz.copy()
+
         self.history_info = {'depth':[depth_init],\
                              'depth_hist':[depth_hist_init], \
                              'velocity':[0.0], \
@@ -342,18 +343,18 @@ class DepthSegm(BaseTracker):
         mean_h =np.mean([bbox[0] for bbox in self.history_info['target_sz']])
         mean_w =np.mean([bbox[1] for bbox in self.history_info['target_sz']])
         mean_target_sz=[mean_h, mean_w]
+        change_ratio = abs(new_ratio-mean_historyratios)/mean_historyratios
 
         area_flag = False
         current_area = self.target_sz[0]*self.target_sz[1]
         history_area = mean_w*mean_h
-        area_change_ratio = abs(current_area - history_area) / (history_area+0.0000000001)
-        if area_change_ratio > 0.25:
+        eps = 0.000000001
+        area_change_ratio = abs(current_area - history_area) / (history_area+eps)
+
+
+        if area_change_ratio > 0.25 or current_area / (init_target_area+eps) < 0.1 or current_area / (init_target_area+eps) > 3 or change_ratio>0.50:
             area_flag = True
-
-
-        change_ratio = abs(new_ratio-mean_historyratios)/mean_historyratios
-        if change_ratio>0.50:
-            self.target_sz=torch.FloatTensor(mean_target_sz)
+            self.target_sz= self.init_target_sz.copy() # torch.FloatTensor(mean_target_sz)
 
 
 
