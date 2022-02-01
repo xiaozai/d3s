@@ -366,7 +366,7 @@ class DepthSegm(BaseTracker):
         # update redetection parameters
         if (self.score_map.max()>=self.params.threshold_updatedepth) \
             or (self.score_map.max()>=self.params.target_not_found_threshold and self.valid_d) \
-            or (area_flag):
+            or (not area_flag):
 
             self.history_info['depth'].append(new_d)
             if len(self.history_info['depth'])>self.params.num_history:#5:
