@@ -84,16 +84,16 @@ class DepthSegmNet(nn.Module):
         self.mixer = conv(16, 16, kernel_size=3, padding=1) # ???? 256 depth feat + 1 dist map ?
 
         self.f2 = conv(512, 16, kernel_size=3, padding=1)
-        self.f1 = conv(256, 16, kernel_size=3, padding=1)
-        self.f0 = conv(64, 16, kernel_size=3, padding=1)
+        self.f1 = conv(256, 8, kernel_size=3, padding=1)
+        self.f0 = conv(64, 4, kernel_size=3, padding=1)
 
         self.s2 = conv(16, 16, kernel_size=3, padding=1)
-        self.s1 = conv(16, 16, kernel_size=3, padding=1)
-        self.s0 = conv(16, 16, kernel_size=3, padding=1)
+        self.s1 = conv(16, 8, kernel_size=3, padding=1)
+        self.s0 = conv(8, 4, kernel_size=3, padding=1)
 
         self.post2 = conv(16, 16, kernel_size=1, padding=0)
-        self.post1 = conv(16, 16, kernel_size=1, padding=0)
-        self.post0 = conv_no_relu(16, 2) # GT is the pair of Foreground and Background segmentations
+        self.post1 = conv(8, 8, kernel_size=1, padding=0)
+        self.post0 = conv_no_relu(4, 2) # GT is the pair of Foreground and Background segmentations
 
         self.initialize_weights()
 
