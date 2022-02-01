@@ -91,11 +91,14 @@ class DepthSegmNet(nn.Module):
         self.s1 = conv(64, 32, kernel_size=3, padding=1)
         self.s0 = conv(32, 16, kernel_size=3, padding=1)
 
-        self.post2 = conv(64, 64, kernel_size=1, padding=0)
-        self.post1 = conv(32, 32, kernel_size=1, padding=0)
-        self.post0 = conv_no_relu(16, 2) # GT is the pair of Foreground and Background segmentations
+        self.post2 = conv(64, 64, kernel_size=3, padding=1)
+        self.post1 = conv(32, 32, kernel_size=3, padding=1)
+        self.post0 = conv_no_relu(16, 2)                                        # GT is the pair of Foreground and Background segmentations
 
         self.initialize_weights()
+
+        self.w_rgb = 0.6
+        self.w_d = 0.4
 
     def initialize_weights(self):
         for m in self.modules():
@@ -120,10 +123,10 @@ class DepthSegmNet(nn.Module):
 
         # Mix DepthFeat and Location Map
         out0 = self.mixer(segm_layers)
-                                                                             # [B, C, 384, 384]
-        out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]) * self.s2(out0), scale_factor=2)) # 48 ->  96
-        out2 = self.post1(F.upsample(self.f1(feat_test_rgb[1]) * self.s1(out1), scale_factor=2)) # 96 -> 192
-        out3 = self.post0(F.upsample(self.f0(feat_test_rgb[0]) * self.s0(out2), scale_factor=2)) # 192 -> 384
+                                                                                # [B, C, 384, 384]
+        out1 = self.post2(F.upsample(self.w_rgb * self.f2(feat_test_rgb[2]) + self.w_d * self.s2(out0), scale_factor=2)) # 48 ->  96
+        out2 = self.post1(F.upsample(self.w_rgb * self.f1(feat_test_rgb[1]) + self.w_d * self.s1(out1), scale_factor=2)) # 96 -> 192
+        out3 = self.post0(F.upsample(self.w_rgb * self.f0(feat_test_rgb[0]) + self.w_d * self.s0(out2), scale_factor=2)) # 192 -> 384
 
         return out3
 
