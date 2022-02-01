@@ -106,7 +106,7 @@ class DepthSegmNet(nn.Module):
 
     def forward(self, feat_test_rgb, depth_test_imgs, feat_train_rgb, feat_train_d, mask_train, test_dist=None):
 
-        feat_test_d = self.depth_feat_extractor(depth_test_imgs)  # [B, 2, 384, 384] = F+B, [B, C, 48, 48]
+        feat_test_d = self.depth_feat_extractor(depth_test_imgs)                         # [B, 2, 384, 384] = F+B, [B, C, 48, 48]
         feat_test_d = self.feature_correlation(feat_test_d, feat_train_d, mask_train[0]) # [B, 2*2, H, W]
 
         feat_test_rgb[2] = self.feature_correlation(feat_test_rgb[2], feat_train_rgb[2], mask_train[0])
@@ -121,9 +121,9 @@ class DepthSegmNet(nn.Module):
         # Mix DepthFeat and Location Map
         out0 = self.mixer(segm_layers)
                                                                              # [B, C, 384, 384]
-        out1 = self.post2(F.upsample(torch.mul(self.f2(feat_test_rgb[2]), self.s2(out0)), scale_factor=2)) # 48 ->  96
-        out2 = self.post1(F.upsample(torch.mul(self.f1(feat_test_rgb[1]), self.s1(out1)), scale_factor=2)) #  96 -> 192
-        out3 = self.post0(F.upsample(torch.mul(self.f0(feat_test_rgb[0]), self.s0(out2)), scale_factor=2)) # 192 -> 384
+        out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]) + self.s2(out0), scale_factor=2)) # 48 ->  96
+        out2 = self.post1(F.upsample(self.f1(feat_test_rgb[1]) + self.s1(out1), scale_factor=2)) # 96 -> 192
+        out3 = self.post0(F.upsample(self.f0(feat_test_rgb[0]) + self.s0(out2), scale_factor=2)) # 192 -> 384
 
         return out3
 
