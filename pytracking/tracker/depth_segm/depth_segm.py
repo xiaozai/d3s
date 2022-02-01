@@ -350,9 +350,9 @@ class DepthSegm(BaseTracker):
         history_area = mean_w*mean_h
         eps = 0.000000001
         area_change_ratio = abs(current_area - history_area) / (history_area+eps)
+        area_init_chage_ratio = abs(current_area - self.init_target_area) / (self.init_target_area+eps)
 
-
-        if area_change_ratio > 0.25 or current_area / (self.init_target_area+eps) < 0.1 or current_area / (self.init_target_area+eps) > 3 or change_ratio>0.50:
+        if area_change_ratio > 0.25 or area_init_chage_ratio > 0.5 or change_ratio>0.50:
             area_flag = True
             self.target_sz= self.init_target_sz.clone() # torch.FloatTensor(mean_target_sz)
 
