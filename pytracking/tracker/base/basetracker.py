@@ -27,7 +27,7 @@ class BaseTracker:
         """Run tracker on a sequence."""
 
         # Initialize
-        image = self._read_image(sequence.frames[0], max_depth=sequence.max_depth)
+        image = self._read_image(sequence.frames[0], max_depth=sequence.max_depth, min_depth=sequence.min_depth)
 
         times = []
         start_time = time.time()
@@ -44,7 +44,7 @@ class BaseTracker:
         tracked_bb = [sequence.init_state]
         tracked_conf = [1]
         for frame in sequence.frames[1:]:
-            image = self._read_image(frame, max_depth=sequence.max_depth)
+            image = self._read_image(frame, max_depth=sequence.max_depth, min_depth=sequence.min_depth)
 
             start_time = time.time()
             state, conf = self.track(image)
@@ -332,14 +332,16 @@ class BaseTracker:
         if self.pause_mode:
             plt.waitforbuttonpress()
 
-    def _read_image(self, image_file: str, max_depth=1000):
+    def _read_image(self, image_file: str, max_depth=5000, min_depth=0):
         # return cv.cvtColor(cv.imread(image_file), cv.COLOR_BGR2RGB)
         if isinstance(image_file, dict):
             # For CDTB and DepthTrack RGBD datasets
             color = cv.cvtColor(cv.imread(image_file['color']), cv.COLOR_BGR2RGB)
             depth = cv.imread(image_file['depth'], -1)
-            depth[depth > max_depth] = max_depth
-            depth = cv.normalize(depth, None, alpha=0, beta=1, norm_type=cv.NORM_MINMAX, dtype=cv.CV_32F)
+            depth = np.nan_to_num(depth)
+            # depth[depth > max_depth] = max_depth
+            # depth = cv.normalize(depth, None, alpha=0, beta=1, norm_type=cv.NORM_MINMAX, dtype=cv.CV_32F)
+            depth = (depth - min_depth) / (max_depth - min_depth)
             depth = np.expand_dims(np.asarray(depth), axis=-1)
             images = {'color':color, 'depth':depth}
             return images
