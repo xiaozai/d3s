@@ -354,11 +354,13 @@ class DepthSegm(BaseTracker):
             print(self.frame_num, 'score',self.score_map.max(),'bhatta_depth', new_bhatta_depth,
                  'average depth', new_d, 'history_depth', self.history_info['depth'][-1], 'valid_d', self.valid_d)
             print('target_sz', self.target_sz, 'ratio_bbox', self.target_sz[0]/self.target_sz[1],
-                  'base_target_sz', self.base_target_sz, 'target_scale', self.target_scale)
+                  'base_target_sz', self.base_target_sz, 'target_scale', self.target_scale,
+                  ' target sz change ratio : ', change_ratio)
 
         # update redetection parameters
         if (self.score_map.max()>=self.params.threshold_updatedepth) \
-            or (self.score_map.max()>=self.params.target_not_found_threshold and self.valid_d):
+            or (self.score_map.max()>=self.params.target_not_found_threshold and self.valid_d) \
+            or (target_sz_ratio_flag):
 
             self.history_info['depth'].append(new_d)
             if len(self.history_info['depth'])>self.params.num_history:#5:
