@@ -65,35 +65,61 @@ class DepthNet(nn.Module):
 
     def forward(self, dp):
         feat1 = self.conv1(dp)     # [B, C, 384, 384]
+        # feat1 = F.interpolate(feat1, size=(192, 192))
         feat1 = self.pool1(feat1)  # B, C, 192, 192
 
         feat2 = self.conv2(feat1)
+        # feat2 = F.interpolate(feat2, size=(96, 96))
         feat2 = self.pool2(feat2)  # B, C, 96, 96
 
         feat3 = self.conv3(feat2)
+        # feat3 = F.interpolate(feat3, size=(48, 48))
         feat3 = self.pool3(feat3)  # B, C, 48, 48
+
+        # feat3 = F.softmax(feat3, dim=1)  # ?
 
         return feat3
 
 class DepthSegmNet(nn.Module):
+    """
+        Given the depth image and the dist map, predict the mask from depth
+        depth images -> depth feat + dist map -> mask
+
+        Assume that depth image is the initial mask ??
+
+        segm_input_dim = (64, 64, 128, 256)
+        segm_inter_dim = (4, 16, 32, 64)
+        segm_dim = (64, 64)  # convolutions before cosine similarity
+
+    """
     def __init__(self):
         super().__init__()
+        '''
+        1) simple : depth feat + L 256+1 -> mixer 3x3x128 -> 3x3x64 -> 3x3x32 -> 3x3x2, train loss = 0.048
+        2)        : depth feat + L 2+1   -> mixer 1x1x32  -> 3x3x32 -> 3x3x32 -> 3x3x2
+        3)        : depth feat (Bx2x48x48) * similarity(feat_test_d, feat_train_d)
+                    -> depth feat + L
+                    -> mix, 1x1x32
+                    -> [feat_test_rgb[2] (BxCx48x48) * similarity(feat_test_rgb[2], feat_train_rgb[2])] -> 1x1x32 + mix_feat
+                    -> feat_test_rgb[1] -> 1x1x32 + out1
+                    -> feat_test_rgb[0] -> 1x1x32 + out2
+        '''
 
-        self.depth_feat_extractor = DepthNet(input_dim=1, dims=(16, 32, 64), kernels=(3,3,3), pads=(1,1,1))
+        self.depth_feat_extractor = DepthNet(input_dim=1, dims=(32, 32, 2), kernels=(1,3,1), pads=(0, 1, 0))
 
-        self.mixer = conv(64, 128, kernel_size=3, padding=1) # ???? 256 depth feat + 1 dist map ?
+        self.mixer = conv(3, 32, kernel_size=1, padding=0) # ???? 256 depth feat + 1 dist map ?
 
-        self.f2 = conv(512, 64, kernel_size=3, padding=1)
-        self.f1 = conv(256, 32, kernel_size=3, padding=1)
-        self.f0 = conv(64, 16, kernel_size=3, padding=1)
+        self.f2 = conv(512, 32, kernel_size=1, padding=0)
+        self.f1 = conv(256, 32, kernel_size=1, padding=0)
+        self.f0 = conv(64, 32, kernel_size=1, padding=0)
 
-        self.s2 = conv(128, 64, kernel_size=3, padding=1)
-        self.s1 = conv(64, 32, kernel_size=3, padding=1)
-        self.s0 = conv(32, 16, kernel_size=3, padding=1)
+        # self.s2 = conv(32, 32, kernel_size=1, padding=0)
+        # self.s1 = conv(32, 32, kernel_size=1, padding=0)
+        # self.s0 = conv(32, 32, kernel_size=1, padding=0)
 
-        self.post2 = conv(64, 64)
+        self.post2 = conv(32, 32)
         self.post1 = conv(32, 32)
-        self.post0 = conv_no_relu(16, 2) # GT is the pair of Foreground and Background segmentations
+        self.post0 = conv_no_relu(32, 2)      # GT is the pair of Foreground and Background segmentations
 
         self.initialize_weights()
 
@@ -105,25 +131,46 @@ class DepthSegmNet(nn.Module):
                     m.bias.data.zero_()
 
     def forward(self, feat_test_rgb, depth_test_imgs, feat_train_rgb, feat_train_d, mask_train, test_dist=None):
+        ''' Song's comments:
+            depth test   : batch*1*384*384
+            f_test_depth : batch*256*384*384
+            feat_test_rgb layer0 : [8, 64, 192, 192]
+                          layer1 : [8, 256, 96, 96]
+                          layer2 : [8, 512, 48, 48]
+            We assume that DepthFeat = F+P, concatenate with dist (location) map
+            how about channel wise multiplication???
+        '''
 
+        ''' multi level depth feat ???? '''
         feat_test_d = self.depth_feat_extractor(depth_test_imgs)  # [B, 2, 384, 384] = F+B, [B, C, 48, 48]
+
         feat_test_d = self.feature_correlation(feat_test_d, feat_train_d, mask_train[0]) # [B, 2*2, H, W]
 
         feat_test_rgb[2] = self.feature_correlation(feat_test_rgb[2], feat_train_rgb[2], mask_train[0])
-        feat_test_rgb[1] = self.feature_correlation(feat_test_rgb[1], feat_train_rgb[1], mask_train[0])
-        feat_test_rgb[0] = self.feature_correlation(feat_test_rgb[0], feat_train_rgb[0], mask_train[0])
+        # feat_test_rgb[1] = self.feature_correlation(feat_test_rgb[1], feat_train_rgb[1], mask_train[0])
+        # feat_test_rgb[0] = self.feature_correlation(feat_test_rgb[0], feat_train_rgb[0], mask_train[0])
 
-        # distance map is give - resize for mixer # concatenate inputs for mixer
-        dist = F.interpolate(test_dist[0], size=(feat_test_d.shape[-2], feat_test_d.shape[-1]))            # [B, 1, 384,384]
-        # segm_layers = torch.cat((feat_test_d, dist), dim=1)
-        segm_layers = torch.mul(feat_test_d, dist)                                                         # [B, C, 384, 384]
+        if test_dist is not None:
+            # distance map is give - resize for mixer # concatenate inputs for mixer
+            dist = F.interpolate(test_dist[0], size=(feat_test_d.shape[-2], feat_test_d.shape[-1])) # [B, 1,   384,384]
+            segm_layers = torch.cat((feat_test_d, dist), dim=1)                                     # [B, C+1, 384, 384]
+        else:
+            segm_layers = torch.cat((feat_test_d, feat_test_d[:, 0, :, :]), dim=1)                  # [B, 3, 384, 384]
 
         # Mix DepthFeat and Location Map
-        out0 = self.mixer(segm_layers)
-                                                                             # [B, C, 384, 384]
-        out1 = self.post2(F.upsample(torch.mul(self.f2(feat_test_rgb[2]), self.s2(out0)), scale_factor=2)) # 48 ->  96
-        out2 = self.post1(F.upsample(torch.mul(self.f1(feat_test_rgb[1]), self.s1(out1)), scale_factor=2)) #  96 -> 192
-        out3 = self.post0(F.upsample(torch.mul(self.f0(feat_test_rgb[0]), self.s0(out2)), scale_factor=2)) # 192 -> 384
+        out0 = self.mixer(segm_layers) # [B, 32, 384, 384]
+
+        '''
+        we should use the depth-wise corrleation
+            feat = feat_test_rgb * out
+        '''
+        out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]) + out0, scale_factor=2))  # 48 ->  96
+        out2 = self.post1(F.upsample(self.f1(feat_test_rgb[1]) + out1, scale_factor=2)) #  96 -> 192
+        out3 = self.post0(F.upsample(self.f0(feat_test_rgb[0]) + out2, scale_factor=2)) # 192 -> 384
+
+        # out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]) + self.s2(out0), scale_factor=2))  # 48 ->  96
+        # out2 = self.post1(F.upsample(self.f1(feat_test_rgb[1]) + self.s1(out1), scale_factor=2)) #  96 -> 192
+        # out3 = self.post0(F.upsample(self.f0(feat_test_rgb[0]) + self.s0(out2), scale_factor=2)) # 192 -> 384
 
         return out3
 
