@@ -553,14 +553,14 @@ class DepthSegm(BaseTracker):
 
 
             ''' update train_feat_rgb and train_feat_d '''
-            #-----------------------------------------------------------------#
-            if self.score_map.max() >= 0.9:
-                bb = new_state
-                if self.params.use_segmentation:
-                    if pred_segm_region is not None:
-                        bb = pred_segm_region
-                self.update_train_feat(color, depth, bb)
-            #-----------------------------------------------------------------#
+            # #-----------------------------------------------------------------#
+            # if self.score_map.max() >= 0.9:
+            #     bb = new_state
+            #     if self.params.use_segmentation:
+            #         if pred_segm_region is not None:
+            #             bb = pred_segm_region
+            #     self.update_train_feat(color, depth, bb)
+            # #-----------------------------------------------------------------#
 
         # Train filter
         if hard_negative:
