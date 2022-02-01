@@ -1281,7 +1281,7 @@ class DepthSegm(BaseTracker):
         print('update train feat....')
         self.train_feat_segm_rgb = [0.5*init_f + 0.5*temp_f for temp_f, init_f in zip(train_feat_segm_rgb, self.init_train_feat_segm_rgb)]
         self.train_feat_segm_d = 0.5*train_feat_segm_d + 0.5*self.init_train_feat_segm_d # 【1， C， H， W]
-        self.mask_patch = torch.tensor((mask_gpu + self.init_mask_patch) > 0, dtype=torch.float32)
+        self.mask_patch = torch.tensor((mask_gpu + self.init_mask_patch) > 0, dtype=torch.float32).to(self.params.device)
 
     def segment_target(self, color, depth, pos, sz):
         # pos and sz are in the image coordinates
