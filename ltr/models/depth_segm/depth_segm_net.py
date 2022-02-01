@@ -79,7 +79,7 @@ class DepthSegmNet(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.depth_feat_extractor = DepthNet(input_dim=1, dims=(8, 16, 32), kernels=(1,3,3), pads=(0,1,1))
+        self.depth_feat_extractor = DepthNet(input_dim=1, dims=(8, 16, 32), kernels=(3,3,3), pads=(1,1,1))
 
         self.mixer = conv(32, 64, kernel_size=3, padding=1) # ???? 256 depth feat + 1 dist map ?
 
@@ -121,9 +121,9 @@ class DepthSegmNet(nn.Module):
         # Mix DepthFeat and Location Map
         out0 = self.mixer(segm_layers)
                                                                              # [B, C, 384, 384]
-        out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]) + self.s2(out0), scale_factor=2)) # 48 ->  96
-        out2 = self.post1(F.upsample(self.f1(feat_test_rgb[1]) + self.s1(out1), scale_factor=2)) # 96 -> 192
-        out3 = self.post0(F.upsample(self.f0(feat_test_rgb[0]) + self.s0(out2), scale_factor=2)) # 192 -> 384
+        out1 = self.post2(F.upsample(self.f2(feat_test_rgb[2]) * self.s2(out0), scale_factor=2)) # 48 ->  96
+        out2 = self.post1(F.upsample(self.f1(feat_test_rgb[1]) * self.s1(out1), scale_factor=2)) # 96 -> 192
+        out3 = self.post0(F.upsample(self.f0(feat_test_rgb[0]) * self.s0(out2), scale_factor=2)) # 192 -> 384
 
         return out3
 
