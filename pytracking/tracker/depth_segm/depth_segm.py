@@ -94,7 +94,7 @@ class DepthSegm(BaseTracker):
         depth_hist_init=self.hist_depth(depth[:,:,0], init_bbox)
 
         self.init_target_area = state[2]*state[3]
-        self.init_target_sz = self.target_sz.copy()
+        self.init_target_sz = self.target_sz.clone()
 
         self.history_info = {'depth':[depth_init],\
                              'depth_hist':[depth_hist_init], \
@@ -354,7 +354,7 @@ class DepthSegm(BaseTracker):
 
         if area_change_ratio > 0.25 or current_area / (init_target_area+eps) < 0.1 or current_area / (init_target_area+eps) > 3 or change_ratio>0.50:
             area_flag = True
-            self.target_sz= self.init_target_sz.copy() # torch.FloatTensor(mean_target_sz)
+            self.target_sz= self.init_target_sz.clone() # torch.FloatTensor(mean_target_sz)
 
 
 
