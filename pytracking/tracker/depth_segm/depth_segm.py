@@ -1278,14 +1278,20 @@ class DepthSegm(BaseTracker):
             iters += 1
 
 
+        print('update train feat....')
         # store everything that is needed for later
-        self.train_feat_segm_rgb = [(init_f + temp_f)*0.5 for init_f, temp_f in zip(train_feat_segm_rgb, self.init_train_feat_segm_rgb)]
-        self.train_feat_segm_d = [(init_f + temp_f)*0.5 for init_f, temp_f in zip(train_feat_segm_d, self.init_train_feat_segm_d)]
+        for init_f, temp_f in zip(train_feat_segm_rgb, self.init_train_feat_segm_rgb):
+            print(init_f.shape, temp_f.shape)
 
+        self.train_feat_segm_rgb = [0.5*init_f + 0.5*temp_f for temp_f, init_f in zip(train_feat_segm_rgb, self.init_train_feat_segm_rgb)]
+        self.train_feat_segm_d = [0.5*init_f + 0.5*temp_f for temp_f, init_f in zip(train_feat_segm_d, self.init_train_feat_segm_d)]
+        print('train_feat_segm_rgb', len(self.train_feat_segm_rgb[2]))
         self.mask_patch = (mask_gpu + self.init_mask_patch) > 0
         #
         # self.mask = mask + self.init_mask
         # self.mask_pixels = np.array([np.sum(self.mask)])
+        for f_ in self.train_feat_segm_rgb:
+            print(f_.shape)
 
 
     def segment_target(self, color, depth, pos, sz):
