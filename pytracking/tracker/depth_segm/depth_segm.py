@@ -340,12 +340,18 @@ class DepthSegm(BaseTracker):
         mean_h =np.mean([bbox[0] for bbox in self.history_info['target_sz']])
         mean_w =np.mean([bbox[1] for bbox in self.history_info['target_sz']])
         mean_target_sz=[mean_h, mean_w]
-        change_ratio = abs(new_ratio-mean_historyratios)/mean_historyratios
 
-        target_sz_ratio_flag = False
+        area_flag = False
+        area_change_ratio = abs(self.target_sz[0]*self.target_sz[1] - mean_w*mean_h) / (mean_w*mean_h+0.0000000001)
+        if area_change_ratio > 0.5:
+            area_flag = True
+
+
+        change_ratio = abs(new_ratio-mean_historyratios)/mean_historyratios
         if change_ratio>0.50:
             self.target_sz=torch.FloatTensor(mean_target_sz)
-            target_sz_ratio_flag = True
+
+
 
         if self.frame_num<self.params.frames_true_validd:
             self.valid_d=True
@@ -355,12 +361,12 @@ class DepthSegm(BaseTracker):
                  'average depth', new_d, 'history_depth', self.history_info['depth'][-1], 'valid_d', self.valid_d)
             print('target_sz', self.target_sz, 'ratio_bbox', self.target_sz[0]/self.target_sz[1],
                   'base_target_sz', self.base_target_sz, 'target_scale', self.target_scale,
-                  ' target sz change ratio : ', change_ratio)
+                  ' target sz change ratio : ', area_change_ratio)
 
         # update redetection parameters
         if (self.score_map.max()>=self.params.threshold_updatedepth) \
             or (self.score_map.max()>=self.params.target_not_found_threshold and self.valid_d) \
-            or (target_sz_ratio_flag):
+            or (area_flag):
 
             self.history_info['depth'].append(new_d)
             if len(self.history_info['depth'])>self.params.num_history:#5:
@@ -384,7 +390,7 @@ class DepthSegm(BaseTracker):
                 self.history_info['pos']=self.history_info['pos'][-self.params.num_history:]
 
         # target lost
-        if (self.score_map.max()<self.params.threshold_force_redetection) or (self.flag=='not_found' and self.valid_d==False) or (target_sz_ratio_flag):
+        if (self.score_map.max()<self.params.threshold_force_redetection) or (self.flag=='not_found' and self.valid_d==False) or (area_flag):
 
             self.redetection_mode=True
             # self.tracker_fail=True
