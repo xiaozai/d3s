@@ -1279,10 +1279,10 @@ class DepthSegm(BaseTracker):
 
 
         # store everything that is needed for later
-        self.train_feat_segm_rgb = [init_f + temp_f for init_f, temp_f in zip(train_feat_segm_rgb, self.init_train_feat_segm_rgb)]
-        self.train_feat_segm_d = [init_f + temp_f for init_f, temp_f in zip(train_feat_segm_d, self.init_train_feat_segm_d)]
+        self.train_feat_segm_rgb = [(init_f + temp_f)*0.5 for init_f, temp_f in zip(train_feat_segm_rgb, self.init_train_feat_segm_rgb)]
+        self.train_feat_segm_d = [(init_f + temp_f)*0.5 for init_f, temp_f in zip(train_feat_segm_d, self.init_train_feat_segm_d)]
 
-        self.mask_patch = torch.logical_or(mask_gpu, self.init_mask_patch)
+        self.mask_patch = (mask_gpu + self.init_mask_patch) > 0
         #
         # self.mask = mask + self.init_mask
         # self.mask_pixels = np.array([np.sum(self.mask)])
