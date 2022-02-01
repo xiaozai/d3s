@@ -93,6 +93,8 @@ class DepthSegm(BaseTracker):
         depth_init = self.avg_depth(depth[:,:,0], init_bbox)   # depth H * W * 1
         depth_hist_init=self.hist_depth(depth[:,:,0], init_bbox)
 
+        self.init_target_area = state[2]*state[3]
+        
         self.history_info = {'depth':[depth_init],\
                              'depth_hist':[depth_hist_init], \
                              'velocity':[0.0], \
@@ -342,8 +344,10 @@ class DepthSegm(BaseTracker):
         mean_target_sz=[mean_h, mean_w]
 
         area_flag = False
-        area_change_ratio = abs(self.target_sz[0]*self.target_sz[1] - mean_w*mean_h) / (mean_w*mean_h+0.0000000001)
-        if area_change_ratio > 0.5:
+        current_area = self.target_sz[0]*self.target_sz[1]
+        history_area = mean_w*mean_h
+        area_change_ratio = abs(current_area - history_area) / (history_area+0.0000000001)
+        if area_change_ratio > 0.25:
             area_flag = True
 
 
