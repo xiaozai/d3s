@@ -316,7 +316,8 @@ class BaseTracker:
                 search = patches.Rectangle((search_tp[1], search_tp[0]), search_hw[1], search_hw[0], linewidth=2, edgecolor='b', facecolor='none')
                 self.ax.add_patch(search)
 
-            rgb_score = Image.blend(self.rgb_patches, self.score_map, 0.5)
+            rgb_score = Image.blend(Image.fromarray(np.uint8(self.rgb_patches)), Image.fromarray(np.uint8(self.score_map)*255), 0.5)
+            # rgb_score = Image.blend(self.rgb_patches, self.score_map, 0.5)
             self.ax_rgb_scoremap.cla()
             self.ax_rgb_scoremap.imshow(rgb_score)
             self.ax_rgb_scoremap.set_title('scoremap over rgb')
