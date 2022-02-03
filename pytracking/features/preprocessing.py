@@ -24,42 +24,22 @@ def sample_patch(im: torch.Tensor, pos: torch.Tensor, sample_sz: torch.Tensor, o
     # copy and convert
     posl = pos.long().clone()
 
-    # # Compute pre-downsampling factor
-    # if output_sz is not None:
-    #     resize_factor = torch.min(sample_sz.float() / output_sz.float()).item()
-    #     df = int(max(int(resize_factor - 0.1), 1))
-    # else:
-    #     df = int(1)
-    #
-    # sz = sample_sz.float() / df     # new size
-    #
-    # # Do downsampling
-    # if df > 1:
-    #     os = posl % df              # offset
-    #     posl = (posl - os) / df     # new position
-    #     im2 = im[..., os[0].item()::df, os[1].item()::df]   # downsample
-    # else:
-    #     im2 = im
-
     # Compute pre-downsampling factor
     if output_sz is not None:
         resize_factor = torch.min(sample_sz.float() / output_sz.float()).item()
-        df = max(int(resize_factor - 0.1), 1)
+        df = int(max(int(resize_factor - 0.1), 1))
     else:
-        df = 1.0
+        df = int(1)
 
     sz = sample_sz.float() / df     # new size
 
     # Do downsampling
     if df > 1:
         os = posl % df              # offset
-        posl = (posl - os) // df     # new position
-        # im2 = im[..., os[0].item()::df, os[1].item()::df]   # downsample
-        im2 = F.interpolate(im, sz.long().tolist(), mode='bilinear')
+        posl = (posl - os) / df     # new position
+        im2 = im[..., os[0].item()::df, os[1].item()::df]   # downsample
     else:
         im2 = im
-
-
 
 
     # compute size to crop
