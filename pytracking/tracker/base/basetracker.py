@@ -7,7 +7,7 @@ import cv2 as cv
 import time
 import os
 import numpy as np
-
+from PIL import Image
 
 class BaseTracker:
     """Base class for all trackers."""
@@ -249,7 +249,7 @@ class BaseTracker:
         self.pause_mode = False
 
         if self.params.debug == 5:
-            self.fig, ((self.ax, self.ax_d, self.ax_initmask, self.ax_rgb_patches), (self.ax_m, self.ax_mrgb, self.ax_score, _)) = plt.subplots(2, 4)
+            self.fig, ((self.ax, self.ax_d, self.ax_initmask, self.ax_rgb_patches), (self.ax_m, self.ax_mrgb, self.ax_score, self.ax_rgb_scoremap)) = plt.subplots(2, 4)
 
         elif self.params.debug == 4:
             self.ax_m = None
@@ -315,6 +315,11 @@ class BaseTracker:
                 search_hw = [search_bm[0] - search_tp[0], search_bm[1] - search_tp[1]]
                 search = patches.Rectangle((search_tp[1], search_tp[0]), search_hw[1], search_hw[0], linewidth=2, edgecolor='b', facecolor='none')
                 self.ax.add_patch(search)
+
+            rgb_score = Image.blend(self.rgb_patches, self.score_map)
+            self.ax_rgb_scoremap.cla()
+            self.ax_rgb_scoremap.imshow(rgb_score)
+            self.ax_rgb_scoremap.set_title('scoremap over rgb')
 
 
         if len(state) == 4:
