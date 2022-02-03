@@ -32,12 +32,14 @@ def sample_patch(im: torch.Tensor, pos: torch.Tensor, sample_sz: torch.Tensor, o
         df = int(1)
 
     sz = sample_sz.float() / df     # new size
+    print('.... df : ', df, sample_sz, output_sz, sz)
 
     # Do downsampling
     if df > 1:
         os = posl % df              # offset
         posl = (posl - os) / df     # new position
         im2 = im[..., os[0].item()::df, os[1].item()::df]   # downsample
+        print('... im2 downsample : ', im2.shape)
     else:
         im2 = im
 
