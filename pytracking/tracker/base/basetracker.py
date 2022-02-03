@@ -300,8 +300,8 @@ class BaseTracker:
                 self.ax_rgb_patches.imshow(self.rgb_patches)
                 self.ax_rgb_patches.set_title('rgb patches')
 
-                rgb = Image.fromarray(np.uint8(self.rgb_patches))
-                scoremap = Image.fromarray(np.uint8(self.score_map*255)).resize(rgb.size)
+                rgb = Image.fromarray(np.uint8(self.rgb_patches)).convert('RGBA')
+                scoremap = Image.fromarray(np.uint8(self.score_map*255)).resize(rgb.size).convert('RGBA')
                 data = zip(scoremap.getdata(), scoremap.getdata(), scoremap.getdata())
                 scoremap.putdata(list(data))
                 print(rgb.size, scoremap.size)
