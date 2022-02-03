@@ -538,7 +538,7 @@ class DepthSegm(BaseTracker):
 
                 scores_re2, pred_segm_region = self.one_pass_track(color, depth, self.target_scale)
 
-                # self.target_scale_redetection=torch.tensor(self.first_target_scale*2)
+                self.target_scale_redetection=torch.tensor(self.first_target_scale*1.5)
                 # self.target_scale=self.first_target_scale # 1
                 # self.redetection_mode=False
 
