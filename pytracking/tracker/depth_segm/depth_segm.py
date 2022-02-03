@@ -506,7 +506,7 @@ class DepthSegm(BaseTracker):
         # ----- redetection module --------- #
         if self.redetection_mode:
             print('....... In redetection Mode.....')
-            self.target_scale_redetection=self.target_scale_redetection*1.05 #slowing enlarge this area to the object
+            self.target_scale_redetection=self.target_scale_redetection*3 # 1.05 #slowing enlarge this area to the object
             self.target_scale_redetection=max(self.target_scale_redetection, self.min_scale_factor)
             self.target_scale_redetection=min(self.target_scale_redetection, 2*self.first_target_scale)
 
