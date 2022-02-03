@@ -32,14 +32,12 @@ def sample_patch(im: torch.Tensor, pos: torch.Tensor, sample_sz: torch.Tensor, o
         df = int(1)
 
     sz = sample_sz.float() / df     # new size
-    print('.... df : ', df, sample_sz, output_sz, sz)
 
     # Do downsampling
     if df > 1:
         os = posl % df              # offset
         posl = (posl - os) / df     # new position
         im2 = im[..., os[0].item()::df, os[1].item()::df]   # downsample
-        print('... im2 downsample : ', im2.shape)
     else:
         im2 = im
 
@@ -51,7 +49,7 @@ def sample_patch(im: torch.Tensor, pos: torch.Tensor, sample_sz: torch.Tensor, o
     br = posl + szl/2
 
     # Get image patch
-    im_patch = F.pad(im2, (-tl[1].item(), br[1].item() - im2.shape[3] + 1, -tl[0].item(), br[0].item() - im2.shape[2] + 1), 'replicate')
+    im_patch = F.pad(im2, (-tl[1].item(), br[1].item() - im2.shape[3] + 1, -tl[0].item(), br[0].item() - im2.shape[2] + 1),'constant') # 'replicate') # constant
 
     if output_sz is None or (im_patch.shape[-2] == output_sz[0] and im_patch.shape[-1] == output_sz[1]):
         return im_patch
