@@ -73,7 +73,7 @@ def parameters():
 
     # Advanced localization parameters
     params.advanced_localization = True         # Use this or not
-    params.target_not_found_threshold = 0.25 # -1      # Absolute score threshold to detect target missing
+    params.target_not_found_threshold = 0.2 # 0.25      # Absolute score threshold to detect target missing
     params.distractor_threshold = 100           # Relative threshold to find distractors
     params.hard_negative_threshold = 0.3        # Relative threshold to find hard negative samples
 
@@ -87,7 +87,7 @@ def parameters():
     params.num_history = 5
     params.frames_true_validd = 100
     params.target_refound_threshold = 0.1 #0.25 params.target_not_found_threshold
-    params.target_forcerefound_threshold = 0.1 # params.target_not_found_threshold+0.03 # recover from redetection
+    params.target_forcerefound_threshold = 0.15 # params.target_not_found_threshold+0.03 # recover from redetection
     params.threshold_updatedepth = 0.80
     params.threshold_force_redetection = 0.20
     params.threshold_allowupdateclassifer = 0.30
