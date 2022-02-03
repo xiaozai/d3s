@@ -429,9 +429,9 @@ class DepthSegm(BaseTracker):
                                                              sample_scales,
                                                              self.img_sample_sz)
         print('search scale : ', sample_scales, self.img_sample_sz, sample_pos)
-        self.vis_search_sample_pos = sample_pos
-        self.vis_search_sample_scales = sample_scales
-        self.vis_serach_sample_size = self.img_sample_sz
+        self.vis_search_sample_pos = copy.deepcopy(sample_pos）
+        self.vis_search_sample_scales = copy.deepcopy(sample_scales）
+        self.vis_serach_sample_size = self.img_sample_sz.clone().detach().cpu().numpy()
 
         # Compute scores
         scores_raw = self.apply_filter(test_x_rgb)
