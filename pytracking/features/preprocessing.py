@@ -48,7 +48,7 @@ def sample_patch(im: torch.Tensor, pos: torch.Tensor, sample_sz: torch.Tensor, o
     else:
         df = 1.0
 
-    sz = int(sample_sz.float() / df)     # new size
+    sz = sample_sz.float() / df     # new size
 
     # Do downsampling
     if df > 1:
