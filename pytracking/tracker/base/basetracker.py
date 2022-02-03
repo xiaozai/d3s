@@ -296,6 +296,7 @@ class BaseTracker:
             self.ax_initmask.set_title('init mask')
 
             if self.rgb_patches is not None:
+                print(self.rgb_patches)
                 self.ax_rgb_patches.cla()
                 self.ax_rgb_patches.imshow(self.rgb_patches)
                 self.ax_rgb_patches.set_title('rgb patches')
@@ -338,6 +339,7 @@ class BaseTracker:
             rect = patches.Rectangle((gt_state[0], gt_state[1]), gt_state[2], gt_state[3], linewidth=1, edgecolor='g',
                                      facecolor='none')
             self.ax.add_patch(rect)
+
         self.ax.set_axis_off()
         self.ax.axis('equal')
         plt.draw()
