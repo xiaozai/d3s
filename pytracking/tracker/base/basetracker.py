@@ -307,7 +307,7 @@ class BaseTracker:
                 search_tp, search_bm = center - search_sz/2, center + search_sz/2
                 search_tp = [max(0, search_tp[0]), max(0, search_tp[1])]
                 search_bm = [min(im_h, search_bm[0]), min(im_w, search_bm[1])]
-                search_hw = search_bm - search_tp
+                search_hw = [search_bm[0] - search_tp[0], search_bm[1] - search_tp[1]]
                 search = patches.Rectangle((search_tp[1], search_tp[0]), search_hw[1], search_hw[0], linewidth=2, edgecolor='b', facecolor='none')
                 self.ax.add_patch(search)
 
