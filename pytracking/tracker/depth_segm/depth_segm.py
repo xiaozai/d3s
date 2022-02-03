@@ -431,8 +431,7 @@ class DepthSegm(BaseTracker):
                                                              sample_pos,
                                                              sample_scales,
                                                              self.img_sample_sz)
-
-        print('search scale : ', sample_scales, self.img_sample_sz, sample_pos)
+        # vis the crop image patches or search region
         self.vis_search_center = sample_pos.clone().detach().cpu().numpy()
         self.vis_search_scales = sample_scales.clone().detach().cpu().numpy()
         self.vis_serach_size = self.img_sample_sz.clone().detach().cpu().numpy()
@@ -529,10 +528,12 @@ class DepthSegm(BaseTracker):
 
             self.redetection_mode=True
             # DAL longter settings, target re-detected conditions
-            if scores_re.max()[0].item()>=self.params.target_refound_threshold and self.valid_d:
+            # if scores_re.max()[0].item()>=self.params.target_refound_threshold and self.valid_d:
+            if self.score_map.max()>=self.params.target_refound_threshold and self.valid_d:
                 print('....Redetection mode finnish.....', scores_re.max()[0].item(), self.params.target_refound_threshold, self.valid_d)
                 self.redetection_mode=False
-            if scores_re.max()[0].item()>=self.params.target_forcerefound_threshold:
+            # if scores_re.max()[0].item()>=self.params.target_forcerefound_threshold:
+            if self.score_map.max()>=self.params.target_forcerefound_threshold:
                 self.redetection_mode=False
 
 
