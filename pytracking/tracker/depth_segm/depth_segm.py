@@ -585,11 +585,11 @@ class DepthSegm(BaseTracker):
             self.update_memory(train_x_rgb, train_y, learning_rate)
 
 
-        # Train filter
-        if hard_negative:
-            self.filter_optimizer.run(self.params.hard_negative_CG_iter)
-        elif (self.frame_num - 1) % self.params.train_skipping == 0:
-            self.filter_optimizer.run(self.params.CG_iter)
+            # Train filter
+            if hard_negative:
+                self.filter_optimizer.run(self.params.hard_negative_CG_iter)
+            elif (self.frame_num - 1) % self.params.train_skipping == 0:
+                self.filter_optimizer.run(self.params.CG_iter)
 
         if self.params.use_segmentation:
             if pred_segm_region is not None:
