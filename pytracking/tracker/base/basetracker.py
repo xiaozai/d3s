@@ -303,6 +303,15 @@ class BaseTracker:
             # self.ax_update_train_m.imshow(update_mask)
             # self.ax_update_train_m.set_title('updated mask')
 
+            if self.vis_serach_sample_size is not None:
+                center = self.vis_search_sample_pos.clone().cpu().detach().numpy()
+                search_sz = self.vis_serach_sample_size * self.vis_search_sample_scales[0]
+                search_sz = search_sz.clone().cpu().detach().numpy()
+                print('center : ', center, 'search_sz : ', search_sz)
+                search_tp, search_bm = center - search_sz/2, center + search_sz/2
+                search = patches.Rectangle((search_tp[0], search_tp[1]), search_sz[0], search_sz[1], linewidth=2, edgecolor='b', facecolor='none')
+                self.ax.add_patch(search)
+
         if len(state) == 4:
             pred = patches.Rectangle((state[0], state[1]), state[2], state[3], linewidth=2, edgecolor='r', facecolor='none')
             pred_d = patches.Rectangle((state[0], state[1]), state[2], state[3], linewidth=2, edgecolor='r', facecolor='none')
@@ -313,16 +322,6 @@ class BaseTracker:
         else:
             print('Error: Unknown prediction region format.')
             exit(-1)
-
-
-        if self.vis_serach_sample_size is not None:
-            center = self.vis_search_sample_pos.clone().cpu().detach().numpy()
-            search_sz = self.vis_serach_sample_size * self.vis_search_sample_scales[0]
-            search_sz = search_sz.clone().cpu().detach().numpy()
-            print('center : ', center, 'search_sz : ', search_sz)
-            search_tp, search_bm = center - search_sz/2, center + search_sz/2
-            search = patches.Rectangle((center[0], center[1]), search_sz[0], search_sz[1], linewidth=2, edgecolor='b', facecolor='none')
-            self.ax.add_patch(search)
 
 
 
