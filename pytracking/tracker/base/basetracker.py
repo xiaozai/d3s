@@ -302,9 +302,9 @@ class BaseTracker:
                 center = self.vis_search_sample_pos# .clone().cpu().detach().numpy()
                 search_sz = self.vis_serach_sample_size * self.vis_search_sample_scales[0]
                 # search_sz = search_sz.clone().cpu().detach().numpy()
-                print('center : ', center, 'search_sz : ', search_sz)
+                print('center cy, cx : ', center, 'search_sz : ', search_sz)
                 search_tp, search_bm = center - search_sz/2, center + search_sz/2
-                search = patches.Rectangle((center[0], center[1]), 10, 10, linewidth=2, edgecolor='b', facecolor='none')
+                search = patches.Rectangle((center[1], center[0]), search_sz[0], search_sz[1], linewidth=2, edgecolor='b', facecolor='none')
                 self.ax.add_patch(search)
 
 
