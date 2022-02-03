@@ -428,6 +428,7 @@ class DepthSegm(BaseTracker):
                                                              sample_pos,
                                                              sample_scales,
                                                              self.img_sample_sz)
+
         print('search scale : ', sample_scales, self.img_sample_sz, sample_pos)
         self.vis_search_center = sample_pos.clone().detach().cpu().numpy()
         self.vis_search_scales = sample_scales.clone().detach().cpu().numpy()
@@ -500,11 +501,12 @@ class DepthSegm(BaseTracker):
         self.im, self.dp = im, dp  # For debugging only
 
         pred_segm_region = None
+
         # ------- LOCALIZATION ------- #
         if not self.redetection_mode:
             score_ra, pred_segm_region = self.one_pass_track(color, depth, self.target_scale) # target_scale = 1 (4x)
         # ---- End of Localization ----#
-
+        print('self.target_sclae : ', self.target_scale, self.target_scale_redetection)
         # --- check longterm settings ---#
         self.update_dal_longterm_params(depth)
 
