@@ -122,7 +122,7 @@ class DepthSegm(BaseTracker):
 
         # Song use the redetection mode
         self.first_target_scale=self.target_scale
-        self.target_scale_redetection=torch.tensor(self.target_scale*3)
+        self.target_scale_redetection=torch.tensor(self.target_scale*2)
         self.redetection_mode=False
 
 
@@ -527,8 +527,8 @@ class DepthSegm(BaseTracker):
             if scores_re.max()[0].item()>=self.params.target_refound_threshold and self.valid_d:
                 print('....Redetection mode finnish.....', scores_re.max()[0].item(), self.params.target_refound_threshold, self.valid_d)
                 self.redetection_mode=False
-            # if scores_re.max()>=self.params.target_forcerefound_threshold:
-            #     self.redetection_mode=False
+            if scores_re.max()[0].item()>=self.params.target_forcerefound_threshold:
+                self.redetection_mode=False
 
 
             ''' target refound '''
@@ -538,7 +538,7 @@ class DepthSegm(BaseTracker):
 
                 scores_re2, pred_segm_region = self.one_pass_track(color, depth, self.target_scale)
 
-                self.target_scale_redetection=torch.tensor(self.first_target_scale*3)
+                # self.target_scale_redetection=torch.tensor(self.first_target_scale*2)
                 # self.target_scale=self.first_target_scale # 1
                 # self.redetection_mode=False
 
