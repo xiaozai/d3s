@@ -269,6 +269,7 @@ class BaseTracker:
     def visualize(self, image, state):
         if isinstance(image, dict) and self.params.debug >= 4:
             color, depth = image['color'], image['depth']
+            im_h, im_w, im_c = color.shape
             self.ax.cla()
             self.ax.imshow(color)
             self.ax_d.cla()
@@ -276,8 +277,10 @@ class BaseTracker:
         else:
             if isinstance(image, dict):
                 image = image['color']
+                im_h, im_w, im_c = image.shape
             self.ax.cla()
             self.ax.imshow(image)
+
 
         if self.params.debug == 5:
             self.ax_m.cla()
@@ -302,7 +305,10 @@ class BaseTracker:
                 center = self.vis_search_center# .clone().cpu().detach().numpy()
                 search_sz = self.vis_serach_size * self.vis_search_scales[0]
                 search_tp, search_bm = center - search_sz/2, center + search_sz/2
-                search = patches.Rectangle((search_tp[1], search_tp[0]), search_sz[1], search_sz[0], linewidth=2, edgecolor='b', facecolor='none')
+                search_tp = [max(0, search_tp[0]), max(0, search_tp[1])]
+                search_bm = [min(im_h, search_bm[0]), min(im_w, search_bm[1])]
+                search_hw = search_bm - search_tp
+                search = patches.Rectangle((search_tp[1], search_tp[0]), search_hw[1], search_hw[0], linewidth=2, edgecolor='b', facecolor='none')
                 self.ax.add_patch(search)
 
 
