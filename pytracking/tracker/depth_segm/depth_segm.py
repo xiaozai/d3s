@@ -366,7 +366,7 @@ class DepthSegm(BaseTracker):
         area_change_ratio = abs(current_area - history_area) / (history_area+eps)
         area_init_chage_ratio = abs(current_area - self.init_target_area) / (self.init_target_area+eps)
 
-        if area_change_ratio > 0.35 or area_init_chage_ratio > 0.35 or change_ratio>0.50:
+        if area_change_ratio > 0.45 or area_init_chage_ratio > 0.45 or change_ratio>0.50:
             area_flag = True
             self.target_sz= self.init_target_sz.clone() # torch.FloatTensor(mean_target_sz)
 
@@ -518,7 +518,7 @@ class DepthSegm(BaseTracker):
             print('....... In redetection Mode.....')
             self.target_scale_redetection=torch.tensor(self.target_scale_redetection*1.05) #slowing enlarge this area to the object
             # self.target_scale_redetection=max(self.target_scale_redetection, self.min_scale_factor)
-            self.target_scale_redetection=min(self.target_scale_redetection, 2*self.first_target_scale) # 2*self.first_target_scale
+            self.target_scale_redetection=min(self.target_scale_redetection, 2.5*self.first_target_scale) # 2*self.first_target_scale
             print('self.target_scale_redetection : ', self.target_scale_redetection)
             scores_re, pred_segm_region = self.one_pass_track(color, depth, self.target_scale_redetection)
 
