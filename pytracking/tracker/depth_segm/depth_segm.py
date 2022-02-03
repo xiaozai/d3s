@@ -729,6 +729,7 @@ class DepthSegm(BaseTracker):
     TensorList, TensorList):
         x_rgb, d_crops, rgb_patches = self.extract_sample(color, depth, pos, scales, sz)
         self.rgb_patches = rgb_patches.clone().detach().cpu().numpy().squeeze()
+        self.rgb_patches = numpy.swapaxes(numpy.swapaxes(self.rgb_patches, 0, 1), 0, 1)
         print(self.rgb_patches.shape)
         return self.preprocess_sample(self.project_sample(x_rgb)), d_crops
 
