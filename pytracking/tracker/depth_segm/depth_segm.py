@@ -328,16 +328,22 @@ class DepthSegm(BaseTracker):
         ------------------------------------------------------------------------
         update mode          cond1 : B_{DCF}(tu=?) & B_{dep}(td=0.8)
 
+
+        Additionally, we also use the target size to constrain
+
         '''
+
         # measure the average depth
         new_bbox = torch.cat((self.pos[[1,0]] - (self.target_sz[[1,0]]-1)/2, self.target_sz[[1,0]])).tolist()
         new_d = self.avg_depth(depth[:,:,0], new_bbox)
         # self.valid_d = self.valid_depth(new_d, self.history_info['depth'][-1]) # what is the meaning of this???
 
+        # depth bhatta
         new_dhist = self.hist_depth(depth[:,:,0], new_bbox)
         new_bhatta_depth=self.bhatta(new_dhist, self.history_info['depth_hist'][-1])
         self.valid_d = np.all([self.bhatta(new_dhist,dhist)>=self.params.threshold_bhatta for dhist in self.history_info['depth_hist']])
 
+        # ratio = h / w
         new_ratio = self.target_sz[0]/self.target_sz[1]
         mean_historyratios=np.mean(self.history_info['ratio_bbox'])
         mean_h =np.mean([bbox[0] for bbox in self.history_info['target_sz']])
@@ -345,6 +351,7 @@ class DepthSegm(BaseTracker):
         mean_target_sz=[mean_h, mean_w]
         change_ratio = abs(new_ratio-mean_historyratios)/mean_historyratios
 
+        # target size vs initial target size
         area_flag = False
         current_area = self.target_sz[0]*self.target_sz[1]
         history_area = mean_w*mean_h
@@ -355,7 +362,6 @@ class DepthSegm(BaseTracker):
         if area_change_ratio > 0.25 or area_init_chage_ratio > 0.5 or change_ratio>0.50:
             area_flag = True
             self.target_sz= self.init_target_sz.clone() # torch.FloatTensor(mean_target_sz)
-
 
 
         if self.frame_num<self.params.frames_true_validd:
@@ -394,11 +400,11 @@ class DepthSegm(BaseTracker):
             if len(self.history_info['pos'])>self.params.num_history:#3:
                 self.history_info['pos']=self.history_info['pos'][-self.params.num_history:]
 
+
         # target lost
         if (self.score_map.max()<self.params.threshold_force_redetection) or (self.flag=='not_found' and self.valid_d==False) or (area_flag):
 
             self.redetection_mode=True
-            # self.tracker_fail=True
 
             if self.params.debug==5:
                 print('.........attention! next iter entering redetection model', self.frame_num, self.score_map.max())
