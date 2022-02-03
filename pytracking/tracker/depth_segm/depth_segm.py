@@ -122,7 +122,7 @@ class DepthSegm(BaseTracker):
 
         # Song use the redetection mode
         self.first_target_scale=self.target_scale
-        self.target_scale_redetection=torch.tensor(self.target_scale*2)
+        self.target_scale_redetection=torch.tensor(self.target_scale*1.5) # 2.25
         self.redetection_mode=False
 
 

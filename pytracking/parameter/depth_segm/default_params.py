@@ -86,7 +86,7 @@ def parameters():
     # DAL redetection parameters
     params.num_history = 5
     params.frames_true_validd = 100
-    params.target_refound_threshold = 0.25 # params.target_not_found_threshold
+    params.target_refound_threshold = 0.2 # params.target_not_found_threshold
     params.target_forcerefound_threshold = params.target_not_found_threshold+0.03 # recover from redetection
     params.threshold_updatedepth = 0.80
     params.threshold_force_redetection = 0.20
