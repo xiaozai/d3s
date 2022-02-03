@@ -153,9 +153,9 @@ class DepthSegm(BaseTracker):
 
         # song
         #-----------------------------------------------------------------------
-        self.vis_search_sample_pos = self.pos
-        self.vis_search_sample_scales = [1]
-        self.vis_serach_sample_size = self.img_sample_sz
+        self.vis_search_center = self.pos
+        self.vis_search_scales = [1]
+        self.vis_serach_size = self.img_sample_sz
         #-----------------------------------------------------------------------
 
 
@@ -429,9 +429,9 @@ class DepthSegm(BaseTracker):
                                                              sample_scales,
                                                              self.img_sample_sz)
         print('search scale : ', sample_scales, self.img_sample_sz, sample_pos)
-        self.vis_search_sample_pos = sample_pos.clone().detach().cpu().numpy()
-        self.vis_search_sample_scales = sample_scales.clone().detach().cpu().numpy()
-        self.vis_serach_sample_size = self.img_sample_sz.clone().detach().cpu().numpy()
+        self.vis_search_center = sample_pos.clone().detach().cpu().numpy()
+        self.vis_search_scales = sample_scales.clone().detach().cpu().numpy()
+        self.vis_serach_size = self.img_sample_sz.clone().detach().cpu().numpy()
 
         # Compute scores
         scores_raw = self.apply_filter(test_x_rgb)
@@ -518,7 +518,7 @@ class DepthSegm(BaseTracker):
             print('....... In redetection Mode.....')
             self.target_scale_redetection=self.target_scale_redetection*3 # 1.05 #slowing enlarge this area to the object
             self.target_scale_redetection=max(self.target_scale_redetection, self.min_scale_factor)
-            self.target_scale_redetection=min(self.target_scale_redetection, 4*self.first_target_scale) # 2*self.first_target_scale
+            self.target_scale_redetection=min(self.target_scale_redetection, 10*self.first_target_scale) # 2*self.first_target_scale
 
             scores_re, pred_segm_region = self.one_pass_track(color, depth, self.target_scale_redetection)
 
