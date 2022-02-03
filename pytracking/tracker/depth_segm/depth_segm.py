@@ -522,9 +522,8 @@ class DepthSegm(BaseTracker):
             print('self.target_scale_redetection : ', self.target_scale_redetection)
             scores_re, pred_segm_region = self.one_pass_track(color, depth, self.target_scale_redetection)
 
-            print('....Redetection results ', scores_re.max()[0].item(), self.params.target_refound_threshold, self.valid_d)
             self.update_dal_longterm_params(depth)
-            print('....Redetection results ', scores_re.max()[0].item(), self.params.target_refound_threshold, self.valid_d)
+            print('....Redetection results ', self.score_map.max(), self.params.target_refound_threshold, self.valid_d)
 
             self.redetection_mode=True
             # DAL longter settings, target re-detected conditions
