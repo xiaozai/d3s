@@ -295,9 +295,10 @@ class BaseTracker:
             self.ax_initmask.imshow(self.init_mask)
             self.ax_initmask.set_title('init mask')
 
-            self.ax_rgb_patches.cla()
-            self.ax_rgb_patches.imshow(self.rgb_patches)
-            self.ax_rgb_patches.set_title('rgb patches')
+            if self.rgb_patches is not None:
+                self.ax_rgb_patches.cla()
+                self.ax_rgb_patches.imshow(self.rgb_patches)
+                self.ax_rgb_patches.set_title('rgb patches')
 
             if self.score_map is not None:
                 self.ax_score.cla()
