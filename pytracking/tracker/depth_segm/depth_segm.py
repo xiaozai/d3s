@@ -366,7 +366,10 @@ class DepthSegm(BaseTracker):
         area_change_ratio = abs(current_area - history_area) / (history_area+eps)
         area_init_chage_ratio = abs(current_area - self.init_target_area) / (self.init_target_area+eps)
 
-        if area_change_ratio > 0.35 or area_init_chage_ratio > 0.35 or change_ratio>0.50:
+        # if area_change_ratio > 0.35 or area_init_chage_ratio > 0.35 or change_ratio>0.50:
+        #     area_flag = True
+        #     self.target_sz= self.init_target_sz.clone() # torch.FloatTensor(mean_target_sz)
+        if area_init_chage_ratio > 0.5 or change_ratio>0.50:
             area_flag = True
             self.target_sz= self.init_target_sz.clone() # torch.FloatTensor(mean_target_sz)
 
@@ -409,7 +412,7 @@ class DepthSegm(BaseTracker):
 
 
         # target lost
-        if (self.score_map.max()<self.params.threshold_force_redetection) or (self.flag=='not_found' and self.valid_d==False): #  or (area_flag):
+        if (self.score_map.max()<self.params.threshold_force_redetection) or (self.flag=='not_found' and self.valid_d==False) or (area_flag):
             print('force redetection : ', self.score_map.max(), self.flag, self.valid_d, area_flag)
             self.redetection_mode=True
 
