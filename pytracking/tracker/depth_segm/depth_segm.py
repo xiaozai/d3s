@@ -514,7 +514,7 @@ class DepthSegm(BaseTracker):
         # ----- redetection module --------- #
         if self.redetection_mode:
             print('....... In redetection Mode.....')
-            self.target_scale_redetection=self.target_scale_redetection*1.5 #slowing enlarge this area to the object
+            self.target_scale_redetection=torch.tensor(self.target_scale_redetection*1.5) #slowing enlarge this area to the object
             # self.target_scale_redetection=max(self.target_scale_redetection, self.min_scale_factor)
             # self.target_scale_redetection=min(self.target_scale_redetection, 10*self.first_target_scale) # 2*self.first_target_scale
 
@@ -523,7 +523,7 @@ class DepthSegm(BaseTracker):
             self.redetection_mode=True
             # DAL longter settings, target re-detected conditions
             if scores_re.max()>=self.params.target_refound_threshold and self.valid_d:
-                print('....Redetection mode finnish.....', scores_re.max(), self.valid_d)
+                print('....Redetection mode finnish.....', scores_re.max(), self.params.target_refound_threshold, self.valid_d)
                 self.redetection_mode=False
             # if scores_re.max()>=self.params.target_forcerefound_threshold:
             #     self.redetection_mode=False
@@ -536,7 +536,7 @@ class DepthSegm(BaseTracker):
 
                 scores_re2, pred_segm_region = self.one_pass_track(color, depth, self.target_scale)
 
-                # self.target_scale_redetection=self.first_target_scale
+                self.target_scale_redetection=torch.tensor(self.first_target_scale*3)
                 # self.target_scale=self.first_target_scale # 1
                 # self.redetection_mode=False
 
