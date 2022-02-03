@@ -313,11 +313,10 @@ class BaseTracker:
                 self.ax_rgb_scoremap.set_title('scoremap over rgb')
 
             if self.score_map is not None:
-                score_map = np.exp(self.score_map)/sum(np.exp(self.score_map))
                 self.ax_score.cla()
-                self.ax_score.imshow(score_map)
-                max_score = np.max(score_map)
-                self.ax_score.set_title('score map %f vs %f'%(max_score, np.max(self.score_map)))
+                self.ax_score.imshow(self.score_map)
+                max_score = np.max(self.score_map)
+                self.ax_score.set_title('score map %f'%max_score)
 
             if self.vis_search_center is not None:
                 center = self.vis_search_center# .clone().cpu().detach().numpy()
