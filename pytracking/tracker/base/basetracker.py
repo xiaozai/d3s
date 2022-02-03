@@ -302,17 +302,12 @@ class BaseTracker:
 
                 rgb = Image.fromarray(np.uint8(self.rgb_patches)).convert('RGBA')
 
-                cm = plt.get_cmap('gist_rainbow')
-                # scoremap = Image.fromarray(np.uint8(self.score_map*255)).resize(rgb.size).convert('RGBA')
+                # cm = plt.get_cmap('gist_rainbow')
+                cm = plt.get_cmap('jet')
                 colored_image = cm(self.score_map)
                 scoremap = Image.fromarray((colored_image[:, :, :3] * 255).astype(np.uint8)).convert('RGBA')
 
-
-                # data = zip(scoremap.getdata(), scoremap.getdata(), scoremap.getdata())
-                # scoremap.putdata(list(data))
-                print(rgb.size, scoremap.size)
-
-                rgb_score = Image.blend(rgb, scoremap, 0.5)
+                rgb_score = Image.blend(rgb, scoremap, 0.3)
                 self.ax_rgb_scoremap.cla()
                 self.ax_rgb_scoremap.imshow(rgb_score)
                 self.ax_rgb_scoremap.set_title('scoremap over rgb')
