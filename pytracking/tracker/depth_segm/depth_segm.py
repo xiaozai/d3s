@@ -413,10 +413,10 @@ class DepthSegm(BaseTracker):
 
         # target lost
         if (self.score_map.max()<self.params.threshold_force_redetection) or (self.flag=='not_found' and self.valid_d==False) or (area_flag):
-            print('force redetection : ', self.score_map.max(), self.flag, self.valid_d, area_flag)
             self.redetection_mode=True
 
             if self.params.debug==5:
+                print('force redetection : ', self.score_map.max(), self.flag, self.valid_d, area_flag)
                 print('.........attention! next iter entering redetection model', self.frame_num, self.score_map.max())
         else:
             self.redetection_mode = False
@@ -512,27 +512,34 @@ class DepthSegm(BaseTracker):
             score_ra, pred_segm_region = self.one_pass_track(color, depth, self.target_scale) # target_scale = tensor([1.6]) (4x)
 
         # ---- End of Localization ----#
-        print('self.target_sclae : ', self.target_scale, self.target_scale_redetection)
+        if self.params.debug==5:
+            print('self.target_sclae : ', self.target_scale, self.target_scale_redetection)
         # --- check longterm settings ---#
         self.update_dal_longterm_params(depth)
 
         # ----- redetection module --------- #
         if self.redetection_mode:
-            print('....... In redetection Mode.....')
+            if self.params.debug==5:
+                print('....... In redetection Mode.....')
             self.target_scale_redetection=torch.tensor(self.target_scale_redetection*1.05) #slowing enlarge this area to the object
             self.target_scale_redetection=max(self.target_scale_redetection, self.min_scale_factor)
             self.target_scale_redetection=min(self.target_scale_redetection, 2.5*self.first_target_scale) # 2*self.first_target_scale
-            print('self.target_scale_redetection : ', self.target_scale_redetection,  2.5*self.first_target_scale)
+
+            if self.params.debug==5:
+                print('self.target_scale_redetection : ', self.target_scale_redetection,  2.5*self.first_target_scale)
             scores_re, pred_segm_region = self.one_pass_track(color, depth, self.target_scale_redetection)
 
             self.update_dal_longterm_params(depth)
-            print('....Redetection results ', self.score_map.max(), self.params.target_refound_threshold, self.valid_d)
+
+            if self.params.debug==5:
+                print('....Redetection results ', self.score_map.max(), self.params.target_refound_threshold, self.valid_d)
 
             self.redetection_mode=True
             # DAL longter settings, target re-detected conditions
             # if scores_re.max()[0].item()>=self.params.target_refound_threshold and self.valid_d:
             if self.score_map.max()>=self.params.target_refound_threshold and self.valid_d:
-                print('....Redetection mode finnish.....', scores_re.max()[0].item(), self.params.target_refound_threshold, self.valid_d)
+                if self.params.debug==5:
+                    print('....Redetection mode finnish.....', scores_re.max()[0].item(), self.params.target_refound_threshold, self.valid_d)
                 self.redetection_mode=False
             # if scores_re.max()[0].item()>=self.params.target_forcerefound_threshold:
             if self.score_map.max()>=self.params.target_forcerefound_threshold:
@@ -591,7 +598,8 @@ class DepthSegm(BaseTracker):
             self.update_memory(train_x_rgb, train_y, learning_rate)
 
 
-            print('... filter optimization running ...')
+            if self.params.debug==5:
+                print('... filter optimization running ...')
             # Train filter
             if hard_negative:
                 self.filter_optimizer.run(self.params.hard_negative_CG_iter)
@@ -1195,125 +1203,125 @@ class DepthSegm(BaseTracker):
 
 
 
-    def update_train_feat(self, color, depth, bb):
-        '''
-        Given new train samples and new bbox,
-        Update train_feat_segm_rgb and train_feat_segm_d and train_masks for segm_target '''
-
-        init_patch_crop_rgb, f_ = prutils.sample_target(color, np.array(bb), self.params.segm_search_area_factor,
-                                                    output_sz=self.params.segm_output_sz)
-
-        init_patch_crop_d, _ = prutils.sample_target(depth, np.array(bb), self.params.segm_search_area_factor,
-                                                    output_sz=self.params.segm_output_sz)
-        init_patch_crop_d = np.expand_dims(init_patch_crop_d, axis=-1)
-
-
-        mask = np.zeros((color.shape[0], color.shape[1]), dtype=np.int32)
-        p1 = bb[:2]
-        p2 = [bb[0] + bb[2], bb[1]]
-        p3 = [bb[0] + bb[2], bb[1] + bb[3]]
-        p4 = [bb[0], bb[1] + bb[3]]
-        cv2.fillConvexPoly(mask, np.array([p1, p2, p3, p4], dtype=np.int32), 1)
-        mask = mask.astype(np.float32)
-
-        init_mask_patch_np, patch_factor_init = prutils.sample_target(mask, np.array(bb),
-                                                                      self.params.segm_search_area_factor,
-                                                                      output_sz=self.params.segm_output_sz, pad_val=0)
-
-
-        # normalize input image RGB
-        init_patch_norm_rgb = init_patch_crop_rgb.astype(np.float32) / float(255)
-        init_patch_norm_rgb -= self.params.segm_normalize_mean
-        init_patch_norm_rgb /= self.params.segm_normalize_std
-
-        # Depth is already normalized when basetracker._read_image()
-        init_patch_norm_d = init_patch_crop_d.astype(np.float32)
-
-        # create distance map for discriminative segmentation
-        if self.params.segm_use_dist:
-            if self.params.segm_dist_map_type == 'center':
-                # center-based dist map
-                dist_map = self.create_dist(init_patch_crop_rgb.shape[0], init_patch_crop_rgb.shape[1])
-            elif self.params.segm_dist_map_type == 'bbox':
-                # bbox-based dist map
-                dist_map = self.create_dist_gauss(self.params.segm_output_sz, bb[2] * patch_factor_init,
-                                                  bb[3] * patch_factor_init)
-            else:
-                print('Error: Unknown distance map type.')
-                exit(-1)
-
-            dist_map = torch.Tensor(dist_map)
-
-        # put image patch and mask to GPU
-        init_patch_rgb = torch.Tensor(init_patch_norm_rgb)
-        init_patch_d = torch.Tensor(init_patch_norm_d)
-        init_mask_patch = torch.Tensor(init_mask_patch_np)
-
-        if self.params.use_gpu:
-            init_patch_rgb = init_patch_rgb.to(self.params.device)
-            init_patch_d = init_patch_d.to(self.params.device)
-            init_mask_patch = init_mask_patch.to(self.params.device)
-            if self.params.segm_use_dist:
-                dist_map = dist_map.to(self.params.device)
-                dist_map = torch.unsqueeze(torch.unsqueeze(dist_map, dim=0), dim=0)
-                test_dist_map = [dist_map]
-            else:
-                test_dist_map = None
-
-        # reshape image for the feature extractor
-        init_patch_rgb = torch.unsqueeze(init_patch_rgb, dim=0).permute(0, 3, 1, 2)
-        init_patch_d = torch.unsqueeze(init_patch_d, dim=0).permute(0, 3, 1, 2)
-        init_mask_patch = torch.unsqueeze(torch.unsqueeze(init_mask_patch, dim=0), dim=0)
-
-        # extract features (extracting twice on the same patch - not necessary)
-        train_feat_rgb = self.segm_net.extract_backbone_features(init_patch_rgb)
-
-        # prepare features in the list (format for the network)
-        train_feat_segm_rgb = [feat for feat in train_feat_rgb.values()]
-        test_feat_segm_rgb = [feat for feat in train_feat_rgb.values()]
-        train_masks = [init_mask_patch]
-
-        # Song : extract depth features
-        train_feat_segm_d = self.segm_net.segm_predictor.depth_feat_extractor(init_patch_d)
-
-        # if init_mask is None:
-        # Get mask
-        iters = 0
-        while iters < 1:
-            # Obtain segmentation prediction
-            segm_pred = self.segm_net.segm_predictor(test_feat_segm_rgb, init_patch_d,
-                                                     train_feat_segm_rgb, train_feat_segm_d, # if we use the feature correlation
-                                                     train_masks, test_dist_map)
-            # softmax on the prediction (during training this is done internaly when calculating loss)
-            # take only the positive channel as predicted segmentation mask
-            mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy()
-            mask = (mask > self.params.init_segm_mask_thr).astype(np.float32)
-
-            if hasattr(self, 'gt_poly'):
-                # dilate polygon-based mask
-                # dilate only if given mask is made from polygon, not from axis-aligned bb (since rotated bb is much tighter)
-                dil_kernel_sz = max(5, int(round(0.05 * min(self.target_sz).item() * f_)))
-                kernel = np.ones((dil_kernel_sz, dil_kernel_sz), np.uint8)
-                mask_dil = cv2.dilate(init_mask_patch_np, kernel, iterations=1)
-                mask = mask * mask_dil
-            else:
-                mask = mask * init_mask_patch_np
-
-            target_pixels = np.sum((mask > 0.5).astype(np.float32))
-            if target_pixels / (bb[2]*bb[3]*(patch_factor_init*patch_factor_init)+0.1) < 0.3:
-                mask = (init_mask_patch_np > 0.1).astype(np.float32)
-                target_pixels = np.sum((mask > 0.5).astype(np.float32))
-
-            mask_gpu = torch.unsqueeze(torch.unsqueeze(torch.tensor(mask), dim=0), dim=0).to(self.params.device)
-            train_masks = [mask_gpu]
-
-            iters += 1
-
-
-        print('update train feat....')
-        self.train_feat_segm_rgb = [0.5*init_f + 0.5*temp_f for temp_f, init_f in zip(train_feat_segm_rgb, self.init_train_feat_segm_rgb)]
-        self.train_feat_segm_d = 0.5*train_feat_segm_d + 0.5*self.init_train_feat_segm_d # 【1， C， H， W]
-        self.mask_patch = torch.tensor((mask_gpu + self.init_mask_patch) > 0, dtype=torch.float32).to(self.params.device)
+    # def update_train_feat(self, color, depth, bb):
+    #     '''
+    #     Given new train samples and new bbox,
+    #     Update train_feat_segm_rgb and train_feat_segm_d and train_masks for segm_target '''
+    #
+    #     init_patch_crop_rgb, f_ = prutils.sample_target(color, np.array(bb), self.params.segm_search_area_factor,
+    #                                                 output_sz=self.params.segm_output_sz)
+    #
+    #     init_patch_crop_d, _ = prutils.sample_target(depth, np.array(bb), self.params.segm_search_area_factor,
+    #                                                 output_sz=self.params.segm_output_sz)
+    #     init_patch_crop_d = np.expand_dims(init_patch_crop_d, axis=-1)
+    #
+    #
+    #     mask = np.zeros((color.shape[0], color.shape[1]), dtype=np.int32)
+    #     p1 = bb[:2]
+    #     p2 = [bb[0] + bb[2], bb[1]]
+    #     p3 = [bb[0] + bb[2], bb[1] + bb[3]]
+    #     p4 = [bb[0], bb[1] + bb[3]]
+    #     cv2.fillConvexPoly(mask, np.array([p1, p2, p3, p4], dtype=np.int32), 1)
+    #     mask = mask.astype(np.float32)
+    #
+    #     init_mask_patch_np, patch_factor_init = prutils.sample_target(mask, np.array(bb),
+    #                                                                   self.params.segm_search_area_factor,
+    #                                                                   output_sz=self.params.segm_output_sz, pad_val=0)
+    #
+    #
+    #     # normalize input image RGB
+    #     init_patch_norm_rgb = init_patch_crop_rgb.astype(np.float32) / float(255)
+    #     init_patch_norm_rgb -= self.params.segm_normalize_mean
+    #     init_patch_norm_rgb /= self.params.segm_normalize_std
+    #
+    #     # Depth is already normalized when basetracker._read_image()
+    #     init_patch_norm_d = init_patch_crop_d.astype(np.float32)
+    #
+    #     # create distance map for discriminative segmentation
+    #     if self.params.segm_use_dist:
+    #         if self.params.segm_dist_map_type == 'center':
+    #             # center-based dist map
+    #             dist_map = self.create_dist(init_patch_crop_rgb.shape[0], init_patch_crop_rgb.shape[1])
+    #         elif self.params.segm_dist_map_type == 'bbox':
+    #             # bbox-based dist map
+    #             dist_map = self.create_dist_gauss(self.params.segm_output_sz, bb[2] * patch_factor_init,
+    #                                               bb[3] * patch_factor_init)
+    #         else:
+    #             print('Error: Unknown distance map type.')
+    #             exit(-1)
+    #
+    #         dist_map = torch.Tensor(dist_map)
+    #
+    #     # put image patch and mask to GPU
+    #     init_patch_rgb = torch.Tensor(init_patch_norm_rgb)
+    #     init_patch_d = torch.Tensor(init_patch_norm_d)
+    #     init_mask_patch = torch.Tensor(init_mask_patch_np)
+    #
+    #     if self.params.use_gpu:
+    #         init_patch_rgb = init_patch_rgb.to(self.params.device)
+    #         init_patch_d = init_patch_d.to(self.params.device)
+    #         init_mask_patch = init_mask_patch.to(self.params.device)
+    #         if self.params.segm_use_dist:
+    #             dist_map = dist_map.to(self.params.device)
+    #             dist_map = torch.unsqueeze(torch.unsqueeze(dist_map, dim=0), dim=0)
+    #             test_dist_map = [dist_map]
+    #         else:
+    #             test_dist_map = None
+    #
+    #     # reshape image for the feature extractor
+    #     init_patch_rgb = torch.unsqueeze(init_patch_rgb, dim=0).permute(0, 3, 1, 2)
+    #     init_patch_d = torch.unsqueeze(init_patch_d, dim=0).permute(0, 3, 1, 2)
+    #     init_mask_patch = torch.unsqueeze(torch.unsqueeze(init_mask_patch, dim=0), dim=0)
+    #
+    #     # extract features (extracting twice on the same patch - not necessary)
+    #     train_feat_rgb = self.segm_net.extract_backbone_features(init_patch_rgb)
+    #
+    #     # prepare features in the list (format for the network)
+    #     train_feat_segm_rgb = [feat for feat in train_feat_rgb.values()]
+    #     test_feat_segm_rgb = [feat for feat in train_feat_rgb.values()]
+    #     train_masks = [init_mask_patch]
+    #
+    #     # Song : extract depth features
+    #     train_feat_segm_d = self.segm_net.segm_predictor.depth_feat_extractor(init_patch_d)
+    #
+    #     # if init_mask is None:
+    #     # Get mask
+    #     iters = 0
+    #     while iters < 1:
+    #         # Obtain segmentation prediction
+    #         segm_pred = self.segm_net.segm_predictor(test_feat_segm_rgb, init_patch_d,
+    #                                                  train_feat_segm_rgb, train_feat_segm_d, # if we use the feature correlation
+    #                                                  train_masks, test_dist_map)
+    #         # softmax on the prediction (during training this is done internaly when calculating loss)
+    #         # take only the positive channel as predicted segmentation mask
+    #         mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy()
+    #         mask = (mask > self.params.init_segm_mask_thr).astype(np.float32)
+    #
+    #         if hasattr(self, 'gt_poly'):
+    #             # dilate polygon-based mask
+    #             # dilate only if given mask is made from polygon, not from axis-aligned bb (since rotated bb is much tighter)
+    #             dil_kernel_sz = max(5, int(round(0.05 * min(self.target_sz).item() * f_)))
+    #             kernel = np.ones((dil_kernel_sz, dil_kernel_sz), np.uint8)
+    #             mask_dil = cv2.dilate(init_mask_patch_np, kernel, iterations=1)
+    #             mask = mask * mask_dil
+    #         else:
+    #             mask = mask * init_mask_patch_np
+    #
+    #         target_pixels = np.sum((mask > 0.5).astype(np.float32))
+    #         if target_pixels / (bb[2]*bb[3]*(patch_factor_init*patch_factor_init)+0.1) < 0.3:
+    #             mask = (init_mask_patch_np > 0.1).astype(np.float32)
+    #             target_pixels = np.sum((mask > 0.5).astype(np.float32))
+    #
+    #         mask_gpu = torch.unsqueeze(torch.unsqueeze(torch.tensor(mask), dim=0), dim=0).to(self.params.device)
+    #         train_masks = [mask_gpu]
+    #
+    #         iters += 1
+    #
+    #     #
+    #     # print('update train feat....')
+    #     # self.train_feat_segm_rgb = [0.5*init_f + 0.5*temp_f for temp_f, init_f in zip(train_feat_segm_rgb, self.init_train_feat_segm_rgb)]
+    #     # self.train_feat_segm_d = 0.5*train_feat_segm_d + 0.5*self.init_train_feat_segm_d # 【1， C， H， W]
+    #     # self.mask_patch = torch.tensor((mask_gpu + self.init_mask_patch) > 0, dtype=torch.float32).to(self.params.device)
 
     def segment_target(self, color, depth, pos, sz):
         # pos and sz are in the image coordinates
