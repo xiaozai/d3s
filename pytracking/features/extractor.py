@@ -118,7 +118,7 @@ class MultiResolutionExtractor(ExtractorBase):
         feature_map = TensorList([f.get_feature(im_patches) for f in self.features]).unroll()
 
         if dp is not None:
-            return feature_map, dp_patches
+            return feature_map, dp_patches, im_patches
         else:
             return feature_map
 

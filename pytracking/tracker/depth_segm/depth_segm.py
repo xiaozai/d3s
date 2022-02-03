@@ -725,7 +725,8 @@ class DepthSegm(BaseTracker):
 
     def extract_processed_sample(self, color: torch.Tensor, depth: torch.Tensor, pos: torch.Tensor, scales, sz: torch.Tensor) -> (
     TensorList, TensorList):
-        x_rgb, d_crops = self.extract_sample(color, depth, pos, scales, sz)
+        x_rgb, d_crops, rgb_patches = self.extract_sample(color, depth, pos, scales, sz)
+        self.rgb_patches = rgb_patches.clone().detach().cpu().numpy().squeeze()
         return self.preprocess_sample(self.project_sample(x_rgb)), d_crops
 
     def preprocess_sample(self, x: TensorList) -> (TensorList, TensorList):

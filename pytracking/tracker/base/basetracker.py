@@ -249,7 +249,7 @@ class BaseTracker:
         self.pause_mode = False
 
         if self.params.debug == 5:
-            self.fig, ((self.ax, self.ax_d, self.ax_initmask), (self.ax_m, self.ax_mrgb, self.ax_score)) = plt.subplots(2, 3)
+            self.fig, ((self.ax, self.ax_d, self.ax_initmask, self.ax_rgb_patches), (self.ax_m, self.ax_mrgb, self.ax_score, _)) = plt.subplots(2, 4)
 
         elif self.params.debug == 4:
             self.ax_m = None
@@ -294,6 +294,10 @@ class BaseTracker:
             self.ax_initmask.cla()
             self.ax_initmask.imshow(self.init_mask)
             self.ax_initmask.set_title('init mask')
+
+            self.ax_rgb_patches.cla()
+            self.ax_rgb_patches.imshwo(self.rgb_patches)
+            self.ax_rgb_patches.set_title('rgb patches')
 
             if self.score_map is not None:
                 self.ax_score.cla()
