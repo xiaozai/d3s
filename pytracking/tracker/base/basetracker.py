@@ -302,8 +302,8 @@ class BaseTracker:
 
                 rgb = Image.fromarray(np.uint8(self.rgb_patches)).convert('RGBA')
                 scoremap = Image.fromarray(np.uint8(self.score_map*255)).resize(rgb.size).convert('RGBA')
-                data = zip(scoremap.getdata(), scoremap.getdata(), scoremap.getdata())
-                scoremap.putdata(list(data))
+                # data = zip(scoremap.getdata(), scoremap.getdata(), scoremap.getdata())
+                # scoremap.putdata(list(data))
                 print(rgb.size, scoremap.size)
                 rgb_score = Image.blend(rgb, scoremap, 0.5)
                 self.ax_rgb_scoremap.cla()
