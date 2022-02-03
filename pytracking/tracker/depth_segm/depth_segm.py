@@ -522,8 +522,8 @@ class DepthSegm(BaseTracker):
 
             self.redetection_mode=True
             # DAL longter settings, target re-detected conditions
-            if scores_re.max()>=self.params.target_refound_threshold and self.valid_d:
-                print('....Redetection mode finnish.....', scores_re.max(), self.params.target_refound_threshold, self.valid_d)
+            if scores_re.max()[0].item()>=self.params.target_refound_threshold and self.valid_d:
+                print('....Redetection mode finnish.....', scores_re.max()[0].item(), self.params.target_refound_threshold, self.valid_d)
                 self.redetection_mode=False
             # if scores_re.max()>=self.params.target_forcerefound_threshold:
             #     self.redetection_mode=False
