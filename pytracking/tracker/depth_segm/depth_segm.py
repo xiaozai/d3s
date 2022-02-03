@@ -366,7 +366,7 @@ class DepthSegm(BaseTracker):
         area_change_ratio = abs(current_area - history_area) / (history_area+eps)
         area_init_chage_ratio = abs(current_area - self.init_target_area) / (self.init_target_area+eps)
 
-        if area_change_ratio > 0.45 or area_init_chage_ratio > 0.45 or change_ratio>0.50:
+        if area_change_ratio > 0.35 or area_init_chage_ratio > 0.35 or change_ratio>0.50:
             area_flag = True
             self.target_sz= self.init_target_sz.clone() # torch.FloatTensor(mean_target_sz)
 
@@ -518,7 +518,7 @@ class DepthSegm(BaseTracker):
             print('....... In redetection Mode.....')
             self.target_scale_redetection=torch.tensor(self.target_scale_redetection*1.05) #slowing enlarge this area to the object
             # self.target_scale_redetection=max(self.target_scale_redetection, self.min_scale_factor)
-            self.target_scale_redetection=min(self.target_scale_redetection, 3*self.first_target_scale) # 2*self.first_target_scale
+            self.target_scale_redetection=min(self.target_scale_redetection, 2.8*self.first_target_scale) # 2*self.first_target_scale
             print('self.target_scale_redetection : ', self.target_scale_redetection)
             scores_re, pred_segm_region = self.one_pass_track(color, depth, self.target_scale_redetection)
 
@@ -541,7 +541,7 @@ class DepthSegm(BaseTracker):
                 scores_re2, pred_segm_region = self.one_pass_track(color, depth, self.target_scale)
 
                 self.target_scale_redetection=torch.tensor(self.first_target_scale*1.5)
-                # self.target_scale=self.first_target_scale # 1
+                self.target_scale=self.first_target_scale # 1
                 # self.redetection_mode=False
 
         # new tracking results
@@ -584,16 +584,6 @@ class DepthSegm(BaseTracker):
             # Update memory
             self.update_memory(train_x_rgb, train_y, learning_rate)
 
-
-            ''' update train_feat_rgb and train_feat_d '''
-            # #-----------------------------------------------------------------#
-            # if self.score_map.max() >= 0.9:
-            #     bb = new_state
-            #     if self.params.use_segmentation:
-            #         if pred_segm_region is not None:
-            #             bb = pred_segm_region
-            #     self.update_train_feat(color, depth, bb)
-            # #-----------------------------------------------------------------#
 
         # Train filter
         if hard_negative:
@@ -730,7 +720,6 @@ class DepthSegm(BaseTracker):
         x_rgb, d_crops, rgb_patches = self.extract_sample(color, depth, pos, scales, sz)
         self.rgb_patches = rgb_patches.clone().detach().cpu().numpy().squeeze()
         self.rgb_patches = np.swapaxes(np.swapaxes(self.rgb_patches, 0, 1), 1, 2).astype(int)
-        print(self.rgb_patches.shape)
         return self.preprocess_sample(self.project_sample(x_rgb)), d_crops
 
     def preprocess_sample(self, x: TensorList) -> (TensorList, TensorList):

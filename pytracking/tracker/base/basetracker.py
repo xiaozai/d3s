@@ -296,7 +296,6 @@ class BaseTracker:
             self.ax_initmask.set_title('init mask')
 
             if self.rgb_patches is not None:
-                print(self.rgb_patches)
                 self.ax_rgb_patches.cla()
                 self.ax_rgb_patches.imshow(self.rgb_patches)
                 self.ax_rgb_patches.set_title('rgb patches')
