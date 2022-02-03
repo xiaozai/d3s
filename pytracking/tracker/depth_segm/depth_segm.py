@@ -517,7 +517,7 @@ class DepthSegm(BaseTracker):
             self.target_scale_redetection=torch.tensor(self.target_scale_redetection*1.05) #slowing enlarge this area to the object
             # self.target_scale_redetection=max(self.target_scale_redetection, self.min_scale_factor)
             # self.target_scale_redetection=min(self.target_scale_redetection, 10*self.first_target_scale) # 2*self.first_target_scale
-            print('self.target_scale_redetection : ', target_scale_redetection)
+            print('self.target_scale_redetection : ', self.target_scale_redetection)
             scores_re, pred_segm_region = self.one_pass_track(color, depth, self.target_scale_redetection)
 
             print('....Redetection results ', scores_re.max()[0].item(), self.params.target_refound_threshold, self.valid_d)
