@@ -518,7 +518,7 @@ class DepthSegm(BaseTracker):
             print('....... In redetection Mode.....')
             self.target_scale_redetection=torch.tensor(self.target_scale_redetection*1.05) #slowing enlarge this area to the object
             # self.target_scale_redetection=max(self.target_scale_redetection, self.min_scale_factor)
-            self.target_scale_redetection=min(self.target_scale_redetection, 2.8*self.first_target_scale) # 2*self.first_target_scale
+            self.target_scale_redetection=min(self.target_scale_redetection, 2.5*self.first_target_scale) # 2*self.first_target_scale
             print('self.target_scale_redetection : ', self.target_scale_redetection)
             scores_re, pred_segm_region = self.one_pass_track(color, depth, self.target_scale_redetection)
 
@@ -585,6 +585,7 @@ class DepthSegm(BaseTracker):
             self.update_memory(train_x_rgb, train_y, learning_rate)
 
 
+            print('... filter optimization running ...')
             # Train filter
             if hard_negative:
                 self.filter_optimizer.run(self.params.hard_negative_CG_iter)
