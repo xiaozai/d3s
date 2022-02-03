@@ -221,7 +221,7 @@ class DepthSegm(BaseTracker):
         self.time += toc_
 
         self.rgb_patches = None
-        
+
     def init_optimization(self, train_x, init_y):
         # Initialize filter for DCF RGB based
         filter_init_method = getattr(self.params, 'filter_init_method', 'zeros')
@@ -729,6 +729,7 @@ class DepthSegm(BaseTracker):
     TensorList, TensorList):
         x_rgb, d_crops, rgb_patches = self.extract_sample(color, depth, pos, scales, sz)
         self.rgb_patches = rgb_patches.clone().detach().cpu().numpy().squeeze()
+        print(self.rgb_patches.shape)
         return self.preprocess_sample(self.project_sample(x_rgb)), d_crops
 
     def preprocess_sample(self, x: TensorList) -> (TensorList, TensorList):
