@@ -122,7 +122,7 @@ class DepthSegm(BaseTracker):
 
         # Song use the redetection mode
         self.first_target_scale=self.target_scale
-        self.target_scale_redetection=self.target_scale*3
+        self.target_scale_redetection=torch.tensor(self.target_scale*3)
         self.redetection_mode=False
 
 
@@ -504,7 +504,8 @@ class DepthSegm(BaseTracker):
 
         # ------- LOCALIZATION ------- #
         if not self.redetection_mode:
-            score_ra, pred_segm_region = self.one_pass_track(color, depth, self.target_scale) # target_scale = 1 (4x)
+            score_ra, pred_segm_region = self.one_pass_track(color, depth, self.target_scale) # target_scale = tensor([1.6]) (4x)
+
         # ---- End of Localization ----#
         print('self.target_sclae : ', self.target_scale, self.target_scale_redetection)
         # --- check longterm settings ---#
