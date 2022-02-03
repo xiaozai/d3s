@@ -314,6 +314,16 @@ class BaseTracker:
             print('Error: Unknown prediction region format.')
             exit(-1)
 
+
+        if self.vis_serach_sample_size is not None:
+            center = self.vis_search_sample_pos
+            search_sz = [self.vis_serach_sample_size* s for s in self.vis_search_sample_scales]
+            print('center : ', center, 'search_sz : ', search_sz)
+
+
+
+
+
         self.ax.add_patch(pred)
 
         if self.params.debug == 5:

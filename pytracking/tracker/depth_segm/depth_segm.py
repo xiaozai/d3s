@@ -151,7 +151,12 @@ class DepthSegm(BaseTracker):
         self.kernel_size = self.fparams.attribute('kernel_size')
 
 
-
+        # song
+        #-----------------------------------------------------------------------
+        self.vis_search_sample_pos = self.pos
+        self.vis_search_sample_scales = [1]
+        self.vis_serach_sample_size = self.img_sample_sz
+        #-----------------------------------------------------------------------
 
 
 
@@ -423,6 +428,11 @@ class DepthSegm(BaseTracker):
                                                              sample_pos,
                                                              sample_scales,
                                                              self.img_sample_sz)
+        print('search scale : ', sample_scales, self.img_sample_sz, sample_pos)
+        self.vis_search_sample_pos = sample_pos
+        self.vis_search_sample_scales = sample_scales
+        self.vis_serach_sample_size = self.img_sample_sz
+
         # Compute scores
         scores_raw = self.apply_filter(test_x_rgb)
         translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
