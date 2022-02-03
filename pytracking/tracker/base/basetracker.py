@@ -298,7 +298,7 @@ class BaseTracker:
                 max_score = np.max(self.score_map)
                 self.ax_score.set_title('score map %f'%max_score)
 
-            if self.vis_serach_sample_size is not None:
+            if self.vis_search_center is not None:
                 center = self.vis_search_center# .clone().cpu().detach().numpy()
                 search_sz = self.vis_serach_size * self.vis_search_scales[0]
                 search_tp, search_bm = center - search_sz/2, center + search_sz/2
