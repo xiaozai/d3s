@@ -90,7 +90,7 @@ def parameters():
     params.target_forcerefound_threshold = 0.2 # params.target_not_found_threshold+0.03 # recover from redetection
     params.threshold_updatedepth = 0.80
     params.threshold_force_redetection = 0.20
-    params.threshold_allowupdateclassifer = 0.30
+    params.threshold_allowupdateclassifer = 0.6 # 0.30
     params.threshold_bhatta = 0.8
 
 

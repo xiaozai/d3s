@@ -606,6 +606,8 @@ class DepthSegm(BaseTracker):
 
             if self.params.debug==5:
                 print('... filter optimization running ...')
+
+
             # Train filter
             if hard_negative:
                 self.filter_optimizer.run(self.params.hard_negative_CG_iter)
