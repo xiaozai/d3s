@@ -367,7 +367,7 @@ class DepthSegm(BaseTracker):
         # area_init_chage_ratio = abs(current_area - self.init_target_area) / (self.init_target_area+eps)
         area_ratio = current_area / (self.init_target_area+eps)
         area_flag = area_ratio > 1.6 or area_ratio < 0.1
-        print('area : ', current_area, self.init_target_area, area_ratio, area_flag)
+        print('... area : ', current_area, self.init_target_area, area_ratio, area_flag)
 
         # if area_change_ratio > 0.35 or area_init_chage_ratio > 0.35 or change_ratio>0.50:
         #     area_flag = True
