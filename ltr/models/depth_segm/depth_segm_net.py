@@ -28,11 +28,11 @@ class DepthNet(nn.Module):
             3) 1x1x32 -> maxpool 384->192 -> 3x3x32 -> maxpool 192->96 -> 1x1x2 -> maxpool 96->48 -> softmax
         '''
         self.conv0 = conv(input_dim, dims[0], kernel_size=kernels[0], padding=pads[0])
-        self.conv0_1 = conv(input_dim, dims[0], kernel_size=kernels[0], padding=pads[0])
+        self.conv0_1 = conv(dims[0],, dims[0], kernel_size=kernels[0], padding=pads[0])
         self.conv1 = conv(dims[0], dims[1], kernel_size=kernels[1], padding=pads[1])
-        self.conv1_1 = conv(dims[0], dims[1], kernel_size=kernels[1], padding=pads[1])
-        self.conv2 = conv_no_relu(dims[1], dims[2], kernel_size=kernels[2], padding=pads[2])
-        self.conv2_1 = conv_no_relu(dims[1], dims[2], kernel_size=kernels[2], padding=pads[2])
+        self.conv1_1 = conv(dims[1], dims[1], kernel_size=kernels[1], padding=pads[1])
+        self.conv2 = conv(dims[1], dims[2], kernel_size=kernels[2], padding=pads[2])
+        self.conv2_1 = conv_no_relu(dims[2], dims[2], kernel_size=kernels[2], padding=pads[2])
 
         # AvgPool2d , more smooth, MaxPool2d, more sharp
         self.pool0 = nn.MaxPool2d(2, stride=2)
