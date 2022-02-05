@@ -10,7 +10,7 @@ def parameters():
     params.debug = 1                        # Debug level
     params.visualization = True            # Do visualization
 
-    params.longterm = True                # Song : dal longterm or shortterm
+    params.longterm = False                # Song : dal longterm or shortterm
     # Use GPU or not (IoUNet requires this to be True)
     params.use_gpu = True
 
