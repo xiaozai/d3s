@@ -367,7 +367,7 @@ class DepthSegm_ST(BaseTracker):
 
         if self.params.use_segmentation:
             if pred_segm_region is not None:
-                return pred_segm_region
+                return pred_segm_region, np.max(self.score_map)
 
         # Return new state
         new_state = torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]]))
