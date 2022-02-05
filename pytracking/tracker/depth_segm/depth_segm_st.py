@@ -170,6 +170,8 @@ class DepthSegm_ST(BaseTracker):
         toc_ = time.time() - tic
         self.time += toc_
 
+        self.rgb_patches = None
+
     def init_optimization(self, train_x, init_y):
         # Initialize filter for DCF RGB based
         filter_init_method = getattr(self.params, 'filter_init_method', 'zeros')
