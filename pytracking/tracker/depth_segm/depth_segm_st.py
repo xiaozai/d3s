@@ -371,7 +371,7 @@ class DepthSegm_ST(BaseTracker):
 
         # Return new state
         new_state = torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]]))
-        return new_state.tolist()
+        return new_state.tolist(), np.max(self.score_map)
 
     def apply_filter(self, sample_x: TensorList):
         return operation.conv2d(sample_x, self.filter, mode='same')
