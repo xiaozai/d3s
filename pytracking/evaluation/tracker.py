@@ -29,7 +29,10 @@ class Tracker:
 
         self.parameters = self.get_parameters()
 
-        self.tracker_class = tracker_module.get_tracker_class() # depth_segm
+        if hasattr(self.parameters, 'longterm'):
+            self.tracker_class = tracker_module.get_tracker_class(longterm=self.parameters.longterm) # depth_segm
+        else:
+            self.tracker_class = tracker_module.get_tracker_class() # depth_segm
 
         self.default_visualization = getattr(self.parameters, 'visualization', False)
         self.default_debug = getattr(self.parameters, 'debug', 0)
@@ -61,7 +64,7 @@ class Tracker:
         self.parameters.free_memory()
 
         return output_bb, execution_times, tracked_conf
-        
+
     def run_video(self, videofilepath, optional_box=None, debug=None):
         """Run the tracker with the vieofile.
         args:

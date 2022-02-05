@@ -20,7 +20,7 @@ from pytracking.bbox_fit import fit_bbox_to_mask
 from pytracking.mask_to_disk import save_mask
 
 
-class DepthSegm(BaseTracker):
+class DepthSegm_ST(BaseTracker):
     def initialize_features(self):
         if not getattr(self, 'features_initialized', False):
             self.params.features_filter.initialize()
@@ -35,7 +35,7 @@ class DepthSegm(BaseTracker):
         if not hasattr(self.params, 'device'):
             self.params.device = 'cuda' if self.params.use_gpu else 'cpu'
 
-        # Initialize features for ResNet50 , No need to Depth ?
+        # Initialize features for ResNet50
         self.initialize_features()
 
         # Check if image is color
@@ -76,7 +76,6 @@ class DepthSegm(BaseTracker):
             # Get position and size
             self.pos = torch.Tensor([state[1] + state[3] / 2, state[0] + state[2] / 2])
             self.pos_prev = [state[1] + state[3] / 2, state[0] + state[2] / 2]
-            ''' Song : in RGBD long term the target_sz changes '''
             self.target_sz = torch.Tensor([state[3], state[2]])
             self.gt_poly = np.array([state[0], state[1],
                                      state[0] + state[2] - 1, state[1],
@@ -133,22 +132,18 @@ class DepthSegm(BaseTracker):
             else:
                 self.output_window = dcf.hann2d(self.output_sz.long(), centered=False).to(self.params.device)
 
-        # Initialize some learning things for DCF, No need for depth?
-        ''' Song's comment: what if we use DAL?'''
+        # Initialize some learning things
         self.init_learning()
 
         # Convert image
         im, dp = numpy_to_torch(color), numpy_to_torch(depth)
-        self.im, self.dp = im, dp  # For debugging only
-        self.raw_mask, self.mask, self.score_map = None, None, None
+        self.im, self.dp, self.mask, self.score_map = im, dp, None, None  # For debugging only
 
         # Setup scale bounds
         self.image_sz = torch.Tensor([im.shape[2], im.shape[3]])
         self.min_scale_factor = torch.max(10 / self.base_target_sz)
         self.max_scale_factor = torch.min(self.image_sz / self.base_target_sz)
 
-
-        ''' Song : if only initial DCF, rgb is enough, unless we use DAL '''
         # Extract and transform sample
         x_rgb = self.generate_init_samples(im) # crops and augments and Generated ResNet50 feature maps for DCF
 
@@ -291,19 +286,6 @@ class DepthSegm(BaseTracker):
         translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
         new_pos = sample_pos + translation_vec
 
-        # Update position and scale
-        if flag != 'not_found':
-            #we found the target, we reset the s
-            self.target_scale_redetection=self.target_scale
-            if getattr(self.params, 'use_iou_net', True):
-                update_scale_flag = getattr(self.params, 'update_scale_when_uncertain', True) or flag != 'uncertain'
-                if getattr(self.params, 'use_classifier', True):
-                    self.update_state(new_pos)
-                self.net.bb_regressor.test_depths=patches_d
-                self.refine_target_box(backbone_feat, sample_pos[scale_ind,:], sample_scales[scale_ind], scale_ind, update_scale_flag)
-            elif getattr(self.params, 'use_classifier', True):
-                self.update_state(new_pos, sample_scales[scale_ind])
-
         # Localization uncertainty
         max_score = torch.max(s).item()
         uncert_score = 0
@@ -332,10 +314,7 @@ class DepthSegm(BaseTracker):
             show_tensor(s[scale_ind, ...], 5, title='Max score = {:.2f}'.format(torch.max(s[scale_ind, ...]).item()))
 
         # Song
-        if self.params.debug == 5:
-            self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy()
-        else:
-            self.score_map = None
+        self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy() if self.params.debug == 5 else None
 
         # just a sanity check so that it does not get out of image
         if new_pos[0] < 0:
@@ -350,9 +329,6 @@ class DepthSegm(BaseTracker):
         pred_segm_region = None
         if self.segmentation_task or (
             self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
-            '''Song's comment:
-               update self.pos by using segmentation
-            '''
             pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
 
             if pred_segm_region is None:
@@ -756,7 +732,6 @@ class DepthSegm(BaseTracker):
         # Update scale
         if new_scale is not None:
             self.target_scale = new_scale.clamp(self.min_scale_factor, self.max_scale_factor)
-            ''' Song in LT tracking, target_sz changes too much'''
             self.target_sz = self.base_target_sz * self.target_scale
 
         # Update pos
@@ -765,7 +740,7 @@ class DepthSegm(BaseTracker):
         self.pos = torch.max(torch.min(new_pos, self.image_sz - inside_offset), inside_offset)
 
     def create_dist(self, width, height, cx=None, cy=None):
-
+        ''' Song: we use the response map as dist map, differ from D3S'''
         if cx is None:
             cx = width / 2
         if cy is None:
@@ -780,6 +755,7 @@ class DepthSegm(BaseTracker):
         return D
 
     def create_dist_gauss(self, map_sz, w, h, cx=None, cy=None, p=4, sz_weight=0.7):
+        ''' Song: we use the response map as dist map, differ from D3S'''
         # create a square-shaped distance map with a Gaussian function which can be interpreted as a distance
         # to the given bounding box (center [cx, cy], width w, height h)
         # p is power of a Gaussian function
@@ -917,11 +893,6 @@ class DepthSegm(BaseTracker):
                 mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy()
                 mask = (mask > self.params.init_segm_mask_thr).astype(np.float32)
 
-                '''------------------------------------------------------------'''
-                self.raw_mask = mask
-                self.contours = mask
-                '''-----------------------------------------------------------'''
-
                 if hasattr(self, 'gt_poly'):
                     # dilate polygon-based mask
                     # dilate only if given mask is made from polygon, not from axis-aligned bb (since rotated bb is much tighter)
@@ -932,12 +903,11 @@ class DepthSegm(BaseTracker):
                 else:
                     mask = mask * init_mask_patch_np
 
-
-                ''' Song : check init_mask from segm_net is correct or not '''
                 target_pixels = np.sum((mask > 0.5).astype(np.float32))
-                if target_pixels / (bb[2]*bb[3]*(patch_factor_init*patch_factor_init)+0.1) < 0.3:
-                    mask = (init_mask_patch_np > 0.1).astype(np.float32)
-                    target_pixels = np.sum((mask > 0.5).astype(np.float32))
+                # ''' Song : check init_mask from segm_net is correct or not '''
+                # if target_pixels / (bb[2]*bb[3]*(patch_factor_init*patch_factor_init)+0.1) < 0.3:
+                #     mask = (init_mask_patch_np > 0.1).astype(np.float32)
+                #     target_pixels = np.sum((mask > 0.5).astype(np.float32))
 
                 self.mask = mask # Song
                 self.segm_init_target_pixels = target_pixels
@@ -1036,42 +1006,17 @@ class DepthSegm(BaseTracker):
         # softmax on the prediction (during training this is done internaly when calculating loss)
         # take only the positive channel as predicted segmentation mask
         mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy() # [1,2,384, 384] -> [384,384]
-
-
-        self.raw_mask = mask # Song : the mask not clear , the area is sooo small???
-        ''' Song wants to see the mask before contour'''
-        if self.params.save_mask:
-            save_mask(None, mask, segm_crop_sz, bb, color.shape[1], color.shape[0],
-                      self.params.masks_save_path, self.sequence_name+'_raw', self.frame_name)
-
         if self.params.save_mask:
             mask_real = copy.copy(mask)
-        '''Song's comment : mask > 0.5 ???  maybe it is too high and mask = zeros '''
         mask = (mask > self.params.segm_mask_thr).astype(np.uint8)
         self.mask = mask
         self.masked_img = patch_rgb * np.expand_dims(mask, axis=-1)
 
-        ''' Song's comment :
-            it seems that after cv2.findContours, mask becomes zeros ...
-        '''
         if cv2.__version__[-5] == '4':
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         else:
             _, contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         cnt_area = [cv2.contourArea(cnt) for cnt in contours]
-
-        ''' Song wants to see the mask before contour'''
-        if self.params.save_mask:
-            save_mask(None, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
-                      self.params.masks_save_path, self.sequence_name+'_real', self.frame_name)
-
-        if len(cnt_area):
-            cts = np.zeros(mask.shape, dtype=np.uint8)
-            cv2.drawContours(cts, contours, np.argmax(cnt_area), 1, thickness=2)
-            self.contours = cts
-        else:
-            self.contours = None
-        '''---------------------------------------------------------------'''
 
         if self.segmentation_task:
             mask = np.zeros(mask.shape, dtype=np.uint8)
@@ -1208,24 +1153,3 @@ class DepthSegm(BaseTracker):
         if np.isnan(avg_depth):
             return -1.
         return avg_depth
-
-    def valid_depth(self, depth_a, history_depth):
-        depth_margin = 0.6#600
-        if depth_a>2:#2000:
-            depth_percent = depth_margin / depth_a
-        else:
-            depth_percent = 0.4
-        d = np.abs((depth_a-history_depth))
-        if d == 0 or depth_a == 0:
-            return False
-        p = d/depth_a
-        # if d>depth_margin or p > depth_percent:
-        if p > depth_percent:
-            return False
-        else:
-            return True
-
-    def bhatta(self, hist1, hist2):
-        hist1=hist1/np.sum(hist1)
-        hist2=hist2/np.sum(hist2)
-        return sum(np.sqrt(np.multiply(hist1,hist2)))
