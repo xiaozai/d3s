@@ -171,6 +171,10 @@ class DepthSegm_ST(BaseTracker):
         self.time += toc_
 
         self.rgb_patches = None
+        # vis the crop image patches or search region
+        self.vis_search_center = None
+        self.vis_search_scales = None
+        self.vis_serach_size = None
 
     def init_optimization(self, train_x, init_y):
         # Initialize filter for DCF RGB based
