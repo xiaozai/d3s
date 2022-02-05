@@ -318,7 +318,7 @@ class DepthSegm_ST(BaseTracker):
             show_tensor(s[scale_ind, ...], 5, title='Max score = {:.2f}'.format(torch.max(s[scale_ind, ...]).item()))
 
         # Song
-        self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy() if self.params.debug == 5 else None
+        self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy() # if self.params.debug == 5 else None
 
         # just a sanity check so that it does not get out of image
         if new_pos[0] < 0:
@@ -367,11 +367,11 @@ class DepthSegm_ST(BaseTracker):
 
         if self.params.use_segmentation:
             if pred_segm_region is not None:
-                return pred_segm_region, np.max(self.score_map)
+                return pred_segm_region, self.score_map.max()
 
         # Return new state
         new_state = torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]]))
-        return new_state.tolist(), np.max(self.score_map)
+        return new_state.tolist(), self.score_map.max()
 
     def apply_filter(self, sample_x: TensorList):
         return operation.conv2d(sample_x, self.filter, mode='same')
