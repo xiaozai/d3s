@@ -27,7 +27,6 @@ class DepthSegm_ST(BaseTracker):
         self.features_initialized = True
 
     def initialize(self, image, state, init_mask=None, *args, **kwargs):
-        print('in initialize ...')
         # Initialize some stuff
         self.frame_num = 1
         self.frame_name = '%08d' % self.frame_num
@@ -162,7 +161,6 @@ class DepthSegm_ST(BaseTracker):
         # Init optimizer and do initial optimization for DCF
         self.init_optimization(train_x_rgb, init_y)
 
-        print(' before init_segmentation ...')
         if self.params.use_segmentation:
             self.init_segmentation(color, depth, state, init_mask=init_mask)
 
@@ -266,7 +264,6 @@ class DepthSegm_ST(BaseTracker):
             del self.joint_problem, self.joint_optimizer
 
     def track(self, image):
-        print('in track ...')
         self.frame_num += 1
         self.frame_name = '%08d' % self.frame_num
 
@@ -282,7 +279,6 @@ class DepthSegm_ST(BaseTracker):
         sample_pos = copy.deepcopy(self.pos)
         sample_scales = self.target_scale * self.params.scale_factors
         test_x_rgb, test_x_d = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
-        print(' before localize_target..')
         # Compute scores
         scores_raw = self.apply_filter(test_x_rgb)
         translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
@@ -328,7 +324,6 @@ class DepthSegm_ST(BaseTracker):
         if new_pos[1] >= color.shape[1]:
             new_pos[1] = color.shape[1] - 1
 
-        print('before segment_target..')
         pred_segm_region = None
         if self.segmentation_task or (
             self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
@@ -487,7 +482,9 @@ class DepthSegm_ST(BaseTracker):
 
     def extract_processed_sample(self, color: torch.Tensor, depth: torch.Tensor, pos: torch.Tensor, scales, sz: torch.Tensor) -> (
     TensorList, TensorList):
-        x_rgb, d_crops = self.extract_sample(color, depth, pos, scales, sz)
+        x_rgb, d_crops, rgb_patches = self.extract_sample(color, depth, pos, scales, sz)
+        self.rgb_patches = rgb_patches.clone().detach().cpu().numpy().squeeze()
+        self.rgb_patches = np.swapaxes(np.swapaxes(self.rgb_patches, 0, 1), 1, 2).astype(int)
         return self.preprocess_sample(self.project_sample(x_rgb)), d_crops
 
     def preprocess_sample(self, x: TensorList) -> (TensorList, TensorList):
@@ -1141,7 +1138,6 @@ class DepthSegm_ST(BaseTracker):
                 return [lx, ly, w, h]
 
         h, w = depth_im.shape
-        #print ("avg_depth h: {} w: {}".format(h, w))
         shrink_box = shrink_box(bbox, h, w, r=0.4)
         shrink_box = np.asarray(shrink_box).astype(np.int16)
         avg_depth = np.mean(depth_im[shrink_box[1]:(shrink_box[1]+shrink_box[3]), \
