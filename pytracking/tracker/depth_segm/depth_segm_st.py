@@ -27,7 +27,7 @@ class DepthSegm_ST(BaseTracker):
         self.features_initialized = True
 
     def initialize(self, image, state, init_mask=None, *args, **kwargs):
-
+        print('in initialize ...')
         # Initialize some stuff
         self.frame_num = 1
         self.frame_name = '%08d' % self.frame_num
@@ -162,6 +162,7 @@ class DepthSegm_ST(BaseTracker):
         # Init optimizer and do initial optimization for DCF
         self.init_optimization(train_x_rgb, init_y)
 
+        print(' before init_segmentation ...')
         if self.params.use_segmentation:
             self.init_segmentation(color, depth, state, init_mask=init_mask)
 
@@ -265,6 +266,7 @@ class DepthSegm_ST(BaseTracker):
             del self.joint_problem, self.joint_optimizer
 
     def track(self, image):
+        print('in track ...')
         self.frame_num += 1
         self.frame_name = '%08d' % self.frame_num
 
@@ -280,7 +282,7 @@ class DepthSegm_ST(BaseTracker):
         sample_pos = copy.deepcopy(self.pos)
         sample_scales = self.target_scale * self.params.scale_factors
         test_x_rgb, test_x_d = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
-
+        print(' before localize_target..')
         # Compute scores
         scores_raw = self.apply_filter(test_x_rgb)
         translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
@@ -326,6 +328,7 @@ class DepthSegm_ST(BaseTracker):
         if new_pos[1] >= color.shape[1]:
             new_pos[1] = color.shape[1] - 1
 
+        print('before segment_target..')
         pred_segm_region = None
         if self.segmentation_task or (
             self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
@@ -904,15 +907,9 @@ class DepthSegm_ST(BaseTracker):
                     mask = mask * init_mask_patch_np
 
                 target_pixels = np.sum((mask > 0.5).astype(np.float32))
-                # ''' Song : check init_mask from segm_net is correct or not '''
-                # if target_pixels / (bb[2]*bb[3]*(patch_factor_init*patch_factor_init)+0.1) < 0.3:
-                #     mask = (init_mask_patch_np > 0.1).astype(np.float32)
-                #     target_pixels = np.sum((mask > 0.5).astype(np.float32))
 
                 self.mask = mask # Song
                 self.segm_init_target_pixels = target_pixels
-
-
 
                 if self.params.save_mask:
                     segm_crop_sz = math.ceil(math.sqrt(bb[2] * bb[3]) * self.params.segm_search_area_factor)
