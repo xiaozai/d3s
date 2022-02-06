@@ -28,7 +28,7 @@ def conv_no_relu(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dila
 
 
 class DepthNet(nn.Module):
-    def __init__(self, input_dim=1, output_dim):
+    def __init__(self, input_dim=1, output_dim=64):
         super().__init__()
 
         self.conv0 = conv_block(input_dim, output_dim)
