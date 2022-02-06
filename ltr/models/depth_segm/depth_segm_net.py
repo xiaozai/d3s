@@ -131,21 +131,21 @@ class DepthSegmNet(nn.Module):
         p_rgb1 = F.interpolate(w_rgb, size=(feat_test_rgb[2].shape[-2], feat_test_rgb[2].shape[-1]))  # [B, 1, 48, 48]
         p_d1 = F.interpolate(w_d, size=(feat_test_d[2].shape[-2], feat_test_d[2].shape[-1]))          # [B, 1, 48, 48]
 
-        out1 = torch.cat(self.f1(torch.mul(feat_test_rgb[2], p_rgb1)), self.d1(torch.mul(feat_test_d[2], p_d1)), dim=1) # [B, 64, 48, 48]
+        out1 = torch.cat((self.f1(torch.mul(feat_test_rgb[2], p_rgb1)), self.d1(torch.mul(feat_test_d[2], p_d1))), dim=1) # [B, 64, 48, 48]
         out1 = self.post1(F.upsample(out1+out0, scale_factor=2))                # [B, 32, 96, 96]
 
         # merge with layer1 features
         p_rgb2 = F.interpolate(w_rgb, size=(feat_test_rgb[1].shape[-2], feat_test_rgb[1].shape[-1]))  # [B, 1, 96, 96]
         p_d2 = F.interpolate(w_d, size=(feat_test_d[1].shape[-2], feat_test_d[1].shape[-1]))          # [B, 1, 96, 96]
 
-        out2 = torch.cat(self.f2(torch.mul(feat_test_rgb[1], p_rgb2)), self.d2(torch.mul(feat_test_d[1], p_d2)), dim=1) # [B, 32, 96, 96]
+        out2 = torch.cat((self.f2(torch.mul(feat_test_rgb[1], p_rgb2)), self.d2(torch.mul(feat_test_d[1], p_d2))), dim=1) # [B, 32, 96, 96]
         out2 = self.post2(F.upsample(out2+out1, scale_factor=2))                # [B, 16, 192, 192]
 
         # merge with layer0 features
         p_rgb3 = F.interpolate(w_rgb, size=(feat_test_rgb[0].shape[-2], feat_test_rgb[0].shape[-1]))  # [B, 1, 96, 96]
         p_d3 = F.interpolate(w_d, size=(feat_test_d[0].shape[-2], feat_test_d[0].shape[-1]))          # [B, 1, 96, 96]
 
-        out3 = torch.cat(self.f3(torch.mul(feat_test_rgb[0], p_rgb3)), self.d3(torch.mul(feat_test_d[0], p_d3)), dim=1) # [B, 16, 96, 96]
+        out3 = torch.cat((self.f3(torch.mul(feat_test_rgb[0], p_rgb3)), self.d3(torch.mul(feat_test_d[0], p_d3))), dim=1) # [B, 16, 96, 96]
         out3 = self.post3(F.upsample(out3+out2, scale_factor=2))                # [B, 2, 384, 384]
 
         return out3
