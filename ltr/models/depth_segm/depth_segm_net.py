@@ -116,17 +116,14 @@ class DepthSegmNet(nn.Module):
         feat_test_d = self.depth_feat_extractor(depth_test_imgs)
 
         # weights for RGB features and Depth features
-        similarity_rgb = self.cosine_similarity(self.f0(feat_test_rgb[3]), self.f0(feat_train_rgb[3]), mask_train[0]) # Bx1x24x24
-        similarity_d = self.cosine_similarity(feat_test_d[3], feat_test_d[3], mask_train[0])                          # Bx1x24x24
+        similarity_rgb = self.cosine_similarity(self.f0(feat_test_rgb[3]), self.f0(feat_train_rgb[3]), mask_train[0]) # [B, 1, 24, 24]
+        similarity_d = self.cosine_similarity(feat_test_d[3], feat_train_d[3], mask_train[0])                         # [B, 1, 24, 24]
+        similarity = F.softmax(torch.cat((similarity_rgb, similarity_d), dim=1), dim=1)                               # [B, 2, 24, 24]
+        prob_rbg = torch.unsqueeze(similarity[:, 0, :, :], dim=1)                                                     # [B, 1, 24, 24]
+        prob_d = torch.unsqueeze(similarity[:, 1, :, :], dim=1)                                                       # [B, 1, 24, 24]
 
-        similarity = torch.cat((similarity_rgb, similarity_d), dim=1)           # [B, 2, 24, 24]
-        similarity = F.softmax(similarity, dim=1)
-
-        prob_rbg = torch.unsqueeze(similarity[:, 0, :, :], dim=1)               # [B, 1, 24, 24]
-        prob_d = torch.unsqueeze(similarity[:, 1, :, :], dim=1)                 # [B, 1, 24, 24]
-
-        # distance map is give - resize for mixer # concatenate inputs for mixer
-        dist = F.interpolate(test_dist[0], size=(feat_test_d[3].shape[-2], feat_test_d[3].shape[-1]))  # [B, 1, 24, 24]
+        # distance map is give - resize for mixer
+        dist = F.interpolate(test_dist[0], size=(feat_test_d[3].shape[-2], feat_test_d[3].shape[-1]))                 # [B, 1, 24, 24]
 
         out0 = torch.cat((prob_rgb, prob_d, dist), dim=1)                       # [B, 3, 24, 24]
         out0 = F.upsample(self.mixer(out0), scale_factor=2)                     # [B, 64, 48, 48]
@@ -150,12 +147,15 @@ class DepthSegmNet(nn.Module):
         p_d3 = F.interpolate(prob_d, size=(feat_test_d[0].shape[-2], feat_test_d[0].shape[-1]))          # [B, 1, 96, 96]
 
         out3 = torch.cat(self.f3(torch.mul(feat_test_rgb[0], p_rgb3)), self.d3(torch.mul(feat_test_d[0], p_d3)), dim=1) # [B, 16, 96, 96]
-        out3 = self.post3(F.upsample(out3+out2, scale_factor=2))                     # [B, 2, 384, 384]
+        out3 = self.post3(F.upsample(out3+out2, scale_factor=2))                # [B, 2, 384, 384]
 
         return out3
 
 
-    def cosine_similarity(self, f_test, f_train, mask_pos, mask_neg, topk=3):
+    def cosine_similarity(self, f_test, f_train, mask_train, topk=3):
+
+        mask_pos = F.interpolate(mask_train, size=(f_train.shape[-2], f_train.shape[-1]))
+        mask_neg = 1 - mask_pos
         # first normalize train and test features to have L2 norm 1
         # cosine similarity and reshape last two dimensions into one
         sim = torch.einsum('ijkl,ijmn->iklmn',
