@@ -128,24 +128,24 @@ class DepthSegmNet(nn.Module):
         # distance map is give - resize for mixer
         dist = F.interpolate(test_dist[0], size=(feat_test_d[3].shape[-2], feat_test_d[3].shape[-1]))                 # [B, 1, 24, 24]
 
-        out0 = torch.cat((similarity_rgb, similarity_d, dist), dim=1)                       # [B, 3, 24, 24]
+        out0 = torch.cat((similarity_rgb, similarity_d, dist), dim=1)           # [B, 3, 24, 24]
         out0 = F.upsample(self.mixer(out0), scale_factor=2)                     # [B, 64, 48, 48]
 
-        # merge with layer2 features
+        # layer2
         p_rgb1 = F.interpolate(w_rgb, size=(feat_test_rgb[2].shape[-2], feat_test_rgb[2].shape[-1]))  # [B, 1, 48, 48]
         p_d1 = F.interpolate(w_d, size=(feat_test_d[2].shape[-2], feat_test_d[2].shape[-1]))          # [B, 1, 48, 48]
 
         out1 = torch.cat((self.f1(torch.mul(feat_test_rgb[2], p_rgb1)), self.d1(torch.mul(feat_test_d[2], p_d1))), dim=1) # [B, 64+64, 48, 48]
         out1 = self.post1(F.upsample(self.c1(out1)+out0, scale_factor=2))                # [B, 32, 96, 96]
 
-        # merge with layer1 features
+        # layer1
         p_rgb2 = F.interpolate(w_rgb, size=(feat_test_rgb[1].shape[-2], feat_test_rgb[1].shape[-1]))  # [B, 1, 96, 96]
         p_d2 = F.interpolate(w_d, size=(feat_test_d[1].shape[-2], feat_test_d[1].shape[-1]))          # [B, 1, 96, 96]
 
         out2 = torch.cat((self.f2(torch.mul(feat_test_rgb[1], p_rgb2)), self.d2(torch.mul(feat_test_d[1], p_d2))), dim=1) # [B, 32, 96, 96]
         out2 = self.post2(F.upsample(self.c2(out2)+out1, scale_factor=2))                # [B, 16, 192, 192]
 
-        # merge with layer0 features
+        # layer0
         p_rgb3 = F.interpolate(w_rgb, size=(feat_test_rgb[0].shape[-2], feat_test_rgb[0].shape[-1]))  # [B, 1, 96, 96]
         p_d3 = F.interpolate(w_d, size=(feat_test_d[0].shape[-2], feat_test_d[0].shape[-1]))          # [B, 1, 96, 96]
 
