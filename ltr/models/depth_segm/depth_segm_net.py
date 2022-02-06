@@ -4,12 +4,12 @@ import torch.nn.functional as F
 import numpy as np
 #
 
-def conv_block(in_planes, out_planes=256):
+def conv_block(in_planes, out_planes):
     ''' 1x1x256 -> 3x3x256 -> 1x1x256 '''
     return nn.Sequential(
             nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=1, padding=0, dilation=1, bias=True),
-            nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1, bias=True),
-            nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=1, padding=0, dilation=1, bias=True),
+            nn.Conv2d(out_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1, bias=True),
+            nn.Conv2d(out_planes, out_planes, kernel_size=1, stride=1, padding=0, dilation=1, bias=True),
             nn.BatchNorm2d(out_planes),
             nn.ReLU(inplace=True))
 
@@ -28,7 +28,7 @@ def conv_no_relu(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dila
 
 
 class DepthNet(nn.Module):
-    def __init__(self, input_dim=1, output_dim=256):
+    def __init__(self, input_dim=1, output_dim):
         super().__init__()
 
         self.conv0 = conv_block(input_dim, output_dim)
