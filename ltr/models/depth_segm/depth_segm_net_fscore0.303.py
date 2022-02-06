@@ -3,13 +3,6 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 #
-# import matplotlib.pyplot as plt
-# def draw_axis(ax, img, title, show_minmax=False):
-#     ax.imshow(img)
-#     if show_minmax:
-#         minval_, maxval_, _, _ = cv2.minMaxLoc(img)
-#         title = '%s \n min=%.2f max=%.2f' % (title, minval_, maxval_)
-#     ax.set_title(title, fontsize=9)
 
 
 def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1):
@@ -26,17 +19,6 @@ def conv_no_relu(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dila
             nn.BatchNorm2d(out_planes))
 
 
-# def valid_roi(roi: torch.Tensor, image_size: torch.Tensor):
-#     valid = all(0 <= roi[:, 1]) and all(0 <= roi[:, 2]) and all(roi[:, 3] <= image_size[0]-1) and \
-#             all(roi[:, 4] <= image_size[1]-1)
-#     return valid
-
-
-# def normalize_vis_img(x):
-#     x = x - np.min(x)
-#     x = x / np.max(x)
-#     return (x * 255).astype(np.uint8)
-
 class DepthNet(nn.Module):
     def __init__(self, input_dim=1, dims=(64, 128, 256), kernels=(1,3,3), pads=(0, 1, 0)):
         super().__init__()
@@ -45,14 +27,17 @@ class DepthNet(nn.Module):
             2) 1x1x32 -> 3x3x32 -> 1x1x2 ?
             3) 1x1x32 -> maxpool 384->192 -> 3x3x32 -> maxpool 192->96 -> 1x1x2 -> maxpool 96->48 -> softmax
         '''
-        self.conv1 = conv(input_dim, dims[0], kernel_size=kernels[0], padding=pads[0])
-        self.conv2 = conv(dims[0], dims[1], kernel_size=kernels[1], padding=pads[1])
-        self.conv3 = conv_no_relu(dims[1], dims[2], kernel_size=kernels[2], padding=pads[2])
+        self.conv0 = conv(input_dim, dims[0], kernel_size=kernels[0], padding=pads[0])
+        self.conv0_1 = conv(dims[0], dims[0], kernel_size=kernels[0], padding=pads[0])
+        self.conv1 = conv(dims[0], dims[1], kernel_size=kernels[1], padding=pads[1])
+        self.conv1_1 = conv(dims[1], dims[1], kernel_size=kernels[1], padding=pads[1])
+        self.conv2 = conv(dims[1], dims[2], kernel_size=kernels[2], padding=pads[2])
+        self.conv2_1 = conv_no_relu(dims[2], dims[2], kernel_size=kernels[2], padding=pads[2])
 
         # AvgPool2d , more smooth, MaxPool2d, more sharp
+        self.pool0 = nn.MaxPool2d(2, stride=2)
         self.pool1 = nn.MaxPool2d(2, stride=2)
         self.pool2 = nn.MaxPool2d(2, stride=2)
-        self.pool3 = nn.MaxPool2d(2, stride=2)
 
         self.initialize()
 
@@ -64,24 +49,22 @@ class DepthNet(nn.Module):
                     m.bias.data.zero_()
 
     def forward(self, dp):
-        feat1 = self.conv1(dp)     # [B, C, 384, 384]
-        feat1 = self.pool1(feat1)  # B, C, 192, 192
+        feat0 = self.conv0_1(self.conv0(dp))    # [B, C, 384, 384]  # B, C, 192, 192
+        feat0 = self.pool0(feat0)
+        feat1 = self.conv1_1(self.conv1(feat0)) # B, C, 96, 96
+        feat1 = self.pool1(feat1)
+        feat2 = self.conv2_1(self.conv2(feat1)) # B, C, 48, 48
+        feat2 = self.pool2(feat2)
 
-        feat2 = self.conv2(feat1)
-        feat2 = self.pool2(feat2)  # B, C, 96, 96
-
-        feat3 = self.conv3(feat2)
-        feat3 = self.pool3(feat3)  # B, C, 48, 48
-
-        return feat3
+        return [feat0, feat1, feat2]
 
 class DepthSegmNet(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.depth_feat_extractor = DepthNet(input_dim=1, dims=(8, 16, 32), kernels=(3,3,3), pads=(1,1,1))
+        self.depth_feat_extractor = DepthNet(input_dim=1, dims=(16, 32, 64), kernels=(3,3,3), pads=(1,1,1))
 
-        self.mixer = conv(32, 64, kernel_size=3, padding=1) # ???? 256 depth feat + 1 dist map ?
+        self.mixer = conv(64, 64, kernel_size=3, padding=1) # ???? 256 depth feat + 1 dist map ?
 
         self.f2 = conv(512, 64, kernel_size=3, padding=1)
         self.f1 = conv(256, 64, kernel_size=3, padding=1)
@@ -90,6 +73,10 @@ class DepthSegmNet(nn.Module):
         self.s2 = conv(64, 64, kernel_size=3, padding=1)
         self.s1 = conv(64, 64, kernel_size=3, padding=1)
         self.s0 = conv(64, 16, kernel_size=3, padding=1)
+
+        self.d2 = conv(64, 64, kernel_size=3, padding=1)
+        self.d1 = conv(32, 64, kernel_size=3, padding=1)
+        self.d0 = conv(16, 16, kernel_size=3, padding=1)
 
         self.post2 = conv(64, 64, kernel_size=3, padding=1)
         self.post1 = conv(64, 64, kernel_size=3, padding=1)
@@ -110,28 +97,29 @@ class DepthSegmNet(nn.Module):
     def forward(self, feat_test_rgb, depth_test_imgs, feat_train_rgb, feat_train_d, mask_train, test_dist=None):
 
         feat_test_d = self.depth_feat_extractor(depth_test_imgs)                         # [B, 2, 384, 384] = F+B, [B, C, 48, 48]
-        feat_test_d = self.feature_correlation(feat_test_d, feat_train_d, mask_train[0]) # [B, 2*2, H, W]
+
+        feat_test_d[2] = self.feature_correlation(feat_test_d[2], feat_train_d[2], mask_train[0]) # [B, 2*2, H, W]
+        # feat_test_d[1] = self.feature_correlation(feat_test_d[1], feat_train_d[1], mask_train[0]) # [B, 2*2, H, W]
+        # feat_test_d[0] = self.feature_correlation(feat_test_d[0], feat_train_d[0], mask_train[0]) # [B, 2*2, H, W]
 
         feat_test_rgb[2] = self.feature_correlation(feat_test_rgb[2], feat_train_rgb[2], mask_train[0])
         # feat_test_rgb[1] = self.feature_correlation(feat_test_rgb[1], feat_train_rgb[1], mask_train[0]) # no space on cuda :|
         # feat_test_rgb[0] = self.feature_correlation(feat_test_rgb[0], feat_train_rgb[0], mask_train[0])
 
         # distance map is give - resize for mixer # concatenate inputs for mixer
-        dist = F.interpolate(test_dist[0], size=(feat_test_d.shape[-2], feat_test_d.shape[-1]))            # [B, 1, 384,384]
-        # segm_layers = torch.cat((feat_test_d, dist), dim=1)
-        segm_layers = torch.mul(feat_test_d, dist)                                                         # [B, C, 384, 384]
+        dist = F.interpolate(test_dist[0], size=(feat_test_d[2].shape[-2], feat_test_d[2].shape[-1]))         # [B, 1, 384,384]
+        segm_layers = torch.mul(feat_test_d[2], dist)                                                         # [B, C, 384, 384]
 
         # Mix DepthFeat and Location Map
         out0 = self.mixer(segm_layers)
-                                                                                # [B, C, 384, 384]
-        # out1 = self.post2(F.upsample(self.w_rgb * self.f2(feat_test_rgb[2]) + self.w_d * self.s2(out0), scale_factor=2)) # 48 ->  96
-        # out2 = self.post1(F.upsample(self.w_rgb * self.f1(feat_test_rgb[1]) + self.w_d * self.s1(out1), scale_factor=2)) # 96 -> 192
-        # out3 = self.post0(F.upsample(self.w_rgb * self.f0(feat_test_rgb[0]) + self.w_d * self.s0(out2), scale_factor=2)) # 192 -> 384
-        out1 = self.post2(self.w_rgb * self.f2(feat_test_rgb[2]) + self.w_d * self.s2(out0))
+
+        out1 = self.post2(self.w_rgb * self.f2(feat_test_rgb[2]) + self.w_d * self.d2(feat_test_d[2]) + self.s2(out0))
         out1 = F.upsample(out1 + out0, scale_factor=2) # 48 ->  96
-        out2 = self.post1(self.w_rgb * self.f1(feat_test_rgb[1]) + self.w_d * self.s1(out1))
+
+        out2 = self.post1(self.w_rgb * self.f1(feat_test_rgb[1]) + self.w_d * self.d1(feat_test_d[1]) + self.s1(out1))
         out2 = F.upsample(out2 + out1, scale_factor=2) # 96 -> 192
-        out3 = self.post0(F.upsample(self.w_rgb * self.f0(feat_test_rgb[0]) + self.w_d * self.s0(out2), scale_factor=2)) # 192 -> 384
+
+        out3 = self.post0(F.upsample(self.w_rgb * self.f0(feat_test_rgb[0]) + self.w_d * self.d0(feat_test_d[0]) + self.s0(out2), scale_factor=2)) # 192 -> 384
 
         return out3
 
