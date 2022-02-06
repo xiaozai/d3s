@@ -113,38 +113,37 @@ class DepthSegmNet(nn.Module):
             out_{i+1} = pos_i(cat(f_i(p_rgb * f_rgb), d_i(p_d * f_d)) + out_i)
         '''
 
-        # feat_test_d = self.depth_feat_extractor(depth_test_imgs)
-
         # weights for RGB features and Depth features
         similarity_rgb = self.cosine_similarity(self.f0(feat_test_rgb[3]), self.f0(feat_train_rgb[3]), mask_train[0]) # [B, 1, 24, 24]
         similarity_d = self.cosine_similarity(feat_test_d[3], feat_train_d[3], mask_train[0])                         # [B, 1, 24, 24]
-        similarity = F.softmax(torch.cat((similarity_rgb, similarity_d), dim=1), dim=1)                               # [B, 2, 24, 24]
-        prob_rbg = torch.unsqueeze(similarity[:, 0, :, :], dim=1)                                                     # [B, 1, 24, 24]
-        prob_d = torch.unsqueeze(similarity[:, 1, :, :], dim=1)                                                       # [B, 1, 24, 24]
+
+        weights = F.softmax(torch.cat((similarity_rgb, similarity_d), dim=1), dim=1)                                 # [B, 2, 24, 24]
+        w_rgb = torch.unsqueeze(weights[:, 0, :, :], dim=1)                                                          # [B, 1, 24, 24]
+        w_d = torch.unsqueeze(weights[:, 1, :, :], dim=1)                                                            # [B, 1, 24, 24]
 
         # distance map is give - resize for mixer
         dist = F.interpolate(test_dist[0], size=(feat_test_d[3].shape[-2], feat_test_d[3].shape[-1]))                 # [B, 1, 24, 24]
 
-        out0 = torch.cat((prob_rgb, prob_d, dist), dim=1)                       # [B, 3, 24, 24]
+        out0 = torch.cat((similarity_rgb, similarity_d, dist), dim=1)                       # [B, 3, 24, 24]
         out0 = F.upsample(self.mixer(out0), scale_factor=2)                     # [B, 64, 48, 48]
 
         # merge with layer2 features
-        p_rgb1 = F.interpolate(prob_rbg, size=(feat_test_rgb[2].shape[-2], feat_test_rgb[2].shape[-1]))  # [B, 1, 48, 48]
-        p_d1 = F.interpolate(prob_d, size=(feat_test_d[2].shape[-2], feat_test_d[2].shape[-1]))          # [B, 1, 48, 48]
+        p_rgb1 = F.interpolate(w_rgb, size=(feat_test_rgb[2].shape[-2], feat_test_rgb[2].shape[-1]))  # [B, 1, 48, 48]
+        p_d1 = F.interpolate(w_d, size=(feat_test_d[2].shape[-2], feat_test_d[2].shape[-1]))          # [B, 1, 48, 48]
 
         out1 = torch.cat(self.f1(torch.mul(feat_test_rgb[2], p_rgb1)), self.d1(torch.mul(feat_test_d[2], p_d1)), dim=1) # [B, 64, 48, 48]
         out1 = self.post1(F.upsample(out1+out0, scale_factor=2))                # [B, 32, 96, 96]
 
         # merge with layer1 features
-        p_rgb2 = F.interpolate(prob_rbg, size=(feat_test_rgb[1].shape[-2], feat_test_rgb[1].shape[-1]))  # [B, 1, 96, 96]
-        p_d2 = F.interpolate(prob_d, size=(feat_test_d[1].shape[-2], feat_test_d[1].shape[-1]))          # [B, 1, 96, 96]
+        p_rgb2 = F.interpolate(w_rgb, size=(feat_test_rgb[1].shape[-2], feat_test_rgb[1].shape[-1]))  # [B, 1, 96, 96]
+        p_d2 = F.interpolate(w_d, size=(feat_test_d[1].shape[-2], feat_test_d[1].shape[-1]))          # [B, 1, 96, 96]
 
         out2 = torch.cat(self.f2(torch.mul(feat_test_rgb[1], p_rgb2)), self.d2(torch.mul(feat_test_d[1], p_d2)), dim=1) # [B, 32, 96, 96]
         out2 = self.post2(F.upsample(out2+out1, scale_factor=2))                # [B, 16, 192, 192]
 
         # merge with layer0 features
-        p_rgb3 = F.interpolate(prob_rbg, size=(feat_test_rgb[0].shape[-2], feat_test_rgb[0].shape[-1]))  # [B, 1, 96, 96]
-        p_d3 = F.interpolate(prob_d, size=(feat_test_d[0].shape[-2], feat_test_d[0].shape[-1]))          # [B, 1, 96, 96]
+        p_rgb3 = F.interpolate(w_rgb, size=(feat_test_rgb[0].shape[-2], feat_test_rgb[0].shape[-1]))  # [B, 1, 96, 96]
+        p_d3 = F.interpolate(w_d, size=(feat_test_d[0].shape[-2], feat_test_d[0].shape[-1]))          # [B, 1, 96, 96]
 
         out3 = torch.cat(self.f3(torch.mul(feat_test_rgb[0], p_rgb3)), self.d3(torch.mul(feat_test_d[0], p_d3)), dim=1) # [B, 16, 96, 96]
         out3 = self.post3(F.upsample(out3+out2, scale_factor=2))                # [B, 2, 384, 384]
