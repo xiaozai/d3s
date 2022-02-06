@@ -32,18 +32,20 @@ class DepthSegmNet(nn.Module):
 
         train_feat_rgb = self.extract_backbone_features(train_colors) # B * C * H * W -> B * C * H * W
         test_feat_rgb = self.extract_backbone_features(test_colors)
-        train_feat_d = self.segm_predictor.depth_feat_extractor(train_depths)
+        train_feat_rgb = [feat for feat in train_feat_rgb.values()] # layer 0 - 3
+        test_feat_rgb = [feat for feat in test_feat_rgb.values()]
 
-        train_feat_segm = [feat for feat in train_feat_rgb.values()] # layer 0 - 3
-        test_feat_segm = [feat for feat in test_feat_rgb.values()]
+        train_feat_d = self.segm_predictor.depth_feat_extractor(train_depths)
+        test_feat_d = self.segm_predictor.depth_feat_extractor(test_depths)
+
         train_masks = [train_masks]
 
         if test_dist is not None:
             test_dist = [test_dist]
 
         # Obtain iou prediction
-        segm_pred = self.segm_predictor(test_feat_segm, test_depths,
-                                        train_feat_segm, train_feat_d,
+        segm_pred = self.segm_predictor(train_feat_rgb, test_feat_d,
+                                        test_feat_rgb, train_feat_d,
                                         train_masks, test_dist)
         return segm_pred
 

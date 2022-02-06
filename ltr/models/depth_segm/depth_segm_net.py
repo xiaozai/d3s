@@ -104,7 +104,7 @@ class DepthSegmNet(nn.Module):
                 if m.bias is not None:
                     m.bias.data.zero_()
 
-    def forward(self, feat_test_rgb, depth_test_imgs, feat_train_rgb, feat_train_d, mask_train, test_dist=None):
+    def forward(self, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, test_dist=None):
 
         ''' rgb features   : [conv1, layer1, layer2, layer3], Bx64x192x192  -> Bx256x96x96 -> Bx512x48x48 -> Bx1024x24x24
             depth features : [feat0, feat1, feat2, feat3],    Bx64x192x192 -> Bx64x96x96 -> Bx64x48x48 -> Bx64x24x24
@@ -113,7 +113,7 @@ class DepthSegmNet(nn.Module):
             out_{i+1} = pos_i(cat(f_i(p_rgb * f_rgb), d_i(p_d * f_d)) + out_i)
         '''
 
-        feat_test_d = self.depth_feat_extractor(depth_test_imgs)
+        # feat_test_d = self.depth_feat_extractor(depth_test_imgs)
 
         # weights for RGB features and Depth features
         similarity_rgb = self.cosine_similarity(self.f0(feat_test_rgb[3]), self.f0(feat_train_rgb[3]), mask_train[0]) # [B, 1, 24, 24]
