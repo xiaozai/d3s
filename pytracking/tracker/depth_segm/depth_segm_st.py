@@ -891,7 +891,7 @@ class DepthSegm_ST(BaseTracker):
             while iters < 1:
                 # Obtain segmentation prediction
                 # segm_pred = segm_net.segm_predictor(test_feat_segm, train_feat_segm, train_masks, test_dist_map)
-                segm_pred = segm_net.segm_predictor(test_feat_segm_rgb, init_patch_d,
+                segm_pred = segm_net.segm_predictor(test_feat_segm_rgb, train_feat_segm_d,
                                                     train_feat_segm_rgb, train_feat_segm_d, # if we use the feature correlation
                                                     train_masks, test_dist_map)
                 # softmax on the prediction (during training this is done internaly when calculating loss)
