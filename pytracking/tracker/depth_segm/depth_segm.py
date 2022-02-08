@@ -1145,7 +1145,7 @@ class DepthSegm(BaseTracker):
             while iters < 1:
                 # Obtain segmentation prediction
                 # segm_pred = segm_net.segm_predictor(test_feat_segm, train_feat_segm, train_masks, test_dist_map)
-                segm_pred = segm_net.segm_predictor(test_feat_segm_rgb, init_patch_d,
+                segm_pred = segm_net.segm_predictor(test_feat_segm_rgb, train_feat_segm_d,
                                                     train_feat_segm_rgb, train_feat_segm_d, # if we use the feature correlation
                                                     train_masks, test_dist_map)
                 # softmax on the prediction (during training this is done internaly when calculating loss)
@@ -1371,6 +1371,7 @@ class DepthSegm(BaseTracker):
 
         # extract features (extracting twice on the same patch - not necessary)
         test_feat_rgb = self.segm_net.extract_backbone_features(patch_gpu_rgb)
+        test_feat_d = self.segm_net.segm_predictor.depth_feat_extractor(patch_gpu_d)
 
         # prepare features in the list (format for the network)
         test_feat_segm_rgb = [feat for feat in test_feat_rgb.values()]
@@ -1389,7 +1390,7 @@ class DepthSegm(BaseTracker):
             test_dist_map = None
 
         # Obtain segmentation prediction
-        segm_pred = self.segm_net.segm_predictor(test_feat_segm_rgb, patch_gpu_d,
+        segm_pred = self.segm_net.segm_predictor(test_feat_segm_rgb, test_feat_d,
                                                  self.train_feat_segm_rgb, self.train_feat_segm_d,
                                                  train_masks, test_dist_map)
         # softmax on the prediction (during training this is done internaly when calculating loss)

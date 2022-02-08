@@ -984,7 +984,7 @@ class DepthSegm_ST(BaseTracker):
 
         # extract features (extracting twice on the same patch - not necessary)
         test_feat_rgb = self.segm_net.extract_backbone_features(patch_gpu_rgb)
-        test_feat_d = self.segm_net.depth_feat_extractor(patch_gpu_d)
+        test_feat_d = self.segm_net.segm_predictor.depth_feat_extractor(patch_gpu_d)
 
         # prepare features in the list (format for the network)
         test_feat_segm_rgb = [feat for feat in test_feat_rgb.values()]
