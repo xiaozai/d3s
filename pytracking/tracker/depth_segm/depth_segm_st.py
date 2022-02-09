@@ -897,7 +897,6 @@ class DepthSegm_ST(BaseTracker):
                 # softmax on the prediction (during training this is done internaly when calculating loss)
                 # take only the positive channel as predicted segmentation mask
                 mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy()
-                self.mask = mask # Song
                 mask = (mask > self.params.init_segm_mask_thr).astype(np.float32)
 
                 if hasattr(self, 'gt_poly'):
@@ -912,7 +911,7 @@ class DepthSegm_ST(BaseTracker):
 
                 target_pixels = np.sum((mask > 0.5).astype(np.float32))
 
-                # self.mask = mask # Song
+                self.mask = mask # Song
                 self.segm_init_target_pixels = target_pixels
 
                 if self.params.save_mask:
@@ -1008,10 +1007,12 @@ class DepthSegm_ST(BaseTracker):
         # softmax on the prediction (during training this is done internaly when calculating loss)
         # take only the positive channel as predicted segmentation mask
         mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy() # [1,2,384, 384] -> [384,384]
+        print('mask max and min value : ', mask.min(), mask.max())
+        self.mask = mask
         if self.params.save_mask:
             mask_real = copy.copy(mask)
         mask = (mask > self.params.segm_mask_thr).astype(np.uint8)
-        self.mask = mask
+        # self.mask = mask
         self.masked_img = patch_rgb * np.expand_dims(mask, axis=-1)
 
         if cv2.__version__[-5] == '4':
