@@ -73,9 +73,6 @@ class DepthSegmNet(nn.Module):
 
         self.depth_feat_extractor = DepthNet(input_dim=1, output_dim=64)
 
-        # 256 depth feat + 1 dist map + rgb similarity + depth similarity
-        self.mixer = conv(3, 64, kernel_size=3, padding=1)
-
         self.f0 = conv(1024, 64, kernel_size=3, padding=1)
         self.f1 = conv(512, 64, kernel_size=3, padding=1)
         self.f2 = conv(256, 32, kernel_size=3, padding=1)
@@ -86,16 +83,17 @@ class DepthSegmNet(nn.Module):
         self.d2 = conv(64, 32, kernel_size=3, padding=1)
         self.d3 = conv(64, 16, kernel_size=3, padding=1)
 
-        self.c0 = conv(64, 64, kernel_size=3, padding=1)
+        self.c0 = conv( 3, 64, kernel_size=3, padding=1)   # self.mixer : mix (p_rgb, p_d, dist)
         self.c1 = conv(64, 64, kernel_size=3, padding=1)
         self.c2 = conv(32, 32, kernel_size=3, padding=1)
         self.c3 = conv(16, 16, kernel_size=3, padding=1)
 
+        self.s0 = conv(64, 64, kernel_size=3, padding=1)
         self.s1 = conv(64, 64, kernel_size=3, padding=1)
         self.s2 = conv(32, 32, kernel_size=3, padding=1)
         self.s3 = conv(16, 16, kernel_size=3, padding=1)
 
-
+        self.post0 = conv(64, 64, kernel_size=3, padding=1)
         self.post1 = conv(64, 32, kernel_size=3, padding=1)
         self.post2 = conv(32, 16, kernel_size=3, padding=1)
         self.post3 = conv_no_relu(16, 2)   # GT is the pair of Foreground and Background segmentations
@@ -121,7 +119,6 @@ class DepthSegmNet(nn.Module):
     def forward(self, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, test_dist=None):
         ''' rgb features   : [conv1, layer1, layer2, layer3], Bx64x192x192  -> Bx256x96x96 -> Bx512x48x48 -> Bx1024x24x24
             depth features : [feat0, feat1, feat2, feat3],    Bx64x192x192 -> Bx64x96x96 -> Bx64x48x48 -> Bx64x24x24
-
             based on D3S, feat = w_rgb * feat_rgb + w_d * feat_d
         '''
 
@@ -131,18 +128,16 @@ class DepthSegmNet(nn.Module):
 
         # weights for RGB features and Depth features
         w_rgb, w_d = self.mutual_guided_block(pos_rgb, pos_d) # [B, 1, 24, 24]
-        # feat_rgbd3 = self.f0(feat_test_rgb[3]) * w_rgb + self.d0(feat_test_d[3]) * w_d
+        feat_rgbd3 = self.f0(feat_test_rgb[3]) * w_rgb + self.d0(feat_test_d[3]) * w_d # [B, 64, 24, 24]
         feat_rgbd2 = self.f1(feat_test_rgb[2]) * F.upsample(w_rgb, scale_factor=2) + self.d1(feat_test_d[2]) * F.upsample(w_d, scale_factor=2)
         feat_rgbd1 = self.f2(feat_test_rgb[1]) * F.upsample(w_rgb, scale_factor=4) + self.d2(feat_test_d[1]) * F.upsample(w_d, scale_factor=4)
         feat_rgbd0 = self.f3(feat_test_rgb[0]) * F.upsample(w_rgb, scale_factor=8) + self.d3(feat_test_d[0]) * F.upsample(w_d, scale_factor=8)
 
-        out0 = torch.cat((pos_rgb, pos_d, dist), dim=1)                # [B, 3, 24, 24]
-        out0 = self.c0(F.upsample(self.mixer(out0), scale_factor=2))   # [B, 64, 48, 48]
-
+        out0 = torch.cat((pos_rgb, pos_d, dist), dim=1)                                    # [B, 3, 24, 24]
+        out0 = self.post0(F.upsample(self.s0(feat_rgbd3) + self.c0(out0), scale_factor=2)) # [B, 64, 24, 24]   -> [B, 64, 48, 48]
         out1 = self.post1(F.upsample(self.s1(feat_rgbd2) + self.c1(out0), scale_factor=2)) # [B, 64, 48, 48]   -> [B, 32, 96, 96]
         out2 = self.post2(F.upsample(self.s2(feat_rgbd1) + self.c2(out1), scale_factor=2)) # [B, 32, 96, 96]   -> [B, 16, 192, 192]
         out3 = self.post3(F.upsample(self.s3(feat_rgbd0) + self.c3(out2), scale_factor=2)) # [B, 16, 192, 192] -> [B, 2, 384, 384]
-
 
         return out3
 
