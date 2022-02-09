@@ -154,7 +154,7 @@ class DepthSegmNet(nn.Module):
 
         w_rgb = self.w3(pos_rgb)
 
-        w = self.w4(torch.mul((w_rgb, w_d2)) + w_rgb)
+        w = self.w4(torch.mul(w_rgb, w_d2) + w_rgb)
         w = self.w5(w + w_d1)
 
         return w*pos_rgb, (1-w)*pos_d # [B, 1, 24, 24]
