@@ -16,6 +16,13 @@ def conv_no_relu(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dila
                       padding=padding, dilation=dilation, bias=True),
             nn.BatchNorm2d(out_planes))
 
+def conv_sigmoid(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1):
+    return nn.Sequential(
+            nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride,
+                      padding=padding, dilation=dilation, bias=True),
+            nn.Sigmoid())
+
+
 class DepthNet(nn.Module):
     def __init__(self, input_dim=1, output_dim=64):
         super().__init__()
@@ -84,9 +91,22 @@ class DepthSegmNet(nn.Module):
         self.c2 = conv(32, 32, kernel_size=3, padding=1)
         self.c3 = conv(16, 16, kernel_size=3, padding=1)
 
+        self.s1 = conv(64, 64, kernel_size=3, padding=1)
+        self.s2 = conv(32, 32, kernel_size=3, padding=1)
+        self.s3 = conv(16, 16, kernel_size=3, padding=1)
+
+
         self.post1 = conv(64, 32, kernel_size=3, padding=1)
         self.post2 = conv(32, 16, kernel_size=3, padding=1)
         self.post3 = conv_no_relu(16, 2)   # GT is the pair of Foreground and Background segmentations
+
+        # to get weights for RGB and D features
+        self.w1_1 = conv_no_relu(1, 1, kernel_size=3, padding=1)
+        self.w1_2 = conv_no_relu(1, 1, kernel_size=3, padding=1)
+        self.w2 = conv_sigmoid(1, 1, kernel_size=3, padding=1)
+        self.w3 = conv_no_relu(1, 1, kernel_size=3, padding=1)
+        self.w4 = conv_no_relu(1, 1, kernel_size=3, padding=1)
+        self.w5 = conv_sigmoid(1, 1, kernel_size=3, padding=1)
 
         self.initialize_weights()
 
@@ -102,26 +122,50 @@ class DepthSegmNet(nn.Module):
         ''' rgb features   : [conv1, layer1, layer2, layer3], Bx64x192x192  -> Bx256x96x96 -> Bx512x48x48 -> Bx1024x24x24
             depth features : [feat0, feat1, feat2, feat3],    Bx64x192x192 -> Bx64x96x96 -> Bx64x48x48 -> Bx64x24x24
 
-            depth_segm = d3s + depth feat
+            based on D3S, feat = w_rgb * feat_rgb + w_d * feat_d
         '''
 
+        pos_rgb, neg_rgb = self.cosine_similarity(self.f0(feat_test_rgb[3]), self.f0(feat_train_rgb[3]), mask_train[0])
+        pos_d, neg_d = self.cosine_similarity(self.d0(feat_test_d[3]), self.d0(feat_train_d[3]), mask_train[0])
+        dist = F.interpolate(test_dist[0], size=(feat_test_d[3].shape[-2], feat_test_d[3].shape[-1]))   # [B, 1, 24, 24]
+
         # weights for RGB features and Depth features
-        similarity_rgb = self.cosine_similarity(self.f0(feat_test_rgb[3]), self.f0(feat_train_rgb[3]), mask_train[0]) # [B, 1, 24, 24]
-        similarity_d = self.cosine_similarity(self.d0(feat_test_d[3]), self.d0(feat_train_d[3]), mask_train[0])       # [B, 1, 24, 24]
-        dist = F.interpolate(test_dist[0], size=(feat_test_d[3].shape[-2], feat_test_d[3].shape[-1]))                 # [B, 1, 24, 24]
+        w_rgb, w_d = self.mutual_guided_block(pos_rgb, pos_d) # [B, 1, 24, 24]
+        # feat_rgbd3 = self.f0(feat_test_rgb[3]) * w_rgb + self.d0(feat_test_d[3]) * w_d
+        feat_rgbd2 = self.f1(feat_test_rgb[2]) * F.upsample(w_rgb, scale_factor=2) + self.d1(feat_test_d[2]) * F.upsample(w_d, scale_factor=2)
+        feat_rgbd1 = self.f2(feat_test_rgb[1]) * F.upsample(w_rgb, scale_factor=4) + self.d2(feat_test_d[1]) * F.upsample(w_d, scale_factor=4)
+        feat_rgbd0 = self.f3(feat_test_rgb[0]) * F.upsample(w_rgb, scale_factor=8) + self.d3(feat_test_d[0]) * F.upsample(w_d, scale_factor=8)
 
-        out0 = torch.cat((similarity_rgb, similarity_d, dist), dim=1)           # [B, 3, 24, 24]
-        out0 = self.c0(F.upsample(self.mixer(out0), scale_factor=2))            # [B, 64, 48, 48]
+        out0 = torch.cat((pos_rgb, pos_d, dist), dim=1)                # [B, 3, 24, 24]
+        out0 = self.c0(F.upsample(self.mixer(out0), scale_factor=2))   # [B, 64, 48, 48]
 
-        out1 = self.post1(F.upsample(self.f1(feat_test_rgb[2]) + self.d1(feat_test_d[2]) + self.c1(out0), scale_factor=2)) # [B, 64, 48, 48]   -> [B, 32, 96, 96]
-        out2 = self.post2(F.upsample(self.f2(feat_test_rgb[1]) + self.d2(feat_test_d[1]) + self.c2(out1), scale_factor=2)) # [B, 32, 96, 96]   -> [B, 16, 192, 192]
-        out3 = self.post3(F.upsample(self.f3(feat_test_rgb[0]) + self.d3(feat_test_d[0]) + self.c3(out2), scale_factor=2)) # [B, 16, 192, 192] -> [B, 2, 384, 384]
+        out1 = self.post1(F.upsample(self.s1(feat_rgbd2) + self.c1(out0), scale_factor=2)) # [B, 64, 48, 48]   -> [B, 32, 96, 96]
+        out2 = self.post2(F.upsample(self.s2(feat_rgbd1) + self.c2(out1), scale_factor=2)) # [B, 32, 96, 96]   -> [B, 16, 192, 192]
+        out3 = self.post3(F.upsample(self.s3(feat_rgbd0) + self.c3(out2), scale_factor=2)) # [B, 16, 192, 192] -> [B, 2, 384, 384]
+
 
         return out3
 
 
-    def cosine_similarity(self, f_test, f_train, mask_train, topk=3):
+    def mutual_guided_block(self, pos_rgb, pos_d):
+        ''' rgb->tir, tir->rgb blocks in paper Temporal Aggregation for Adaptive RGBT Tracking
+            we use it as d -> rgb, use depth to guide rgb
+            rgb_pn : rgb positive response map [B, 1, H, W]
+            depth_pn : depth positive maps, [B, 1, H, W]
+        '''
 
+        w_d1 = self.w1_2(self.w1_1(pos_d))
+        w_d2 = self.w2(pos_d)
+
+        w_rgb = self.w3(pos_rgb)
+
+        w = self.w4(torch.mul((w_rgb, w_d2)) + w_rgb)
+        w = self.w5(w + w_d1)
+
+        return w*pos_rgb, (1-w)*pos_d # [B, 1, 24, 24]
+
+    def cosine_similarity(self, f_test, f_train, mask_train, topk=3):
+        ''' D3S cosine similarity between test and train features'''
         mask_pos = F.interpolate(mask_train, size=(f_train.shape[-2], f_train.shape[-1]))
         mask_neg = 1 - mask_pos
         # first normalize train and test features to have L2 norm 1
@@ -142,4 +186,4 @@ class DepthSegmNet(nn.Module):
         p = torch.cat((torch.unsqueeze(pos_map, -1), torch.unsqueeze(neg_map, -1)), dim=-1) # [B, H, W, 2]
         p = F.softmax(p, dim=-1)                                                # [B, 24, 24, 2]
 
-        return torch.unsqueeze(p[:, :, :, 0], dim=1)                            # [B, 1, 24, 24]
+        return torch.unsqueeze(p[:, :, :, 0], dim=1), torch.unsqueeze(p[:, :, :, 1], dim=1)     # [B, 1, H, W]
