@@ -166,9 +166,9 @@ class BaseTrainer:
             if key in ignore_fields:
                 continue
             if key == 'net':
-                self.actor.net.load_state_dict(checkpoint_dict[key])
+                self.actor.net.load_state_dict(checkpoint_dict[key], strict=False) # Song sets strict = False
             elif key == 'optimizer':
-                self.optimizer.load_state_dict(checkpoint_dict[key])
+                self.optimizer.load_state_dict(checkpoint_dict[key], strict=False) # Song
             else:
                 setattr(self, key, checkpoint_dict[key])
 
@@ -183,7 +183,3 @@ class BaseTrainer:
             self.lr_scheduler.last_epoch = self.epoch
 
         return True
-
-
-
-
