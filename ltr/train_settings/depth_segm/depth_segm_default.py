@@ -121,4 +121,4 @@ def run(settings):
     trainer = LTRTrainer(actor, [loader_train, loader_val], optimizer, settings, lr_scheduler)
 
     # Run training (set fail_safe=False if you are debugging)
-    trainer.train(40, load_latest=True, fail_safe=False)
+    trainer.train(80, load_latest=True, fail_safe=False)
