@@ -158,9 +158,9 @@ class DepthSegmNet(nn.Module):
         out = self.post0(F.upsample(self.f0(feat_test_rgb[0]) + self.d0(feat_test_d[0]) + self.s0(out), scale_factor=2))
 
         if debug:
-            return out3, (pred_pos_rgb,pred_neg_rgb,pred_pos_d,pred_neg_d)
+            return out, (pred_pos_rgb,pred_neg_rgb,pred_pos_d,pred_neg_d)
         else:
-            return out3
+            return out
 
     def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg):
         # first normalize train and test features to have L2 norm 1
