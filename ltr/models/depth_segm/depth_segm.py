@@ -24,7 +24,7 @@ class DepthSegmNet(nn.Module):
             for p in self.feature_extractor.parameters():
                 p.requires_grad_(False)
 
-    def forward(self, train_colors, train_depths, test_colors, test_depths, train_masks, test_dist=None):
+    def forward(self, train_colors, train_depths, test_colors, test_depths, train_masks, test_dist=None, debug=False):
         """ Forward pass
         Note: If the training is done in sequence mode, that is, test_imgs.dim() == 5, then the batch dimension
         corresponds to the first dimensions. test_imgs is thus of the form [sequence, batch, feature, row, col]
@@ -46,7 +46,7 @@ class DepthSegmNet(nn.Module):
         # Obtain iou prediction
         segm_pred = self.segm_predictor(train_feat_rgb, test_feat_d,
                                         test_feat_rgb, train_feat_d,
-                                        train_masks, test_dist)
+                                        train_masks, test_dist, debug=debug)
         return segm_pred
 
     def extract_backbone_features(self, im, layers=None):
