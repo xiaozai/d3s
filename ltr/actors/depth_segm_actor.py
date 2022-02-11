@@ -27,7 +27,7 @@ def save_debug(data, pred_mask, pos_rgb, neg_rgb, pos_d, neg_d):
     test_mask = data['test_masks'][0, batch_element, :, :]
 
     test_dist = data['test_dist'][0, batch_element, :, :] # song
-    print(test_dist.shape)
+    # print(test_dist.shape)
 
     pos_rgb = pos_rgb[batch_element, ...]
     pos_d = pos_d[batch_element, ...]
@@ -52,11 +52,11 @@ def save_debug(data, pred_mask, pos_rgb, neg_rgb, pos_d, neg_d):
     # predicted_mask = mask.astype(np.float32)
 
     # Song
-    test_dist = (test_dist.cpu().numpy().squeeze()).astype(np.float32)
-    pos_rgb = (pos_rgb.cpu().numpy().squeeze()).astype(np.float32)
-    neg_rgb = (neg_rgb.cpu().numpy().squeeze()).astype(np.float32)
-    pos_d = (pos_d.cpu().numpy().squeeze()).astype(np.float32)
-    neg_d = (neg_d.cpu().numpy().squeeze()).astype(np.float32)
+    test_dist = (test_dist.detach().cpu().numpy().squeeze()).astype(np.float32)
+    pos_rgb = (pos_rgb.detach().cpu().numpy().squeeze()).astype(np.float32)
+    neg_rgb = (neg_rgb.detach().cpu().numpy().squeeze()).astype(np.float32)
+    pos_d = (pos_d.detach().cpu().numpy().squeeze()).astype(np.float32)
+    neg_d = (neg_d.detach().cpu().numpy().squeeze()).astype(np.float32)
 
 
     f, ((ax1, ax2, ax3, _), (ax4, ax5, ax6, ax11), (ax7, ax8, ax9, ax10)) = plt.subplots(3, 4, figsize=(8, 8))
