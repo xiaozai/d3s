@@ -63,11 +63,13 @@ def save_debug(data, pred_mask, p_rgb, p_d):
     draw_axis(ax3, test_mask, 'Ground-truth')
     draw_axis(ax6, predicted_mask, 'Prediction', show_minmax=True)
 
-    p_rgb = (p_rgb * 255).astype(np.int32)
-    p_rgb = np.concatenate(p_rgb, np.zeros((p_rgb.shape[0], p_rgb.shape[1], 1), dtype=np.int32), axis=-1) # [H, W, 3]
+    empty_channel = np.zeros((p_rgb.shape[0], p_rgb.shape[1], 1), dtype=np.uint8)
 
-    p_d = (p_d * 255).astype(np.int32)
-    p_d = np.concatenate(p_d, np.zeros((p_d.shape[0], p_d.shape[1], 1), dtype=np.int32), axis=-1) # [H, W, 3]
+    p_rgb = (p_rgb * 255).astype(np.uint8)
+    p_rgb = np.concatenate((p_rgb, empty_channel), axis=-1) # [H, W, 3]
+
+    p_d = (p_d * 255).astype(np.uint8)
+    p_d = np.concatenate((p_d, empty_channel), axis=-1) # [H, W, 3]
 
     draw_axis(ax7, p_rgb, 'similarity rgb')
     draw_axis(ax8, p_d, 'similarity d')
