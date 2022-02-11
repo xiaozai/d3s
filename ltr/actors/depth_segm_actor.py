@@ -16,7 +16,7 @@ def draw_axis(ax, img, title, show_minmax=False):
 
 
 
-def save_debug(data, pred_mask):
+def save_debug(data, pred_mask, pos_rgb, neg_d, pos_d, neg_d):
     batch_element = 0
     dir_path = data['settings'].env.images_dir
 
@@ -43,13 +43,19 @@ def save_debug(data, pred_mask):
     test_mask = (test_mask.cpu().numpy()).astype(np.float32)
     # predicted_mask = mask.astype(np.float32)
 
-    f, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, figsize=(6, 6))
+    f, ((ax1, ax2, ax3, _), (ax4, ax5, ax6, _), (ax7, ax8, ax9, ax10)) = plt.subplots(3, 4, figsize=(6, 6))
     draw_axis(ax1, train_img, 'Train image')
     draw_axis(ax4, test_img, 'Test image')
     draw_axis(ax2, train_depth, 'Train depth')
     draw_axis(ax5, test_depth, 'Test depth')
     draw_axis(ax3, test_mask, 'Ground-truth')
     draw_axis(ax6, predicted_mask, 'Prediction', show_minmax=True)
+
+    draw_axis(ax7, pos_rgb, 'pos-rgb')
+    draw_axis(ax8, neg_rgb, 'neg-rgb')
+    draw_axis(ax9, pos_d, 'pos-d')
+    draw_axis(ax10, neg_d, 'neg_d')
+
 
     save_path = os.path.join(data['settings'].env.images_dir, '%03d-%04d.png' % (data['epoch'], data['iter']))
     plt.savefig(save_path)
@@ -74,12 +80,13 @@ class DepthSegmActor(BaseActor):
             test_dist = data['test_dist'].permute(1, 0, 2, 3)
 
         # Run network to obtain IoU prediction for each proposal in 'test_proposals'
-        masks_pred = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
-                              data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
-                              data['test_images'].permute(1, 0, 2, 3),
-                              data['test_depths'].permute(1, 0, 2, 3),
-                              data['train_masks'].permute(1, 0, 2, 3),
-                              test_dist)
+        masks_pred, (pos_rgb, neg_d, pos_d, neg_d) = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
+                                                              data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
+                                                              data['test_images'].permute(1, 0, 2, 3),
+                                                              data['test_depths'].permute(1, 0, 2, 3),
+                                                              data['train_masks'].permute(1, 0, 2, 3),
+                                                              test_dist,
+                                                              debug=True) # Song :  vis pos and neg maps
 
         masks_gt = data['test_masks'].permute(1, 0, 2, 3)            # B * 1 * H * W
         masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)   # B * 2 * H * W
@@ -91,6 +98,6 @@ class DepthSegmActor(BaseActor):
                  'Loss/segm': loss.item()}
 
         if 'iter' in data and (data['iter'] - 1) % 50 == 0:
-            save_debug(data, masks_pred)
+            save_debug(data, masks_pred, pos_rgb, neg_rgb, pos_d, neg_d)
 
         return loss, stats

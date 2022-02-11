@@ -182,7 +182,7 @@ class DepthSegmProcessing(BaseProcessing):
                 y_ = np.linspace(1, crops_img[0].shape[0], crops_img[0].shape[0]) - 1 - cy_
                 X, Y = np.meshgrid(x_, y_)
                 D = np.sqrt(np.square(X) + np.square(Y)).astype(np.float32)
-                D = 1 - D / np.max(D) # Song : dist map value is too large compared to feat map
+                # D = 1 - D / np.max(D) # Song : dist map value is too large compared to feat map
                                   # the closest pixel to the center, should have highter value
                 data['test_dist'] = [torch.from_numpy(np.expand_dims(D, axis=0))]
 
@@ -215,7 +215,7 @@ class DepthSegmProcessing(BaseProcessing):
                     y_ = np.linspace(1, crops_img[0].shape[0], crops_img[0].shape[0]) - 1 - cy_
                     X, Y = np.meshgrid(x_, y_)
                     D = np.sqrt(np.square(X) + np.square(Y)).astype(np.float32)
-                    D = 1 - D / np.max(D) # Song : dist map value is too large compared to feat map
+                    # D = 1 - D / np.max(D) # Song : dist map value is too large compared to feat map
                     data['test_dist'] = [torch.from_numpy(np.expand_dims(D, axis=0))]
 
         # Prepare output

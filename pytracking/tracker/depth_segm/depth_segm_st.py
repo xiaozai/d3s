@@ -746,7 +746,7 @@ class DepthSegm_ST(BaseTracker):
         self.pos = torch.max(torch.min(new_pos, self.image_sz - inside_offset), inside_offset)
 
     def create_dist(self, width, height, cx=None, cy=None):
-        ''' Song: we use the response map as dist map, differ from D3S'''
+
         if cx is None:
             cx = width / 2
         if cy is None:
@@ -756,12 +756,9 @@ class DepthSegm_ST(BaseTracker):
         y_ = np.linspace(1, width, width) - cy
         X, Y = np.meshgrid(x_, y_)
 
-        D = np.sqrt(np.square(X) + np.square(Y)).astype(np.float32)
-        D = 1 - D / np.max(D) # Song : dist map value is too large compared to feat map
-        return D
+        return np.sqrt(np.square(X) + np.square(Y)).astype(np.float32)
 
     def create_dist_gauss(self, map_sz, w, h, cx=None, cy=None, p=4, sz_weight=0.7):
-        ''' Song: we use the response map as dist map, differ from D3S'''
         # create a square-shaped distance map with a Gaussian function which can be interpreted as a distance
         # to the given bounding box (center [cx, cy], width w, height h)
         # p is power of a Gaussian function
@@ -775,8 +772,7 @@ class DepthSegm_ST(BaseTracker):
         y_ = np.linspace(1, map_sz, map_sz) - 1 - cy
         X, Y = np.meshgrid(x_, y_)
         # 1 - is needed since we need distance-like map (not Gaussian function)
-        # return 1 - np.exp(-((np.power(X, p) / (sz_weight * w ** p)) + (np.power(Y, p) / (sz_weight * h ** p))))
-        return np.exp(-((np.power(X, p) / (sz_weight * w ** p)) + (np.power(Y, p) / (sz_weight * h ** p)))) # Song Yan edited it
+        return 1 - np.exp(-((np.power(X, p) / (sz_weight * w ** p)) + (np.power(Y, p) / (sz_weight * h ** p))))
 
     def init_segmentation(self, color, depth, bb, init_mask=None):
 
