@@ -179,6 +179,7 @@ class BaseTrainer:
 
             elif key == 'optimizer':
                 # self.optimizer.load_state_dict(checkpoint_dict[key])
+
                 # Song load pretrained d3s
                 pretrained_dict = checkpoint_dict[key]
                 model_dict = self.optimizer.state_dict()
@@ -186,7 +187,7 @@ class BaseTrainer:
                 # for k, v in pretrained_dict.items():
                 #     print(k)
                 model_dict.update(pretrained_dict)
-                self.optimizer.load_state_dict(model_dict, strict=False)
+                self.optimizer.load_state_dict(model_dict)
 
             else:
                 setattr(self, key, checkpoint_dict[key])
