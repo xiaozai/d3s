@@ -26,6 +26,14 @@ def save_debug(data, pred_mask, pos_rgb, neg_d, pos_d, neg_d):
     test_depth = data['test_depths'][:, batch_element, :, :].permute(1, 2, 0)
     test_mask = data['test_masks'][0, batch_element, :, :]
 
+    test_dist = data['test_dist'][0, batch_element, :, :] # song
+    print(test_dist.shape)
+    
+    pos_rgb = pos_rgb[batch_element, ...]
+    pos_d = pos_d[batch_element, ...]
+    neg_rgb = neg_rgb[batch_element, ...]
+    neg_d = neg_d[batch_element, ...]
+
     # softmax on the mask prediction (since this is done internaly when calculating loss)
     mask = F.softmax(pred_mask, dim=1)[batch_element, 0, :, :].cpu().detach().numpy().astype(np.float32)
     predicted_mask = (mask > 0.5).astype(np.float32) * mask
@@ -43,7 +51,15 @@ def save_debug(data, pred_mask, pos_rgb, neg_d, pos_d, neg_d):
     test_mask = (test_mask.cpu().numpy()).astype(np.float32)
     # predicted_mask = mask.astype(np.float32)
 
-    f, ((ax1, ax2, ax3, _), (ax4, ax5, ax6, _), (ax7, ax8, ax9, ax10)) = plt.subplots(3, 4, figsize=(6, 6))
+    # Song
+    test_dist = (test_dist.cpu().numpy()).astype(np.float32)
+    pos_rgb = (pos_rgb.cpu().numpy().squeeze()).astype(np.float32)
+    neg_rgb = (neg_rgb.cpu().numpy().squeeze()).astype(np.float32)
+    pos_d = (pos_d.cpu().numpy().squeeze()).astype(np.float32)
+    neg_d = (neg_d.cpu().numpy().squeeze()).astype(np.float32)
+
+
+    f, ((ax1, ax2, ax3, _), (ax4, ax5, ax6, ax11), (ax7, ax8, ax9, ax10)) = plt.subplots(3, 4, figsize=(8, 8))
     draw_axis(ax1, train_img, 'Train image')
     draw_axis(ax4, test_img, 'Test image')
     draw_axis(ax2, train_depth, 'Train depth')
@@ -56,6 +72,7 @@ def save_debug(data, pred_mask, pos_rgb, neg_d, pos_d, neg_d):
     draw_axis(ax9, pos_d, 'pos-d')
     draw_axis(ax10, neg_d, 'neg_d')
 
+    draw_axis(ax11, test_dist, 'test_dist')
 
     save_path = os.path.join(data['settings'].env.images_dir, '%03d-%04d.png' % (data['epoch'], data['iter']))
     plt.savefig(save_path)
