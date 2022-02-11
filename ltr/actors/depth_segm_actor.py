@@ -52,7 +52,7 @@ def save_debug(data, pred_mask, pos_rgb, neg_rgb, pos_d, neg_d):
     # predicted_mask = mask.astype(np.float32)
 
     # Song
-    test_dist = (test_dist.cpu().numpy()).astype(np.float32)
+    test_dist = (test_dist.cpu().numpy().squeeze()).astype(np.float32)
     pos_rgb = (pos_rgb.cpu().numpy().squeeze()).astype(np.float32)
     neg_rgb = (neg_rgb.cpu().numpy().squeeze()).astype(np.float32)
     pos_d = (pos_d.cpu().numpy().squeeze()).astype(np.float32)

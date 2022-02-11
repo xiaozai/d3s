@@ -17,13 +17,13 @@ def conv_no_relu(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dila
             nn.BatchNorm2d(out_planes))
 
 class DepthNet(nn.Module):
-    def __init__(self, input_dim=1):
+    def __init__(self, input_dim=1, segm_inter_dim=(4, 16, 32, 64)):
         super().__init__()
 
-        self.conv0 = conv(input_dim, 4)
-        self.conv1 = conv(4, 16)
-        self.conv2 = conv(16, 32)
-        self.conv3 = conv(32, 64)
+        self.conv0 = conv(input_dim, segm_inter_dim[0])
+        self.conv1 = conv(segm_inter_dim[0], segm_inter_dim[1])
+        self.conv2 = conv(segm_inter_dim[1], segm_inter_dim[2])
+        self.conv3 = conv(segm_inter_dim[2], segm_inter_dim[3])
 
         # AvgPool2d , more smooth, MaxPool2d, more sharp
         self.maxpool0 = nn.MaxPool2d(2, stride=2)
@@ -47,7 +47,7 @@ class DepthNet(nn.Module):
 
     def forward(self, dp):
         feat0 = self.conv0(dp)
-        feat0 = self.maxpool0(feat0) + self.avgpool0(feat0) # 384 -> 192
+        feat0 = self.maxpool0(feat0) + self.avgpool0(feat0) # 384 -> 192, 4
 
         feat1 = self.conv1(feat0)
         feat1 = self.maxpool1(feat1) + self.avgpool1(feat1) # 192 -> 96
@@ -65,36 +65,41 @@ class DepthSegmNet(nn.Module):
     def __init__(self):
         super().__init__()
 
-        self.depth_feat_extractor = DepthNet(input_dim=1)
 
-        # 256 depth feat + 1 dist map + rgb similarity + depth similarity
-        self.mixer = conv(5, 64, kernel_size=3, padding=1)
+
+        segm_input_dim = (64, 256, 512, 1024)
+        segm_inter_dim = (4, 16, 32, 64)
+        segm_dim = (64, 64)  # convolutions before cosine similarity
+
+
+        self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
         # 1024， 512， 256， 64 -> 64, 32, 16, 4
-        self.segment0_rgb = conv(1024, 64, kernel_size=1, padding=0)
-        self.segment1_rgb = conv_no_relu(64, 64)
+        self.segment0_rgb = conv(segm_input_dim[3], segm_dim[0], kernel_size=1, padding=0)
+        self.segment1_rgb = conv_no_relu(segm_dim[0], segm_dim[1]) # 64
 
         self.segment0_d = conv(64, 64, kernel_size=1, padding=0)
         self.segment1_d = conv_no_relu(64, 64)
 
-        self.mixer = conv(5, 64)
-        self.s3 = conv(64, 64)
+        # 256 depth feat + 1 dist map + rgb similarity + depth similarity
+        self.mixer = conv(5, segm_inter_dim[3])
+        self.s3 = conv(segm_inter_dim[3], segm_inter_dim[2]) # 64 -> 32
 
-        self.s2 = conv(32, 32)
-        self.s1 = conv(16, 16)
-        self.s0 = conv(4, 4)
+        self.s2 = conv(segm_inter_dim[2], segm_inter_dim[2])
+        self.s1 = conv(segm_inter_dim[1], segm_inter_dim[1])
+        self.s0 = conv(segm_inter_dim[0], segm_inter_dim[0])
 
-        self.f2 = conv(512, 32)
-        self.f1 = conv(256, 16)
-        self.f0 = conv(64, 4)
+        self.f2 = conv(segm_input_dim[2], segm_inter_dim[2])
+        self.f1 = conv(segm_input_dim[1], segm_inter_dim[1])
+        self.f0 = conv(segm_input_dim[0], segm_inter_dim[0])
 
-        self.d2 = conv(32, 32)
-        self.d1 = conv(16, 16)
-        self.d0 = conv(4, 4)
+        self.d2 = conv(segm_inter_dim[2], segm_inter_dim[2])
+        self.d1 = conv(segm_inter_dim[1], segm_inter_dim[1])
+        self.d0 = conv(segm_inter_dim[0], segm_inter_dim[0])
 
-        self.post2 = conv(32, 16)
-        self.post1 = conv(16, 4)
-        self.post0 = conv_no_relu(4, 2)
+        self.post2 = conv(segm_inter_dim[2], segm_inter_dim[1])
+        self.post1 = conv(segm_inter_dim[1], segm_inter_dim[0])
+        self.post0 = conv_no_relu(segm_inter_dim[0], 2)
 
         self.initialize_weights()
 
