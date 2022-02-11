@@ -65,8 +65,6 @@ class DepthSegmNet(nn.Module):
     def __init__(self):
         super().__init__()
 
-
-
         segm_input_dim = (64, 256, 512, 1024)
         segm_inter_dim = (4, 16, 32, 64)
         segm_dim = (64, 64)  # convolutions before cosine similarity
