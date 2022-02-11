@@ -158,7 +158,7 @@ class DepthSegmNet(nn.Module):
         out = self.post0(F.upsample(self.f0(feat_test_rgb[0]) + self.d0(feat_test_d[0]) + self.s0(out), scale_factor=2))
 
         if debug:
-            return out, (pred_pos_rgb,pred_neg_rgb,pred_pos_d,pred_neg_d)
+            return out, (pred_sm_rgb, pred_sm_d)
         else:
             return out
 

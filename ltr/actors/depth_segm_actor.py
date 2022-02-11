@@ -16,7 +16,7 @@ def draw_axis(ax, img, title, show_minmax=False):
 
 
 
-def save_debug(data, pred_mask, pos_rgb, neg_rgb, pos_d, neg_d):
+def save_debug(data, pred_mask, p_rgb, p_d):
     batch_element = 0
     dir_path = data['settings'].env.images_dir
 
@@ -29,10 +29,8 @@ def save_debug(data, pred_mask, pos_rgb, neg_rgb, pos_d, neg_d):
     test_dist = data['test_dist'][0, batch_element, :, :] # song
     # print(test_dist.shape)
 
-    pos_rgb = pos_rgb[batch_element, ...]
-    pos_d = pos_d[batch_element, ...]
-    neg_rgb = neg_rgb[batch_element, ...]
-    neg_d = neg_d[batch_element, ...]
+    p_rgb = p_rgb[batch_element, ...] # [H, W, 2] F + B
+    p_d = p_d[batch_element, ...]
 
     # softmax on the mask prediction (since this is done internaly when calculating loss)
     mask = F.softmax(pred_mask, dim=1)[batch_element, 0, :, :].cpu().detach().numpy().astype(np.float32)
@@ -53,13 +51,11 @@ def save_debug(data, pred_mask, pos_rgb, neg_rgb, pos_d, neg_d):
 
     # Song
     test_dist = (test_dist.detach().cpu().numpy().squeeze()).astype(np.float32)
-    pos_rgb = (pos_rgb.detach().cpu().numpy().squeeze()).astype(np.float32)
-    neg_rgb = (neg_rgb.detach().cpu().numpy().squeeze()).astype(np.float32)
-    pos_d = (pos_d.detach().cpu().numpy().squeeze()).astype(np.float32)
-    neg_d = (neg_d.detach().cpu().numpy().squeeze()).astype(np.float32)
+    p_rgb = (p_rgb.detach().cpu().numpy().squeeze()).astype(np.float32) # [H, W, 2]
+    p_d = (p_d.detach().cpu().numpy().squeeze()).astype(np.float32)
 
 
-    f, ((ax1, ax2, ax3, _), (ax4, ax5, ax6, ax11), (ax7, ax8, ax9, ax10)) = plt.subplots(3, 4, figsize=(8, 8))
+    f, ((ax1, ax2, ax3), (ax4, ax5, ax6), (ax7, ax8, ax9)) = plt.subplots(3, 3, figsize=(8, 8))
     draw_axis(ax1, train_img, 'Train image')
     draw_axis(ax4, test_img, 'Test image')
     draw_axis(ax2, train_depth, 'Train depth')
@@ -67,12 +63,15 @@ def save_debug(data, pred_mask, pos_rgb, neg_rgb, pos_d, neg_d):
     draw_axis(ax3, test_mask, 'Ground-truth')
     draw_axis(ax6, predicted_mask, 'Prediction', show_minmax=True)
 
-    draw_axis(ax7, pos_rgb, 'pos-rgb')
-    draw_axis(ax8, neg_rgb, 'neg-rgb')
-    draw_axis(ax9, pos_d, 'pos-d')
-    draw_axis(ax10, neg_d, 'neg_d')
+    p_rgb = (p_rgb * 255).astype(np.int32)
+    p_rgb = np.stack(p_rgb, np.zeros((p_rgb.shape[0], p_rgb.shape[1], 1), dtype=np.int32), axis=-1) # [H, W, 3]
 
-    draw_axis(ax11, test_dist, 'test_dist')
+    p_d = (p_d * 255).astype(np.int32)
+    p_d = np.stack(p_d, np.zeros((p_d.shape[0], p_d.shape[1], 1), dtype=np.int32), axis=-1) # [H, W, 3]
+
+    draw_axis(ax7, p_rgb, 'similarity rgb')
+    draw_axis(ax8, p_d, 'similarity d')
+    draw_axis(ax9, test_dist, 'test_dist')
 
     save_path = os.path.join(data['settings'].env.images_dir, '%03d-%04d.png' % (data['epoch'], data['iter']))
     plt.savefig(save_path)
@@ -97,7 +96,7 @@ class DepthSegmActor(BaseActor):
             test_dist = data['test_dist'].permute(1, 0, 2, 3)
 
         # Run network to obtain IoU prediction for each proposal in 'test_proposals'
-        masks_pred, (pos_rgb, neg_rgb, pos_d, neg_d) = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
+        masks_pred, (p_rgb, p_d) = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
                                                               data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
                                                               data['test_images'].permute(1, 0, 2, 3),
                                                               data['test_depths'].permute(1, 0, 2, 3),
@@ -115,6 +114,6 @@ class DepthSegmActor(BaseActor):
                  'Loss/segm': loss.item()}
 
         if 'iter' in data and (data['iter'] - 1) % 50 == 0:
-            save_debug(data, masks_pred, pos_rgb, neg_rgb, pos_d, neg_d)
+            save_debug(data, masks_pred, p_rgb, p_d)
 
         return loss, stats
