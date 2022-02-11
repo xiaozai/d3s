@@ -159,7 +159,7 @@ class BaseTrainer:
             ignore_fields = ['settings']
 
             # Never load the scheduler. It exists in older checkpoints.
-        ignore_fields.extend(['lr_scheduler', 'constructor', 'net_type', 'actor_type', 'net_info'])
+        ignore_fields.extend(['lr_scheduler', 'constructor', 'net_type', 'actor_type', 'net_info', 'optimizer'])
 
         # Load all fields
         for key in fields:
@@ -179,7 +179,7 @@ class BaseTrainer:
 
             # elif key == 'optimizer':
             #     self.optimizer.load_state_dict(checkpoint_dict[key])
-            # 
+            #
             else:
                 setattr(self, key, checkpoint_dict[key])
 
