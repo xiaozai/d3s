@@ -16,7 +16,7 @@ def draw_axis(ax, img, title, show_minmax=False):
 
 
 
-def save_debug(data, pred_mask, pos_rgb, neg_d, pos_d, neg_d):
+def save_debug(data, pred_mask, pos_rgb, neg_rgb, pos_d, neg_d):
     batch_element = 0
     dir_path = data['settings'].env.images_dir
 
@@ -28,7 +28,7 @@ def save_debug(data, pred_mask, pos_rgb, neg_d, pos_d, neg_d):
 
     test_dist = data['test_dist'][0, batch_element, :, :] # song
     print(test_dist.shape)
-    
+
     pos_rgb = pos_rgb[batch_element, ...]
     pos_d = pos_d[batch_element, ...]
     neg_rgb = neg_rgb[batch_element, ...]
