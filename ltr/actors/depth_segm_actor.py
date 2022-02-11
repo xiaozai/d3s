@@ -97,7 +97,7 @@ class DepthSegmActor(BaseActor):
             test_dist = data['test_dist'].permute(1, 0, 2, 3)
 
         # Run network to obtain IoU prediction for each proposal in 'test_proposals'
-        masks_pred, (pos_rgb, neg_d, pos_d, neg_d) = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
+        masks_pred, (pos_rgb, neg_rgb, pos_d, neg_d) = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
                                                               data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
                                                               data['test_images'].permute(1, 0, 2, 3),
                                                               data['test_depths'].permute(1, 0, 2, 3),
