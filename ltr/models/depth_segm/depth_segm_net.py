@@ -137,6 +137,10 @@ class DepthSegmNet(nn.Module):
         out0 = self.post0(F.upsample(self.s0(feat_rgbd3) + self.c0(out0), scale_factor=2)) # [B, 64, 24, 24]   -> [B, 64, 48, 48]
         out1 = self.post1(F.upsample(self.s1(feat_rgbd2) + self.c1(out0), scale_factor=2)) # [B, 64, 48, 48]   -> [B, 32, 96, 96]
         out2 = self.post2(F.upsample(self.s2(feat_rgbd1) + self.c2(out1), scale_factor=2)) # [B, 32, 96, 96]   -> [B, 16, 192, 192]
+
+        ''' should we model for background? it directly from pos to pos+neg , 16 -> 2 ???
+            how about cat(feat*pos, feat*neg) 
+        '''
         out3 = self.post3(F.upsample(self.s3(feat_rgbd0) + self.c3(out2), scale_factor=2)) # [B, 16, 192, 192] -> [B, 2, 384, 384]
 
         return out3
