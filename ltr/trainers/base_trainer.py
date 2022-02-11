@@ -159,27 +159,27 @@ class BaseTrainer:
             ignore_fields = ['settings']
 
             # Never load the scheduler. It exists in older checkpoints.
-        ignore_fields.extend(['lr_scheduler', 'constructor', 'net_type', 'actor_type', 'net_info', 'optimizer'])
+        ignore_fields.extend(['lr_scheduler', 'constructor', 'net_type', 'actor_type', 'net_info'])
 
         # Load all fields
         for key in fields:
             if key in ignore_fields:
                 continue
             if key == 'net':
-                # self.actor.net.load_state_dict(checkpoint_dict[key])
+                self.actor.net.load_state_dict(checkpoint_dict[key])
 
-                # Song load pretrained d3s
-                pretrained_dict = checkpoint_dict[key]
-                model_dict = self.actor.net.state_dict()
-                pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict and not k.startswith('segm_predictor.mixer')}
-                # for k, v in pretrained_dict.items():
-                #     print(k)
-                model_dict.update(pretrained_dict)
-                self.actor.net.load_state_dict(model_dict, strict=False)
+                # # Song load part of pretrained d3s weights
+                # pretrained_dict = checkpoint_dict[key]
+                # model_dict = self.actor.net.state_dict()
+                # pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict and not k.startswith('segm_predictor.mixer')}
+                # # for k, v in pretrained_dict.items():
+                # #     print(k)
+                # model_dict.update(pretrained_dict)
+                # self.actor.net.load_state_dict(model_dict, strict=False)
 
-            # elif key == 'optimizer':
-            #     self.optimizer.load_state_dict(checkpoint_dict[key])
-            #
+            elif key == 'optimizer':
+                self.optimizer.load_state_dict(checkpoint_dict[key])
+
             else:
                 setattr(self, key, checkpoint_dict[key])
 
