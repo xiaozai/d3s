@@ -102,7 +102,7 @@ class DepthSegmActor(BaseActor):
                                                               data['test_images'].permute(1, 0, 2, 3),
                                                               data['test_depths'].permute(1, 0, 2, 3),
                                                               data['train_masks'].permute(1, 0, 2, 3),
-                                                              test_dist,
+                                                              test_dist=test_dist,
                                                               debug=True) # Song :  vis pos and neg maps
 
         masks_gt = data['test_masks'].permute(1, 0, 2, 3)            # B * 1 * H * W
