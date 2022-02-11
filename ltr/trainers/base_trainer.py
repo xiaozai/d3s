@@ -172,8 +172,10 @@ class BaseTrainer:
                 pretrained_dict = checkpoint_dict[key]
                 model_dict = self.actor.net.state_dict()
                 pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+                for k, v in pretrained_dict.items():
+                    print(k)
                 model_dict.update(pretrained_dict)
-                self.actor.net.load_state_dict(model_dict, strict=False, skip_mismatch=True)
+                self.actor.net.load_state_dict(model_dict, strict=False)
 
             elif key == 'optimizer':
                 self.optimizer.load_state_dict(checkpoint_dict[key], strict=False) # Song
