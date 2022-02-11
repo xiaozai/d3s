@@ -17,13 +17,13 @@ def conv_no_relu(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dila
             nn.BatchNorm2d(out_planes))
 
 class DepthNet(nn.Module):
-    def __init__(self, input_dim=1, segm_inter_dim=(4, 16, 32, 64)):
+    def __init__(self, input_dim=1, inter_dim=(4, 16, 32, 64)):
         super().__init__()
 
-        self.conv0 = conv(input_dim, segm_inter_dim[0])
-        self.conv1 = conv(segm_inter_dim[0], segm_inter_dim[1])
-        self.conv2 = conv(segm_inter_dim[1], segm_inter_dim[2])
-        self.conv3 = conv(segm_inter_dim[2], segm_inter_dim[3])
+        self.conv0 = conv(input_dim, inter_dim[0])    # 1  -> 4
+        self.conv1 = conv(inter_dim[0], inter_dim[1]) # 4 -> 16
+        self.conv2 = conv(inter_dim[1], inter_dim[2]) # 16 -> 32
+        self.conv3 = conv(inter_dim[2], inter_dim[3]) # 32 -> 64
 
         # AvgPool2d , more smooth, MaxPool2d, more sharp
         self.maxpool0 = nn.MaxPool2d(2, stride=2)
@@ -50,13 +50,13 @@ class DepthNet(nn.Module):
         feat0 = self.maxpool0(feat0) + self.avgpool0(feat0) # 384 -> 192, 4
 
         feat1 = self.conv1(feat0)
-        feat1 = self.maxpool1(feat1) + self.avgpool1(feat1) # 192 -> 96
+        feat1 = self.maxpool1(feat1) + self.avgpool1(feat1) # 192 -> 96, 16
 
         feat2 = self.conv2(feat1)
-        feat2 = self.maxpool2(feat2) + self.avgpool2(feat2) # 96 -> 48
+        feat2 = self.maxpool2(feat2) + self.avgpool2(feat2) # 96 -> 48, 32
 
         feat3 = self.conv3(feat2)
-        feat3 = self.maxpool3(feat3) + self.avgpool3(feat3) # 48 -> 24
+        feat3 = self.maxpool3(feat3) + self.avgpool3(feat3) # 48 -> 24, 64
 
         return [feat0, feat1, feat2, feat3] # [4, 16, 32, 64]
 
@@ -85,9 +85,9 @@ class DepthSegmNet(nn.Module):
         self.mixer = conv(5, segm_inter_dim[3])
         self.s3 = conv(segm_inter_dim[3], segm_inter_dim[2]) # 64 -> 32
 
-        self.s2 = conv(segm_inter_dim[2], segm_inter_dim[2])
-        self.s1 = conv(segm_inter_dim[1], segm_inter_dim[1])
-        self.s0 = conv(segm_inter_dim[0], segm_inter_dim[0])
+        self.s2 = conv(segm_inter_dim[2], segm_inter_dim[2]) # 32, 32
+        self.s1 = conv(segm_inter_dim[1], segm_inter_dim[1]) # 16, 16
+        self.s0 = conv(segm_inter_dim[0], segm_inter_dim[0]) # 4, 4
 
         self.f2 = conv(segm_input_dim[2], segm_inter_dim[2])
         self.f1 = conv(segm_input_dim[1], segm_inter_dim[1])
