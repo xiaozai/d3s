@@ -150,7 +150,7 @@ class BaseTrainer:
 
         # Load network
         checkpoint_dict = loading.torch_load_legacy(checkpoint_path)
-
+        print(net_type, checkpoint_dict['net_type'])
         assert net_type == checkpoint_dict['net_type'], 'Network is not of correct type.'
 
         if fields is None:
