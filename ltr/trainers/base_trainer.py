@@ -150,7 +150,7 @@ class BaseTrainer:
 
         # Load network
         checkpoint_dict = loading.torch_load_legacy(checkpoint_path)
-        # print(net_type, checkpoint_dict['net_type'])
+        # print(net_type, checkpoint_dict['net_type']) # Song
         # assert net_type == checkpoint_dict['net_type'], 'Network is not of correct type.'
 
         if fields is None:
@@ -166,7 +166,15 @@ class BaseTrainer:
             if key in ignore_fields:
                 continue
             if key == 'net':
-                self.actor.net.load_state_dict(checkpoint_dict[key], strict=False) # Song sets strict = False
+                # self.actor.net.load_state_dict(checkpoint_dict[key])
+
+                # Song load pretrained d3s
+                pretrained_dict = checkpoint_dict[key]
+                model_dict = self.actor.net.state_dict()
+                pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
+                model_dict.update(pretrained_dict)
+                model.load_state_dict(model_dict)
+
             elif key == 'optimizer':
                 self.optimizer.load_state_dict(checkpoint_dict[key], strict=False) # Song
             else:
