@@ -115,8 +115,7 @@ def run(settings):
     optimizer = optim.Adam(actor.net.segm_predictor.parameters(), lr=1e-3)
 
     # Learning rate scheduler
-    # lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.2)
-    lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=55, gamma=0.2)
+    lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.2)
 
     # Create trainer
     trainer = LTRTrainer(actor, [loader_train, loader_val], optimizer, settings, lr_scheduler)
