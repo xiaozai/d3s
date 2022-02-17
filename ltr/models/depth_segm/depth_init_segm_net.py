@@ -61,7 +61,7 @@ class DepthNet(nn.Module):
         return [feat0, feat1, feat2, feat3] # [4, 16, 32, 64]
 
 
-class DepthOnlySegmNet(nn.Module):
+class DepthInitSegmNet(nn.Module):
     def __init__(self):
         super().__init__()
 
