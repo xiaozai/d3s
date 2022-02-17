@@ -99,12 +99,12 @@ class DepthSegmActor(BaseActor):
 
         # Run network to obtain IoU prediction for each proposal in 'test_proposals'
         masks_pred, (p_rgb, p_d) = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
-                                                              data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
-                                                              data['test_images'].permute(1, 0, 2, 3),
-                                                              data['test_depths'].permute(1, 0, 2, 3),
-                                                              data['train_masks'].permute(1, 0, 2, 3),
-                                                              test_dist=test_dist,
-                                                              debug=True) # Song :  vis pos and neg maps
+                                            data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
+                                            data['test_images'].permute(1, 0, 2, 3),
+                                            data['test_depths'].permute(1, 0, 2, 3),
+                                            data['train_masks'].permute(1, 0, 2, 3),
+                                            test_dist=test_dist,
+                                            debug=True) # Song :  vis pos and neg maps
 
         masks_gt = data['test_masks'].permute(1, 0, 2, 3)            # B * 1 * H * W
         masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)   # B * 2 * H * W
@@ -117,5 +117,45 @@ class DepthSegmActor(BaseActor):
 
         if 'iter' in data and (data['iter'] - 1) % 50 == 0:
             save_debug(data, masks_pred, p_rgb, p_d)
+
+        return loss, stats
+
+class DepthSegmAttentionActor(BaseActor):
+    """ Actor for training the Segmentation in ATOM"""
+    def __call__(self, data):
+        """
+        args:
+            data - The input data, should contain the fields 'train_images', 'test_images', 'train_anno',
+                    'test_proposals' and 'proposal_iou'.
+
+        returns:
+            loss    - the training loss
+            states  -  dict containing detailed losses
+        """
+
+        test_dist = None
+        if 'test_dist' in data:
+            test_dist = data['test_dist'].permute(1, 0, 2, 3)
+
+        # Run network to obtain IoU prediction for each proposal in 'test_proposals'
+        masks_pred, (pred_sm_d, attn_weights2, attn_weights1, attn_weights0) = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
+                                                                                        data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
+                                                                                        data['test_images'].permute(1, 0, 2, 3),
+                                                                                        data['test_depths'].permute(1, 0, 2, 3),
+                                                                                        data['train_masks'].permute(1, 0, 2, 3),
+                                                                                        test_dist=test_dist,
+                                                                                        debug=True) # Song :  vis pos and neg maps
+
+        masks_gt = data['test_masks'].permute(1, 0, 2, 3)            # B * 1 * H * W
+        masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)   # B * 2 * H * W
+        # Compute loss
+        loss = self.objective(masks_pred, masks_gt_pair)
+
+        # Return training stats
+        stats = {'Loss/total': loss.item(),
+                 'Loss/segm': loss.item()}
+
+        if 'iter' in data and (data['iter'] - 1) % 50 == 0:
+            save_debug(data, masks_pred, pred_sm_d, attn_weights2, attn_weights1, attn_weights0)
 
         return loss, stats
