@@ -43,9 +43,9 @@ def save_debug(data, pred_mask, p_rgb, p_d):
     test_img = 255 * (test_img * std + mu)
 
     train_img = (train_img.cpu().numpy()).astype(np.uint8)
-    train_depth = (train_depth.cpu().numpy()).astype(np.float32)
+    train_depth = (train_depth.cpu().numpy().squeeze()).astype(np.float32)
     test_img = (test_img.cpu().numpy()).astype(np.uint8)
-    test_depth = (test_depth.cpu().numpy()).astype(np.float32)
+    test_depth = (test_depth.cpu().numpy().squeeze()).astype(np.float32)
     test_mask = (test_mask.cpu().numpy()).astype(np.float32)
     # predicted_mask = mask.astype(np.float32)
 
