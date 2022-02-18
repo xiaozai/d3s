@@ -210,9 +210,9 @@ def get_b16_config(size=(16,16)):
     config.patches = ml_collections.ConfigDict({'size': size})
     config.hidden_size = 768
     config.transformer = ml_collections.ConfigDict()
-    config.transformer.mlp_dim = 3072
+    config.transformer.mlp_dim = 1024 # 3072
     config.transformer.num_heads = 12
-    config.transformer.num_layers = 12
+    config.transformer.num_layers = 6 # 12
     config.transformer.attention_dropout_rate = 0.0
     config.transformer.dropout_rate = 0.1
     config.classifier = 'token'
@@ -277,8 +277,8 @@ class DepthSegmNetAttention(nn.Module):
 
 
         self.rgbd_transformers = nn.ModuleList([Transformer(get_b16_config(size=(12, 12)), (384, 384), 4, True),  # self.rgbd_attention0 32 * 32 patches, 1024
-                                             Transformer(get_b16_config(size=(12, 12)), (192, 192), 16, True), # self.rgbd_attention1 16 * 16 patches, 256
-                                             Transformer(get_b16_config(size=(12, 12)), (96, 96), 32, True)])  # self.rgbd_attention2 vis = True img_size = 384, patches=(12, 12), in_channels=32
+                                                Transformer(get_b16_config(size=(12, 12)), (192, 192), 16, True), # self.rgbd_attention1 16 * 16 patches, 256
+                                                Transformer(get_b16_config(size=(12, 12)), (96, 96), 32, True)])  # self.rgbd_attention2 vis = True img_size = 384, patches=(12, 12), in_channels=32
 
 
 
@@ -293,42 +293,26 @@ class DepthSegmNetAttention(nn.Module):
         self.mixer = conv(9, segm_inter_dim[3])
 
         self.s_layers = nn.ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]), # self.s0 64 -> 32
-                                    conv(segm_inter_dim[1], segm_inter_dim[1]), # self.s1 32 -> 32
-                                    conv(segm_inter_dim[2], segm_inter_dim[2]), # self.s2 16 -> 16
-                                    conv(segm_inter_dim[3], segm_inter_dim[2])])# self.s3  4 ->  4
-        # self.s3 = conv(segm_inter_dim[3], segm_inter_dim[2]) # 64 -> 32
-        # self.s2 = conv(segm_inter_dim[2], segm_inter_dim[2]) # 32, 32
-        # self.s1 = conv(segm_inter_dim[1], segm_inter_dim[1]) # 16, 16
-        # self.s0 = conv(segm_inter_dim[0], segm_inter_dim[0]) # 4, 4
+                                       conv(segm_inter_dim[1], segm_inter_dim[1]), # self.s1 32 -> 32
+                                       conv(segm_inter_dim[2], segm_inter_dim[2]), # self.s2 16 -> 16
+                                       conv(segm_inter_dim[3], segm_inter_dim[2])])# self.s3  4 ->  4
 
         self.a_layers = nn.ModuleList([conv(768*2, segm_inter_dim[0]),             # self.a0
-                                    conv(768*2, segm_inter_dim[1]),             # self.a1
-                                    conv(768*2, segm_inter_dim[2])])            # self.a2
-        # self.a2 = conv(768*2, segm_inter_dim[2]) # 32, 32
-        # self.a1 = conv(768*2, segm_inter_dim[1]) # 16, 16
-        # self.a0 = conv(768*2, segm_inter_dim[0]) # 4, 4
+                                       conv(768*2, segm_inter_dim[1]),             # self.a1
+                                       conv(768*2, segm_inter_dim[2])])            # self.a2
 
         self.f_layers = nn.ModuleList([conv(segm_input_dim[0], segm_inter_dim[0]), # self.f0
-                                    conv(segm_input_dim[1], segm_inter_dim[1]), # self.f1
-                                    conv(segm_input_dim[2], segm_inter_dim[2])])# self.f2
+                                       conv(segm_input_dim[1], segm_inter_dim[1]), # self.f1
+                                       conv(segm_input_dim[2], segm_inter_dim[2])])# self.f2
 
-        # self.f2 = conv(segm_input_dim[2], segm_inter_dim[2])
-        # self.f1 = conv(segm_input_dim[1], segm_inter_dim[1])
-        # self.f0 = conv(segm_input_dim[0], segm_inter_dim[0])
 
         self.d_layers = nn.ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]), # self.d0
-                                    conv(segm_inter_dim[1], segm_inter_dim[1]), # self.d1
-                                    conv(segm_inter_dim[2], segm_inter_dim[2])])# self.d2
-        # self.d2 = conv(segm_inter_dim[2], segm_inter_dim[2])
-        # self.d1 = conv(segm_inter_dim[1], segm_inter_dim[1])
-        # self.d0 = conv(segm_inter_dim[0], segm_inter_dim[0])
+                                       conv(segm_inter_dim[1], segm_inter_dim[1]), # self.d1
+                                       conv(segm_inter_dim[2], segm_inter_dim[2])])# self.d2
 
         self.post_layers = nn.ModuleList([conv_no_relu(segm_inter_dim[0], 2),          # self.post0
-                                       conv(segm_inter_dim[1], segm_inter_dim[0]),  # self.post1
-                                       conv(segm_inter_dim[2], segm_inter_dim[1])]) # self.post2
-        # self.post2 = conv(segm_inter_dim[2], segm_inter_dim[1])
-        # self.post1 = conv(segm_inter_dim[1], segm_inter_dim[0])
-        # self.post0 = conv_no_relu(segm_inter_dim[0], 2)
+                                          conv(segm_inter_dim[1], segm_inter_dim[0]),  # self.post1
+                                          conv(segm_inter_dim[2], segm_inter_dim[1])]) # self.post2
 
         self.initialize_weights()
 
