@@ -9,6 +9,7 @@ from torch.nn.modules.utils import _pair
 from scipy import ndimage
 import ml_collections
 import copy
+import match
 
 def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1):
     return nn.Sequential(
@@ -33,9 +34,9 @@ class Attention(nn.Module):
         self.vis = vis
         self.num_attention_heads = config.transformer["num_heads"]
         self.attention_head_size = int(config.hidden_size / self.num_attention_heads)
-        self.all_head_size = self.num_attention_heads * self.attention_head_size
+        self.all_head_size = self.num_attention_heads * self.attention_head_size # 12 heads * 64
 
-        self.query = Linear(config.hidden_size, self.all_head_size)
+        self.query = Linear(config.hidden_size, self.all_head_size) # 768 -> 768
         self.key = Linear(config.hidden_size, self.all_head_size)
         self.value = Linear(config.hidden_size, self.all_head_size)
 
@@ -51,31 +52,29 @@ class Attention(nn.Module):
         return x.permute(0, 2, 1, 3)
 
     def forward(self, hidden_states):
-        mixed_query_layer = self.query(hidden_states)
-        mixed_key_layer = self.key(hidden_states)
-        mixed_value_layer = self.value(hidden_states)
-        print('mixed q/k/v : ', mixed_query_layer.shape, mixed_key_layer.shape, mixed_value_layer.shape)
+        mixed_query_layer = self.query(hidden_states)  # [B, Patches, C]
+        mixed_key_layer = self.key(hidden_states)      # [B, Patches, C]
+        mixed_value_layer = self.value(hidden_states)  # [B, Patches, C]
 
-        query_layer = self.transpose_for_scores(mixed_query_layer)
-        key_layer = self.transpose_for_scores(mixed_key_layer)
+        query_layer = self.transpose_for_scores(mixed_query_layer) # [B, patches, C] -> [B, num_attention_heads, patches, attention_head_size]
+        key_layer = self.transpose_for_scores(mixed_key_layer)     # [B, 12, 64, 64], 12 heads, 64 head size, 768 = 12 * 64
         value_layer = self.transpose_for_scores(mixed_value_layer)
-        print('query layer : ', query_layer.shape)
 
-        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
+        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2)) # Bx12x64x64 * Bx12x64x64 = Bx12x64x64
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
 
         # Song add mask here for background pixels, force background probs is 0
         print('attention_probs : ', attention_probs.shape)
-        # attetion_probs[:, 8:, :] = 0
+        attetion_probs[:, :, 32:, :] = 0 
 
-        attention_probs = self.softmax(attention_scores)
+        attention_probs = self.softmax(attention_scores) # dim=-1
 
         weights = attention_probs if self.vis else None
         attention_probs = self.attn_dropout(attention_probs)
 
 
 
-        context_layer = torch.matmul(attention_probs, value_layer)
+        context_layer = torch.matmul(attention_probs, value_layer) # Bx12xPatchesx64 * Bx12x64x64
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
         new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
         context_layer = context_layer.view(*new_context_layer_shape)
