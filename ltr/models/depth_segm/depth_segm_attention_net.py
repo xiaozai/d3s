@@ -275,10 +275,10 @@ class DepthSegmNetAttention(nn.Module):
 
         self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
-
-        self.rgbd_transformers = nn.ModuleList([Transformer(get_b16_config(size=(12, 12)), (384, 384), 4, True),  # self.rgbd_attention0 32 * 32 patches, 1024
-                                                Transformer(get_b16_config(size=(12, 12)), (192, 192), 16, True), # self.rgbd_attention1 16 * 16 patches, 256
-                                                Transformer(get_b16_config(size=(12, 12)), (96, 96), 32, True)])  # self.rgbd_attention2 vis = True img_size = 384, patches=(12, 12), in_channels=32
+        config = get_b16_config(size=(12, 12))
+        self.rgbd_transformers = nn.ModuleList([Transformer(config, (384, 384), 4, True),  # self.rgbd_attention0 32 * 32 patches, 1024
+                                                Transformer(config, (192, 192), 16, True), # self.rgbd_attention1 16 * 16 patches, 256
+                                                Transformer(config, (96, 96), 32, True)])  # self.rgbd_attention2 vis = True img_size = 384, patches=(12, 12), in_channels=32
 
 
 
@@ -297,9 +297,9 @@ class DepthSegmNetAttention(nn.Module):
                                        conv(segm_inter_dim[2], segm_inter_dim[2]), # self.s2 16 -> 16
                                        conv(segm_inter_dim[3], segm_inter_dim[2])])# self.s3  4 ->  4
 
-        self.a_layers = nn.ModuleList([conv(768*2, segm_inter_dim[0]),             # self.a0
-                                       conv(768*2, segm_inter_dim[1]),             # self.a1
-                                       conv(768*2, segm_inter_dim[2])])            # self.a2
+        self.a_layers = nn.ModuleList([conv(config.hidden_size*2, segm_inter_dim[0]),   # self.a0
+                                       conv(config.hidden_size*2, segm_inter_dim[1]),   # self.a1
+                                       conv(config.hidden_size*2, segm_inter_dim[2])])  # self.a2
 
         self.f_layers = nn.ModuleList([conv(segm_input_dim[0], segm_inter_dim[0]), # self.f0
                                        conv(segm_input_dim[1], segm_inter_dim[1]), # self.f1
@@ -401,18 +401,22 @@ class DepthSegmNetAttention(nn.Module):
                                dim=2)
         # feat_rgbd2, featuremaps for each pacth
         feat_rgbd, attn_weights = self.rgbd_transformers[layer](feat_rgbd)        # [B, Patches, C=768], attn_weights, [B, heads=12, patches, headsize=64]
-        n_patches, featmap_sz = feat_rgbd.shape[1] // 4, feat_rgbd.shape[1] // 16 # for each patch, 4x4, 16x16, 64x64
+        n_patches = feat_rgbd.shape[1] // 4 # for each patch, 16 patches, 64 patches, 256 patches
+        featmap_sz = math.sqrt(n_patches)   # for RGB and D feat maps, 4x4, 8x8, 16x16
         print('n_patches, featmap_sz : ', n_patches, featmap_sz)
         # Only keep test F_rgb and F_D, [B, Patches//2=32/128x512, C=768]
-        feat_rgbd = torch.cat((feat_rgbd[:, :n_patches, :], feat_rgbd[:, n_patches:2*n_patches, :]), dim=-1) # B x 16 x 2C, B x 256 x 2C, B x 64 *x
-        print(feat_rgbd.shape) # [B, patches, 2C]
-        feat_rgbd = feat_rgbd.view(feat_rgbd.shape[0], featmap_sz, featmap_sz, -1)
-        print(feat_rgbd.shape)
+        feat_rgbd = feat_rgbd[:, :2*n_patches, :] # B, 2*patches, C
+        # featmap_sz rgb, featmap_sz d , featmap_sz rgb, featmap_sz
+
+        feat_rgbd = feat_rgbd.view(feat_rgbd.shape[0], featmap_sz, featmap_sz*2, -1) #
+        feat_rgbd = torch.cat((feat_rgbd[:, :, :featmap_sz, :], feat_rgbd[:, :, featmap_sz:, :]), dim=-1) # cat(f_rgb, f_d),  B x H x W x 2C
+
+        print(feat_rgbd.shape) # [B, patches, 2C])
         feat_rgbd = feat_rgbd.permute(0, 3, 1, 2).contiguous() # [B, 2C, H, W]
         print(feat_rgbd.shape)
         feat_rgbd = F.interpolate(feat_rgbd, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))                     # B x 2C x 4 x 4 ->  B x 2C x 48 x 48
         print(layer)
-        print(feat_rgbd.shape) # B x 384 x 96 x 96
+        print(feat_rgbd.shape) # B x 2C x 96 x 96
         print(pre_out.shape)   # B x 16 x 96 x 96
         print(self.a_layers[layer])
         print(self.s_layers[layer])
