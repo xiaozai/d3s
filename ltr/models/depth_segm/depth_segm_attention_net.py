@@ -344,7 +344,11 @@ class DepthSegmNetAttention(nn.Module):
         mask_pos = F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1])) # [1,1,384, 384] -> [B,1,24,24]
         mask_neg = 1 - mask_pos
 
-
+        # if we use template as Q, search region as K, V
+        # attn_weights is init mask
+        # 
+        # multihead_attn = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True) # [B, Seqs, Dims]
+        # attn_output, attn_output_weights = multihead_attn(query, key, value)
 
         # rgb
         pred_pos_rgb, pred_neg_rgb = self.similarity_segmentation(f_test_rgb, f_train_rgb, mask_pos, mask_neg)
