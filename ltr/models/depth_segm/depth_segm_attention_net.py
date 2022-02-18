@@ -208,11 +208,11 @@ def get_b16_config(size=(16,16)):
     """Returns the ViT-B/16 configuration."""
     config = ml_collections.ConfigDict()
     config.patches = ml_collections.ConfigDict({'size': size})
-    config.hidden_size = 384 # 768
+    config.hidden_size = 96 # 768
     config.transformer = ml_collections.ConfigDict()
     config.transformer.mlp_dim = 1024 # 3072
-    config.transformer.num_heads = 6 # 12
-    config.transformer.num_layers = 6 # 12
+    config.transformer.num_heads = 3 # 12
+    config.transformer.num_layers = 3 # 12
     config.transformer.attention_dropout_rate = 0.0
     config.transformer.dropout_rate = 0.1
     config.classifier = 'token'

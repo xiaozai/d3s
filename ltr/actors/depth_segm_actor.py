@@ -20,7 +20,7 @@ def save_debug(data, pred_mask, vis_data):
 
     if len(vis_data) == 2:
         p_rgb, p_d = vis_data
-    elif len(vis_data) == 6:
+    elif len(vis_data) == 5:
         p_rgb, p_d, attn_weights2, attn_weights1, attn_weights0 = vis_data
 
     batch_element = 0

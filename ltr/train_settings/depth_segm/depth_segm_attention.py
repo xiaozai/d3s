@@ -16,7 +16,7 @@ def run(settings):
     # Most common settings are assigned in the settings struct
     settings.description = 'DepthSegmentationNet with default settings.'
     settings.print_interval = 1  # How often to print loss and other info
-    settings.batch_size = 64  # Batch size
+    settings.batch_size = 32  # Batch size
     settings.num_workers = 1  # Number of workers for image loading
     settings.normalize_mean = [0.485, 0.456, 0.406]  # Normalize mean (default pytorch ImageNet values)
     settings.normalize_std = [0.229, 0.224, 0.225]  # Normalize std (default pytorch ImageNet values)
