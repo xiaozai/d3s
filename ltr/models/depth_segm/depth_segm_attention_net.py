@@ -65,19 +65,16 @@ class Attention(nn.Module):
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
 
         # Song add mask here for background pixels, force background probs is 0
-        print('attention_probs : ', attention_scores.shape)
         attention_scores[:, :, self.patches//2:, :] = 0
 
-        attention_probs = self.softmax(attention_scores) # dim=-1
+        attention_probs = self.softmax(attention_scores) # dim=-1 Bx12xpatchesx64
 
         weights = attention_probs if self.vis else None
         attention_probs = self.attn_dropout(attention_probs)
 
-
-
-        context_layer = torch.matmul(attention_probs, value_layer) # Bx12xPatchesx64 * Bx12x64x64
-        context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
-        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
+        context_layer = torch.matmul(attention_probs, value_layer)              # Bx12xPatchesx64 * Bx12x64x64
+        context_layer = context_layer.permute(0, 2, 1, 3).contiguous()          # [B, Patches, heads, head_size]
+        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,) # [B, Patches, C=768]
         context_layer = context_layer.view(*new_context_layer_shape)
         attention_output = self.out(context_layer)
         attention_output = self.proj_dropout(attention_output)
@@ -127,7 +124,6 @@ class Embeddings(nn.Module):
             n_patches = (img_size[0] // patch_size[0]) * (img_size[1] // patch_size[1])
 
         self.n_patches = n_patches
-        print('embeddings : patches size and num : ', patch_size, n_patches) # (12, 12) 64 patches
 
         self.patch_embeddings = Conv2d(in_channels=in_channels,
                                        out_channels=config.hidden_size,
@@ -201,11 +197,8 @@ class Transformer(nn.Module):
         self.encoder = Encoder(config, vis, patches=self.embeddings.n_patches)
 
     def forward(self, input_ids):
-        embedding_output = self.embeddings(input_ids)            # [B, N_Patches, C=768], class embeddings + patches
-        print('embedding_output : ', embedding_output.shape)
-        encoded, attn_weights = self.encoder(embedding_output)
-        print('encoded : ', encoded.shape)
-        print('attn_weights : ', len(attn_weights))              # [B, 1+N_Patches, C=768]
+        embedding_output = self.embeddings(input_ids)           # [B, N_Patches, C=768], class embeddings + patches
+        encoded, attn_weights = self.encoder(embedding_output)  # encoded [B, patches, C=768]
         return encoded, attn_weights
 
 
@@ -387,9 +380,9 @@ class DepthSegmNetAttention(nn.Module):
         feat_rgbd_stack2 = torch.cat((torch.cat((self.f2(feat_test_rgb[2]), self.d2(feat_test_d[2])), dim=3),
                                         torch.cat((self.f2(feat_train_rgb[2]*train_bg_mask2), self.d2(feat_train_d[2]*train_bg_mask2)), dim=3)),
                                         dim=2)
-        print('stack rgbd feat : ', feat_test_rgb[2].shape, feat_test_d[2].shape, feat_rgbd_stack2.shape)
-        feat_rgbd2, attn_weights2 = self.rgbd_attention2(feat_rgbd_stack2) # Bx1+TxC, the first is a classication learnable embedding
-        print('feat_rgbd2 : ', feat_rgbd2.shape) # [B, 1+T, C]
+
+        feat_rgbd2, attn_weights2 = self.rgbd_attention2(feat_rgbd_stack2) # [B, Patches, C=768]
+        print('feat_rgbd2 : ', feat_rgbd2.shape, atten_weights2[0].shape) # [B, 1+T, C]
 
         out = self.post2(F.upsample(self.f2(feat_rgbd2) + self.s2(out), scale_factor=2))
 
