@@ -11,6 +11,8 @@ import ml_collections
 import copy
 import math
 
+import torch.nn.ModuleList as ModuleList
+
 def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1):
     return nn.Sequential(
             nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride,
@@ -23,6 +25,7 @@ def conv_no_relu(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dila
             nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride,
                       padding=padding, dilation=dilation, bias=True),
             nn.BatchNorm2d(out_planes))
+
 
 ''' Code from
     An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale
@@ -275,9 +278,10 @@ class DepthSegmNetAttention(nn.Module):
         self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
 
-        self.rgbd_attention2 = Transformer(get_b16_config(size=(12, 12)), (96, 96), 32, True)   # vis = True img_size = 384, patches=(16,16), in_channels=32
-        self.rgbd_attention1 = Transformer(get_b16_config(size=(12, 12)), (192, 192), 16, True) # 16 * 16 patches
-        self.rgbd_attention0 = Transformer(get_b16_config(size=(12, 12)), (384, 384), 4, True)  # 32 * 32 patches
+        self.rgbd_transformers = ModuleList([Transformer(get_b16_config(size=(12, 12)), (384, 384), 4, True),  # self.rgbd_attention0 32 * 32 patches, 1024
+                                             Transformer(get_b16_config(size=(12, 12)), (192, 192), 16, True), # self.rgbd_attention1 16 * 16 patches, 256
+                                             Transformer(get_b16_config(size=(12, 12)), (96, 96), 32, True)])  # self.rgbd_attention2 vis = True img_size = 384, patches=(12, 12), in_channels=32
+
 
 
         # 1024， 512， 256， 64 -> 64, 32, 16, 4
@@ -289,23 +293,44 @@ class DepthSegmNetAttention(nn.Module):
 
         # 256 depth feat + 1 dist map + rgb similarity + depth similarity
         self.mixer = conv(9, segm_inter_dim[3])
-        self.s3 = conv(segm_inter_dim[3], segm_inter_dim[2]) # 64 -> 32
 
-        self.s2 = conv(segm_inter_dim[2], segm_inter_dim[2]) # 32, 32
-        self.s1 = conv(segm_inter_dim[1], segm_inter_dim[1]) # 16, 16
-        self.s0 = conv(segm_inter_dim[0], segm_inter_dim[0]) # 4, 4
+        self.s_layers = ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]), # self.s0 64 -> 32
+                                    conv(segm_inter_dim[1], segm_inter_dim[1]), # self.s1 32 -> 32
+                                    conv(segm_inter_dim[2], segm_inter_dim[2]), # self.s2 16 -> 16
+                                    conv(segm_inter_dim[3], segm_inter_dim[2])])# self.s3  4 ->  4
+        # self.s3 = conv(segm_inter_dim[3], segm_inter_dim[2]) # 64 -> 32
+        # self.s2 = conv(segm_inter_dim[2], segm_inter_dim[2]) # 32, 32
+        # self.s1 = conv(segm_inter_dim[1], segm_inter_dim[1]) # 16, 16
+        # self.s0 = conv(segm_inter_dim[0], segm_inter_dim[0]) # 4, 4
 
-        self.f2 = conv(segm_input_dim[2], segm_inter_dim[2])
-        self.f1 = conv(segm_input_dim[1], segm_inter_dim[1])
-        self.f0 = conv(segm_input_dim[0], segm_inter_dim[0])
+        self.a_layers = ModuleList([conv(768*2, segm_inter_dim[0]),             # self.a0
+                                    conv(768*2, segm_inter_dim[1]),             # self.a1
+                                    conv(768*2, segm_inter_dim[2])])            # self.a2
+        # self.a2 = conv(768*2, segm_inter_dim[2]) # 32, 32
+        # self.a1 = conv(768*2, segm_inter_dim[1]) # 16, 16
+        # self.a0 = conv(768*2, segm_inter_dim[0]) # 4, 4
 
-        self.d2 = conv(segm_inter_dim[2], segm_inter_dim[2])
-        self.d1 = conv(segm_inter_dim[1], segm_inter_dim[1])
-        self.d0 = conv(segm_inter_dim[0], segm_inter_dim[0])
+        self.f_layers = ModuleList([conv(segm_input_dim[0], segm_inter_dim[0]), # self.f0
+                                    conv(segm_input_dim[1], segm_inter_dim[1]), # self.f1
+                                    conv(segm_input_dim[2], segm_inter_dim[2])])# self.f2
 
-        self.post2 = conv(segm_inter_dim[2], segm_inter_dim[1])
-        self.post1 = conv(segm_inter_dim[1], segm_inter_dim[0])
-        self.post0 = conv_no_relu(segm_inter_dim[0], 2)
+        # self.f2 = conv(segm_input_dim[2], segm_inter_dim[2])
+        # self.f1 = conv(segm_input_dim[1], segm_inter_dim[1])
+        # self.f0 = conv(segm_input_dim[0], segm_inter_dim[0])
+
+        self.d_layers = ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]), # self.d0
+                                    conv(segm_inter_dim[1], segm_inter_dim[1]), # self.d1
+                                    conv(segm_inter_dim[2], segm_inter_dim[2])])# self.d2
+        # self.d2 = conv(segm_inter_dim[2], segm_inter_dim[2])
+        # self.d1 = conv(segm_inter_dim[1], segm_inter_dim[1])
+        # self.d0 = conv(segm_inter_dim[0], segm_inter_dim[0])
+
+        self.post_layers = ModuleList([conv_no_relu(segm_inter_dim[0], 2),          # self.post0
+                                       conv(segm_inter_dim[1], segm_inter_dim[0]),  # self.post1
+                                       conv(segm_inter_dim[2], segm_inter_dim[1])]) # self.post2
+        # self.post2 = conv(segm_inter_dim[2], segm_inter_dim[1])
+        # self.post1 = conv(segm_inter_dim[1], segm_inter_dim[0])
+        # self.post0 = conv_no_relu(segm_inter_dim[0], 2)
 
         self.initialize_weights()
 
@@ -337,6 +362,8 @@ class DepthSegmNetAttention(nn.Module):
         mask_pos = F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1])) # [1,1,384, 384] -> [B,1,24,24]
         mask_neg = 1 - mask_pos
 
+
+
         # rgb
         pred_pos_rgb, pred_neg_rgb = self.similarity_segmentation(f_test_rgb, f_train_rgb, mask_pos, mask_neg)
 
@@ -367,38 +394,39 @@ class DepthSegmNetAttention(nn.Module):
 
 
         out = self.mixer(segm_layers)
-        out = self.s3(F.upsample(out, scale_factor=2))
+        out = self.s_layers[3](F.upsample(out, scale_factor=2))
 
         # feat maps -> self.attention, -> B, tokens, C
         # Merge RGB and D feature maps into one image, add some background patch
-
-        # feat_test_rgb[2], Bx512x48x48, mask , Bx1x24x24
-        # [[F_rgb, F_d],
-        #  [F_rgb_bg, F_d_bg]] ,  BxCx2Hx2W
-
-        train_bg_mask2 = 1 - F.interpolate(mask_train[0], size=(feat_train_rgb[2].shape[-2], feat_train_rgb[2].shape[-1])) # Bx512x48x48
-        feat_rgbd_stack2 = torch.cat((torch.cat((self.f2(feat_test_rgb[2]), self.d2(feat_test_d[2])), dim=3),
-                                        torch.cat((self.f2(feat_train_rgb[2]*train_bg_mask2), self.d2(feat_train_d[2]*train_bg_mask2)), dim=3)),
-                                        dim=2)
-
-        feat_rgbd2, attn_weights2 = self.rgbd_attention2(feat_rgbd_stack2) # [B, Patches, C=768]
-        print('feat_rgbd2 : ', feat_rgbd2.shape, attn_weights2[0].shape) # [B, , C]
-        # feat_rgbd2, featuremaps for each pacth
-        out = self.post2(F.upsample(self.f2(feat_rgbd2) + self.s2(out), scale_factor=2))
-
-        feat_rgbd_stack1 = torch.cat(((feat_test_rgb[1], feat_test_d[1], feat_train_rgb[1]*mask_neg, feat_train_d[1]*mask_neg)))
-        feat_rgbd1, attn_weights1 = self.rgbd_attention1(feat_rgbd_stack1)
-        out = self.post1(F.upsample(self.f1(feat_rgbd1) + self.s1(out), scale_factor=2))
-
-        feat_rgbd_stack0 = torch.cat(((feat_test_rgb[0], feat_test_d[0], feat_train_rgb[0]*mask_neg, feat_train_d[0]*mask_neg)))
-        feat_rgbd0, attn_weights0 = self.rgbd_attention0(feat_rgbd_stack0)
-        out = self.post0(F.upsample(self.f0(feat_rgbd0) + self.s0(out), scale_factor=2))
+        out, attn_weights2 = self.rgbd_fusion(out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=2)
+        out, attn_weights1 = self.rgbd_fusion(out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=1)
+        out, attn_weights0 = self.rgbd_fusion(out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0)
 
 
         if debug:
             return out, (pred_sm_rgb, pred_sm_d, attn_weights2, attn_weights1, attn_weights0)
         else:
             return out
+
+    def rgbd_fusion(self, pre_out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0):
+
+        f_test_rgb, f_test_d, f_train_rgb, f_train_d = feat_test_rgb[layer], feat_test_d[layer], feat_train_rgb[layer], feat_train_d[layer]
+
+        bg_mask = 1 - F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1])) # Bx1xHxW
+        # F_rgb, F_d, BG_rgb, BG_d, -> BxCx2Hx2W
+        feat_rgbd = torch.cat((torch.cat((self.f_layers[layer](f_test_rgb), self.d_layers[layer](f_test_d)), dim=3),
+                               torch.cat((self.f_layers[layer](f_train_rgb*bg_mask), self.d_layers[layer](f_train_d*bg_mask)), dim=3)),
+                               dim=2)
+        # feat_rgbd2, featuremaps for each pacth
+        feat_rgbd, attn_weights = self.rgbd_transformers[layer](feat_rgbd) # [B, Patches, C=768], attn_weights, [B, heads=12, patches, headsize=64]
+        n_patches, featmap_sz = feat_rgbd.shape[1] // 4, feat_rgbd.shape[1] // 16 # for each patch, 4x4, 16x16, 64x64
+        # Only keep test F_rgb and F_D, [B, Patches//2=32/128x512, C=768]
+        feat_rgbd = torch.cat((feat_rgbd[:, :n_patches, :], feat_rgbd[:, n_patches:2*n_patches, :]), dim=-1)
+        feat_rgbd = feat_rgbd.view(feat_rgbd.shape[0], featmap_sz, featmap_sz, -1).permute(0, 3, 1, 2).contiguous() # [B, 4, 4, 2C], [B, 16, 16, 2C], [B, 64, 64, 2C]
+        feat_rgbd = F.interpolate(feat_rgbd, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))                     # B x 2C x 4 x 4 ->  B x 2C x 48 x 48
+        out = self.post_layers[layer](F.upsample(self.a_layers[layer](feat_rgbd) + self.s_layers[layer](pre_out), scale_factor=2))
+
+        return out, attn_weights
 
     def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg):
         # first normalize train and test features to have L2 norm 1
