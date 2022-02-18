@@ -88,7 +88,7 @@ class Mlp(nn.Module):
         super(Mlp, self).__init__()
         self.fc1 = Linear(config.hidden_size, config.transformer["mlp_dim"])
         self.fc2 = Linear(config.transformer["mlp_dim"], config.hidden_size)
-        self.act_fn = ACT2FN["gelu"]
+        self.act_fn = torch.nn.functional.gelu
         self.dropout = Dropout(config.transformer["dropout_rate"])
 
         self._init_weights()
