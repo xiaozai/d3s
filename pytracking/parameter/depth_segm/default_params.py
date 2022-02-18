@@ -108,12 +108,7 @@ def parameters():
 
     params.use_segmentation = True
 
-<<<<<<< HEAD
-    params.model == 'depth_only_segm' # Song
-    params.segm_net_path = '/home/yan/Data2/d3s/checkpoints/ltr/depth_segm/depth_only_segm/DepthSegmNet_ep0040.pth.tar'
-=======
     params.segm_net_path = '/home/sgn/Data1/yan/d3s/checkpoints/ltr/depth_segm/depth_only_segm/DepthSegmNet_ep0040.pth.tar'
->>>>>>> b5d9aaac231e67d7855e2086e2364d47e8ecd34a
     params.segm_use_dist = True
     params.segm_normalize_mean = [0.485, 0.456, 0.406]
     params.segm_normalize_std = [0.229, 0.224, 0.225]
