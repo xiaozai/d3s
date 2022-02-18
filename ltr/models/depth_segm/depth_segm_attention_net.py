@@ -383,8 +383,8 @@ class DepthSegmNetAttention(nn.Module):
         #  [F_rgb_bg, F_d_bg]] ,  BxCx2Hx2W
 
         train_bg_mask2 = 1 - F.interpolate(mask_train[0], size=(feat_train_rgb[2].shape[-2], feat_train_rgb[2].shape[-1])) # Bx512x48x48
-        feat_rgbd_stack2 = torch.stack([torch.stack([self.f2(feat_test_rgb[2]), self.d2(feat_test_d[2])], dim=3),
-                                        torch.stack([self.f2(feat_train_rgb[2]*train_bg_mask2), self.d2(feat_train_d[2]*train_bg_mask2)], dim=3)],
+        feat_rgbd_stack2 = torch.cat((torch.cat((self.f2(feat_test_rgb[2]), self.d2(feat_test_d[2])), dim=3),
+                                        torch.cat((self.f2(feat_train_rgb[2]*train_bg_mask2), self.d2(feat_train_d[2]*train_bg_mask2)), dim=3)),
                                         dim=2)
         print('stack rgbd feat : ', feat_test_rgb[2].shape, feat_test_d[2].shape, feat_rgbd_stack2.shape)
         feat_rgbd2, attn_weights2 = self.rgbd_attention2(feat_rgbd_stack2) # Bx1+TxC, the first is a classication learnable embedding
