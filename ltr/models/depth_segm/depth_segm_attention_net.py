@@ -194,9 +194,9 @@ class Encoder(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(self, config, img_size, vis):
+    def __init__(self, config, img_size, in_channels, vis):
         super(Transformer, self).__init__()
-        self.embeddings = Embeddings(config, img_size=img_size)
+        self.embeddings = Embeddings(config, img_size=img_size, in_channels=in_channels)
         self.encoder = Encoder(config, vis)
 
     def forward(self, input_ids):
@@ -281,9 +281,9 @@ class DepthSegmNetAttention(nn.Module):
         self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
 
-        self.rgbd_attention2 = Transformer(get_b16_config(size=(12, 12)), (96, 96), True) # vis = True img_size = 384, patches=(16,16)
-        self.rgbd_attention1 = Transformer(get_b16_config(size=(24, 24)), (192, 192), True)
-        self.rgbd_attention0 = Transformer(get_b16_config(size=(48, 48)), (384, 384), True)
+        self.rgbd_attention2 = Transformer(get_b16_config(size=(12, 12)), (96, 96), 32, True) # vis = True img_size = 384, patches=(16,16), in_channels=32
+        self.rgbd_attention1 = Transformer(get_b16_config(size=(24, 24)), (192, 192), 16, True)
+        self.rgbd_attention0 = Transformer(get_b16_config(size=(48, 48)), (384, 384), 4, True)
 
 
         # 1024， 512， 256， 64 -> 64, 32, 16, 4
