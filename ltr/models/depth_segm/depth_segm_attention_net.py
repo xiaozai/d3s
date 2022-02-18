@@ -9,7 +9,7 @@ from torch.nn.modules.utils import _pair
 from scipy import ndimage
 import ml_collections
 import copy
-import match
+import math
 
 def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1):
     return nn.Sequential(
@@ -65,7 +65,7 @@ class Attention(nn.Module):
 
         # Song add mask here for background pixels, force background probs is 0
         print('attention_probs : ', attention_probs.shape)
-        attetion_probs[:, :, 32:, :] = 0 
+        attetion_probs[:, :, 32:, :] = 0
 
         attention_probs = self.softmax(attention_scores) # dim=-1
 
