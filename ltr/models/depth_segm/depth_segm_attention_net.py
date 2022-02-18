@@ -406,6 +406,11 @@ class DepthSegmNetAttention(nn.Module):
         feat_rgbd = torch.cat((feat_rgbd[:, :n_patches, :], feat_rgbd[:, n_patches:2*n_patches, :]), dim=-1)
         feat_rgbd = feat_rgbd.view(feat_rgbd.shape[0], featmap_sz, featmap_sz, -1).permute(0, 3, 1, 2).contiguous() # [B, 4, 4, 2C], [B, 16, 16, 2C], [B, 64, 64, 2C]
         feat_rgbd = F.interpolate(feat_rgbd, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))                     # B x 2C x 4 x 4 ->  B x 2C x 48 x 48
+        print(layer)
+        print(feat_rgbd.shape)
+        print(pre_out.shape)
+        print(self.a_layers[layer])
+        print(self.s_layers[layer])
         out = self.post_layers[layer](F.upsample(self.a_layers[layer](feat_rgbd) + self.s_layers[layer](pre_out), scale_factor=2))
 
         return out, attn_weights
