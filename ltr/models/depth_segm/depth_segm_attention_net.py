@@ -8,6 +8,7 @@ from torch.nn import Dropout, Softmax, Linear, Conv2d, LayerNorm
 from torch.nn.modules.utils import _pair
 from scipy import ndimage
 import ml_collections
+import copy
 
 def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1):
     return nn.Sequential(
@@ -125,13 +126,14 @@ class Embeddings(nn.Module):
             patch_size = _pair(config.patches["size"])
             n_patches = (img_size[0] // patch_size[0]) * (img_size[1] // patch_size[1])
 
-        print('embeddings : patches size and num : ', patch_size, n_patches)
+        print('embeddings : patches size and num : ', patch_size, n_patches) # (12, 12) 64 patches
 
         self.patch_embeddings = Conv2d(in_channels=in_channels,
                                        out_channels=config.hidden_size,
                                        kernel_size=patch_size,
                                        stride=patch_size)
-        self.position_embeddings = nn.Parameter(torch.zeros(1, n_patches+1, config.hidden_size))
+        # self.position_embeddings = nn.Parameter(torch.zeros(1, n_patches+1, config.hidden_size))
+        self.position_embeddings = nn.Parameter(torch.zeros(1, n_patches, config.hidden_size))
         # self.cls_token = nn.Parameter(torch.zeros(1, 1, config.hidden_size))
 
         self.dropout = Dropout(config.transformer["dropout_rate"])
