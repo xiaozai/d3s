@@ -402,7 +402,7 @@ class DepthSegmNetAttention(nn.Module):
         # feat_rgbd2, featuremaps for each pacth
         feat_rgbd, attn_weights = self.rgbd_transformers[layer](feat_rgbd)        # [B, Patches, C=768], attn_weights, [B, heads=12, patches, headsize=64]
         n_patches = feat_rgbd.shape[1] // 4 # for each patch, 16 patches, 64 patches, 256 patches
-        featmap_sz = math.sqrt(n_patches)   # for RGB and D feat maps, 4x4, 8x8, 16x16
+        featmap_sz = int(math.sqrt(n_patches))   # for RGB and D feat maps, 4x4, 8x8, 16x16
         print('n_patches, featmap_sz : ', n_patches, featmap_sz)
         # Only keep test F_rgb and F_D, [B, Patches//2=32/128x512, C=768]
         feat_rgbd = feat_rgbd[:, :2*n_patches, :] # B, 2*patches, C
