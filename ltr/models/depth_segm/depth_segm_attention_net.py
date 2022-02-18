@@ -208,10 +208,10 @@ def get_b16_config(size=(16,16)):
     """Returns the ViT-B/16 configuration."""
     config = ml_collections.ConfigDict()
     config.patches = ml_collections.ConfigDict({'size': size})
-    config.hidden_size = 768
+    config.hidden_size = 384 # 768
     config.transformer = ml_collections.ConfigDict()
     config.transformer.mlp_dim = 1024 # 3072
-    config.transformer.num_heads = 12
+    config.transformer.num_heads = 6 # 12
     config.transformer.num_layers = 6 # 12
     config.transformer.attention_dropout_rate = 0.0
     config.transformer.dropout_rate = 0.1
@@ -403,7 +403,7 @@ class DepthSegmNetAttention(nn.Module):
         feat_rgbd, attn_weights = self.rgbd_transformers[layer](feat_rgbd)        # [B, Patches, C=768], attn_weights, [B, heads=12, patches, headsize=64]
         n_patches = feat_rgbd.shape[1] // 4 # for each patch, 16 patches, 64 patches, 256 patches
         featmap_sz = int(math.sqrt(n_patches))   # for RGB and D feat maps, 4x4, 8x8, 16x16
-        print('n_patches, featmap_sz : ', n_patches, featmap_sz)
+
         # Only keep test F_rgb and F_D, [B, Patches//2=32/128x512, C=768]
         feat_rgbd = feat_rgbd[:, :2*n_patches, :] # B, 2*patches, C
         # featmap_sz rgb, featmap_sz d , featmap_sz rgb, featmap_sz
@@ -411,15 +411,10 @@ class DepthSegmNetAttention(nn.Module):
         feat_rgbd = feat_rgbd.view(feat_rgbd.shape[0], featmap_sz, featmap_sz*2, -1) #
         feat_rgbd = torch.cat((feat_rgbd[:, :, :featmap_sz, :], feat_rgbd[:, :, featmap_sz:, :]), dim=-1) # cat(f_rgb, f_d),  B x H x W x 2C
 
-        print(feat_rgbd.shape) # [B, patches, 2C])
+
         feat_rgbd = feat_rgbd.permute(0, 3, 1, 2).contiguous() # [B, 2C, H, W]
-        print(feat_rgbd.shape)
+
         feat_rgbd = F.interpolate(feat_rgbd, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))                     # B x 2C x 4 x 4 ->  B x 2C x 48 x 48
-        print(layer)
-        print(feat_rgbd.shape) # B x 2C x 96 x 96
-        print(pre_out.shape)   # B x 16 x 96 x 96
-        print(self.a_layers[layer])
-        print(self.s_layers[layer])
         out = self.post_layers[layer](F.upsample(self.a_layers[layer](feat_rgbd) + self.s_layers[layer](pre_out), scale_factor=2))
 
         return out, attn_weights
