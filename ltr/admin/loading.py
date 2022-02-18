@@ -94,8 +94,7 @@ def torch_load_legacy(path):
     _setup_legacy_env()
 
     # Load network
-    checkpoint_dict = torch.load(path)
-    torch.save(checkpoint_dict, path[:-8]+'_02'+'.pth.tar', _use_new_zipfile_serialization=False) # Song
+    checkpoint_dict = torch.load(path, map_location='cpu')
 
     # Cleanup legacy
     _cleanup_legacy_env()

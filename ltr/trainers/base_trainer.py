@@ -111,7 +111,8 @@ class BaseTrainer:
             os.makedirs(directory)
 
         file_path = '{}/{}_ep{:04d}.pth.tar'.format(directory, net_type, self.epoch)
-        torch.save(state, file_path)
+        torch.save(state, file_path, _use_new_zipfile_serialization=False)
+        # Song : Sever is pytorch 1.7.0+cu11, office is pytorch 1.1.0, no zip format
 
 
     def load_checkpoint(self, checkpoint = None, fields = None, ignore_fields = None, load_constructor = False):
