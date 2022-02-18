@@ -29,9 +29,10 @@ def conv_no_relu(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dila
     https://github.com/jeonsworld/ViT-pytorch/blob/main/models/modeling.py
 '''
 class Attention(nn.Module):
-    def __init__(self, config, vis):
+    def __init__(self, config, vis, patches=64):
         super(Attention, self).__init__()
         self.vis = vis
+        self.patches = patches
         self.num_attention_heads = config.transformer["num_heads"]
         self.attention_head_size = int(config.hidden_size / self.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size # 12 heads * 64
@@ -64,8 +65,8 @@ class Attention(nn.Module):
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
 
         # Song add mask here for background pixels, force background probs is 0
-        print('attention_probs : ', attention_probs.shape)
-        attetion_probs[:, :, 32:, :] = 0
+        print('attention_probs : ', attention_scores.shape)
+        attention_scores[:, :, self.patches//2:, :] = 0
 
         attention_probs = self.softmax(attention_scores) # dim=-1
 
@@ -125,6 +126,7 @@ class Embeddings(nn.Module):
             patch_size = _pair(config.patches["size"])
             n_patches = (img_size[0] // patch_size[0]) * (img_size[1] // patch_size[1])
 
+        self.n_patches = n_patches
         print('embeddings : patches size and num : ', patch_size, n_patches) # (12, 12) 64 patches
 
         self.patch_embeddings = Conv2d(in_channels=in_channels,
@@ -152,13 +154,13 @@ class Embeddings(nn.Module):
 
 
 class Block(nn.Module):
-    def __init__(self, config, vis):
+    def __init__(self, config, vis, patches=64):
         super(Block, self).__init__()
         self.hidden_size = config.hidden_size
         self.attention_norm = LayerNorm(config.hidden_size, eps=1e-6)
         self.ffn_norm = LayerNorm(config.hidden_size, eps=1e-6)
         self.ffn = Mlp(config)
-        self.attn = Attention(config, vis)
+        self.attn = Attention(config, vis, patches=patches)
 
     def forward(self, x):
         h = x                        # Bx16xC
@@ -173,13 +175,13 @@ class Block(nn.Module):
         return x, weights
 
 class Encoder(nn.Module):
-    def __init__(self, config, vis):
+    def __init__(self, config, vis, patches=64):
         super(Encoder, self).__init__()
         self.vis = vis
         self.layer = nn.ModuleList()
         self.encoder_norm = LayerNorm(config.hidden_size, eps=1e-6)
         for _ in range(config.transformer["num_layers"]):
-            layer = Block(config, vis)
+            layer = Block(config, vis, patches=patches)
             self.layer.append(copy.deepcopy(layer))
 
     def forward(self, hidden_states):
@@ -196,7 +198,7 @@ class Transformer(nn.Module):
     def __init__(self, config, img_size, in_channels, vis):
         super(Transformer, self).__init__()
         self.embeddings = Embeddings(config, img_size=img_size, in_channels=in_channels)
-        self.encoder = Encoder(config, vis)
+        self.encoder = Encoder(config, vis, patches=self.embeddings.n_patches)
 
     def forward(self, input_ids):
         embedding_output = self.embeddings(input_ids)            # [B, N_Patches, C=768], class embeddings + patches
@@ -280,9 +282,9 @@ class DepthSegmNetAttention(nn.Module):
         self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
 
-        self.rgbd_attention2 = Transformer(get_b16_config(size=(12, 12)), (96, 96), 32, True) # vis = True img_size = 384, patches=(16,16), in_channels=32
-        self.rgbd_attention1 = Transformer(get_b16_config(size=(24, 24)), (192, 192), 16, True)
-        self.rgbd_attention0 = Transformer(get_b16_config(size=(48, 48)), (384, 384), 4, True)
+        self.rgbd_attention2 = Transformer(get_b16_config(size=(12, 12)), (96, 96), 32, True)   # vis = True img_size = 384, patches=(16,16), in_channels=32
+        self.rgbd_attention1 = Transformer(get_b16_config(size=(12, 12)), (192, 192), 16, True) # 16 * 16 patches
+        self.rgbd_attention0 = Transformer(get_b16_config(size=(12, 12)), (384, 384), 4, True)  # 32 * 32 patches
 
 
         # 1024， 512， 256， 64 -> 64, 32, 16, 4
