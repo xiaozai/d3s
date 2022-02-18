@@ -11,8 +11,6 @@ import ml_collections
 import copy
 import math
 
-import torch.nn.ModuleList as ModuleList
-
 def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1):
     return nn.Sequential(
             nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride,
@@ -278,7 +276,7 @@ class DepthSegmNetAttention(nn.Module):
         self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
 
-        self.rgbd_transformers = ModuleList([Transformer(get_b16_config(size=(12, 12)), (384, 384), 4, True),  # self.rgbd_attention0 32 * 32 patches, 1024
+        self.rgbd_transformers = nn.ModuleList([Transformer(get_b16_config(size=(12, 12)), (384, 384), 4, True),  # self.rgbd_attention0 32 * 32 patches, 1024
                                              Transformer(get_b16_config(size=(12, 12)), (192, 192), 16, True), # self.rgbd_attention1 16 * 16 patches, 256
                                              Transformer(get_b16_config(size=(12, 12)), (96, 96), 32, True)])  # self.rgbd_attention2 vis = True img_size = 384, patches=(12, 12), in_channels=32
 
@@ -294,7 +292,7 @@ class DepthSegmNetAttention(nn.Module):
         # 256 depth feat + 1 dist map + rgb similarity + depth similarity
         self.mixer = conv(9, segm_inter_dim[3])
 
-        self.s_layers = ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]), # self.s0 64 -> 32
+        self.s_layers = nn.ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]), # self.s0 64 -> 32
                                     conv(segm_inter_dim[1], segm_inter_dim[1]), # self.s1 32 -> 32
                                     conv(segm_inter_dim[2], segm_inter_dim[2]), # self.s2 16 -> 16
                                     conv(segm_inter_dim[3], segm_inter_dim[2])])# self.s3  4 ->  4
@@ -303,14 +301,14 @@ class DepthSegmNetAttention(nn.Module):
         # self.s1 = conv(segm_inter_dim[1], segm_inter_dim[1]) # 16, 16
         # self.s0 = conv(segm_inter_dim[0], segm_inter_dim[0]) # 4, 4
 
-        self.a_layers = ModuleList([conv(768*2, segm_inter_dim[0]),             # self.a0
+        self.a_layers = nn.ModuleList([conv(768*2, segm_inter_dim[0]),             # self.a0
                                     conv(768*2, segm_inter_dim[1]),             # self.a1
                                     conv(768*2, segm_inter_dim[2])])            # self.a2
         # self.a2 = conv(768*2, segm_inter_dim[2]) # 32, 32
         # self.a1 = conv(768*2, segm_inter_dim[1]) # 16, 16
         # self.a0 = conv(768*2, segm_inter_dim[0]) # 4, 4
 
-        self.f_layers = ModuleList([conv(segm_input_dim[0], segm_inter_dim[0]), # self.f0
+        self.f_layers = nn.ModuleList([conv(segm_input_dim[0], segm_inter_dim[0]), # self.f0
                                     conv(segm_input_dim[1], segm_inter_dim[1]), # self.f1
                                     conv(segm_input_dim[2], segm_inter_dim[2])])# self.f2
 
@@ -318,14 +316,14 @@ class DepthSegmNetAttention(nn.Module):
         # self.f1 = conv(segm_input_dim[1], segm_inter_dim[1])
         # self.f0 = conv(segm_input_dim[0], segm_inter_dim[0])
 
-        self.d_layers = ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]), # self.d0
+        self.d_layers = nn.ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]), # self.d0
                                     conv(segm_inter_dim[1], segm_inter_dim[1]), # self.d1
                                     conv(segm_inter_dim[2], segm_inter_dim[2])])# self.d2
         # self.d2 = conv(segm_inter_dim[2], segm_inter_dim[2])
         # self.d1 = conv(segm_inter_dim[1], segm_inter_dim[1])
         # self.d0 = conv(segm_inter_dim[0], segm_inter_dim[0])
 
-        self.post_layers = ModuleList([conv_no_relu(segm_inter_dim[0], 2),          # self.post0
+        self.post_layers = nn.ModuleList([conv_no_relu(segm_inter_dim[0], 2),          # self.post0
                                        conv(segm_inter_dim[1], segm_inter_dim[0]),  # self.post1
                                        conv(segm_inter_dim[2], segm_inter_dim[1])]) # self.post2
         # self.post2 = conv(segm_inter_dim[2], segm_inter_dim[1])
