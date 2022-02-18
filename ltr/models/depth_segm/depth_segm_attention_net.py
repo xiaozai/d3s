@@ -408,7 +408,7 @@ class DepthSegmNetAttention(nn.Module):
         feat_rgbd = feat_rgbd.view(feat_rgbd.shape[0], featmap_sz, featmap_sz, -1).permute(0, 3, 1, 2).contiguous() # [B, 4, 4, 2C], [B, 16, 16, 2C], [B, 64, 64, 2C]
         print(feat_rgbd.shape)
         feat_rgbd = F.interpolate(feat_rgbd, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))                     # B x 2C x 4 x 4 ->  B x 2C x 48 x 48
-        print(layer) = 1
+        print(layer)
         print(feat_rgbd.shape) # B x 384 x 96 x 96
         print(pre_out.shape)   # B x 16 x 96 x 96
         print(self.a_layers[layer])
