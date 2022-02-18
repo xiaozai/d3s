@@ -62,12 +62,17 @@ class Attention(nn.Module):
 
         attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
-        attention_probs = self.softmax(attention_scores)
 
-        # Song add mask here for background pixels
+        # Song add mask here for background pixels, force background probs is 0
+        print('attention_probs : ', attention_probs.shape)
+        # attetion_probs[:, 8:, :] = 0
+
+        attention_probs = self.softmax(attention_scores)
 
         weights = attention_probs if self.vis else None
         attention_probs = self.attn_dropout(attention_probs)
+
+
 
         context_layer = torch.matmul(attention_probs, value_layer)
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
@@ -127,18 +132,18 @@ class Embeddings(nn.Module):
                                        kernel_size=patch_size,
                                        stride=patch_size)
         self.position_embeddings = nn.Parameter(torch.zeros(1, n_patches+1, config.hidden_size))
-        self.cls_token = nn.Parameter(torch.zeros(1, 1, config.hidden_size))
+        # self.cls_token = nn.Parameter(torch.zeros(1, 1, config.hidden_size))
 
         self.dropout = Dropout(config.transformer["dropout_rate"])
 
     def forward(self, x):
         B = x.shape[0]
-        cls_tokens = self.cls_token.expand(B, -1, -1) # B, 1, C
+        # cls_tokens = self.cls_token.expand(B, -1, -1) # B, 1, C
 
-        x = self.patch_embeddings(x) # [B, C, H, W]
-        x = x.flatten(2)             # [B, C, H*W]
+        x = self.patch_embeddings(x) # [B, C, H/stride, W/stride]
+        x = x.flatten(2)             # [B, C, H*W=patches]
         x = x.transpose(-1, -2)      # [B, tokens, C]
-        x = torch.cat((cls_tokens, x), dim=1) # [B, 1+N, C]
+        # x = torch.cat((cls_tokens, x), dim=1) # [B, 1+N, C]
 
         embeddings = x + self.position_embeddings
         embeddings = self.dropout(embeddings)
@@ -193,7 +198,7 @@ class Transformer(nn.Module):
         self.encoder = Encoder(config, vis)
 
     def forward(self, input_ids):
-        embedding_output = self.embeddings(input_ids)            # [B, 1+N_Patches, C=768], class embeddings + patches
+        embedding_output = self.embeddings(input_ids)            # [B, N_Patches, C=768], class embeddings + patches
         print('embedding_output : ', embedding_output.shape)
         encoded, attn_weights = self.encoder(embedding_output)
         print('encoded : ', encoded.shape)
@@ -274,9 +279,9 @@ class DepthSegmNetAttention(nn.Module):
         self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
 
-        self.rgbd_attention2 = Transformer(get_b16_config(size=(12, 12)), (48*3, 48), True) # vis = True img_size = 384, patches=(16,16)
-        self.rgbd_attention1 = Transformer(get_b16_config(size=(24, 24)), (96*3, 96), True)
-        self.rgbd_attention0 = Transformer(get_b16_config(size=(48, 48)), (192*3, 192), True)
+        self.rgbd_attention2 = Transformer(get_b16_config(size=(12, 12)), (96, 96), True) # vis = True img_size = 384, patches=(16,16)
+        self.rgbd_attention1 = Transformer(get_b16_config(size=(24, 24)), (192, 192), True)
+        self.rgbd_attention0 = Transformer(get_b16_config(size=(48, 48)), (384, 384), True)
 
 
         # 1024， 512， 256， 64 -> 64, 32, 16, 4
@@ -287,7 +292,7 @@ class DepthSegmNetAttention(nn.Module):
         self.segment1_d = conv_no_relu(64, 64)
 
         # 256 depth feat + 1 dist map + rgb similarity + depth similarity
-        self.mixer = conv(5, segm_inter_dim[3])
+        self.mixer = conv(9, segm_inter_dim[3])
         self.s3 = conv(segm_inter_dim[3], segm_inter_dim[2]) # 64 -> 32
 
         self.s2 = conv(segm_inter_dim[2], segm_inter_dim[2]) # 32, 32
@@ -323,6 +328,8 @@ class DepthSegmNetAttention(nn.Module):
             depth features : [feat0, feat1, feat2, feat3],    Bx4x192x192 -> Bx16x96x96 -> Bx32x48x48 -> Bx64x24x24
 
             depth_segm = d3s + depth feat
+
+            we also model background feat
         '''
 
         f_test_rgb = self.segment1_rgb(self.segment0_rgb(feat_test_rgb[3]))
@@ -350,11 +357,17 @@ class DepthSegmNetAttention(nn.Module):
         dist = F.interpolate(test_dist[0], size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))                 # [B, 1, 24, 24]
 
         # mix
-        segm_layers = torch.cat((torch.unsqueeze(pred_sm_rgb[:, :, :, 0], dim=1),
+        segm_layers = torch.cat((dist,
+                                 torch.unsqueeze(pred_sm_rgb[:, :, :, 0], dim=1),
                                  torch.unsqueeze(pred_pos_rgb, dim=1),
                                  torch.unsqueeze(pred_sm_d[:, :, :, 0], dim=1), # depth may mislead
                                  torch.unsqueeze(pred_pos_d, dim=1),
-                                 dist), dim=1)
+                                 #
+                                 torch.unsqueeze(pred_sm_rgb[:, :, :, 1], dim=1), # RGB BG
+                                 torch.unsqueeze(pred_neg_rgb, dim=1),
+                                 torch.unsqueeze(pred_sm_d[:, :, :, 1], dim=1),   # D BG
+                                 torch.unsqueeze(pred_neg_rgb, dim=1)),
+                                 dim=1)
 
 
         out = self.mixer(segm_layers)
@@ -364,11 +377,17 @@ class DepthSegmNetAttention(nn.Module):
         # Merge RGB and D feature maps into one image, add some background patch
 
         # feat_test_rgb[2], Bx512x48x48, mask , Bx1x24x24
-        # How to concatenate F_rgb, F_d, F_bg
-        bg_mask = 1 - F.interpolate(mask_train[0], size=(feat_train_rgb[2].shape[-2], feat_train_rgb[2].shape[-1])) # Bx512x48x48
-        feat_rgbd_stack2 = torch.stack([feat_test_rgb[2], feat_test_d[2], feat_train_rgb[2]*bg_mask], dim=2) # BxCx3Hx48
+        # [[F_rgb, F_d],
+        #  [F_rgb_bg, F_d_bg]] ,  BxCx2Hx2W
+
+        train_bg_mask2 = 1 - F.interpolate(mask_train[0], size=(feat_train_rgb[2].shape[-2], feat_train_rgb[2].shape[-1])) # Bx512x48x48
+        feat_rgbd_stack2 = torch.stack([torch.stack([feat_test_rgb[2], feat_test_d[2]], dim=3),
+                                        torch.stack([feat_train_rgb[2]*train_bg_mask2, feat_train_d[2]*train_bg_mask2], dim=3)],
+                                        dim=2)
+        print('stack rgbd feat : ', feat_test_rgb[2].shape, feat_test_d[2].shape, feat_rgbd_stack2.shape)
         feat_rgbd2, attn_weights2 = self.rgbd_attention2(feat_rgbd_stack2) # Bx1+TxC, the first is a classication learnable embedding
-        print('feat_rgbd2 : ', feat_rgbd2.shape) # [B, 1+T, 768]
+        print('feat_rgbd2 : ', feat_rgbd2.shape) # [B, 1+T, C]
+
         out = self.post2(F.upsample(self.f2(feat_rgbd2) + self.s2(out), scale_factor=2))
 
         feat_rgbd_stack1 = torch.cat(((feat_test_rgb[1], feat_test_d[1], feat_train_rgb[1]*mask_neg, feat_train_d[1]*mask_neg)))
@@ -381,7 +400,7 @@ class DepthSegmNetAttention(nn.Module):
 
 
         if debug:
-            return out, (pred_sm_d, attn_weights2, attn_weights1, attn_weights0)
+            return out, (pred_sm_rgb, pred_sm_d, attn_weights2, attn_weights1, attn_weights0)
         else:
             return out
 

@@ -102,14 +102,14 @@ def run(settings):
 
     # Create network
     # resnet50 or resnet18
-    net = segm_models.depth_only_segm_resnet50(backbone_pretrained=True, topk_pos=settings.segm_topk_pos,
-                                            topk_neg=settings.segm_topk_neg, mixer_channels=mixer_channels)
+    net = segm_models.depth_segm_attention_resnet50(backbone_pretrained=True, topk_pos=settings.segm_topk_pos,
+                                                    topk_neg=settings.segm_topk_neg, mixer_channels=mixer_channels)
 
     # Set objective
     objective = nn.BCEWithLogitsLoss()
 
     # Create actor, which wraps network and objective
-    actor = actors.DepthSegmAttentionActor(net=net, objective=objective)
+    actor = actors.DepthSegmActor(net=net, objective=objective)
 
     # Optimizer
     optimizer = optim.Adam(actor.net.segm_predictor.parameters(), lr=1e-3)
