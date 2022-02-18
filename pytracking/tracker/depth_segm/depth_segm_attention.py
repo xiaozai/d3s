@@ -20,7 +20,7 @@ from pytracking.bbox_fit import fit_bbox_to_mask
 from pytracking.mask_to_disk import save_mask
 
 
-class DepthSegm_ST(BaseTracker):
+class DepthSegmAttention(BaseTracker):
     def initialize_features(self):
         if not getattr(self, 'features_initialized', False):
             self.params.features_filter.initialize()
@@ -816,7 +816,7 @@ class DepthSegm_ST(BaseTracker):
         # network was renamed therefore we need to specify constructor_module and constructor_fun_name
         segm_net, _ = load_network(self.params.segm_net_path, backbone_pretrained=False,
                                    constructor_module='ltr.models.depth_segm.depth_segm',
-                                   constructor_fun_name='depth_segm_resnet50') # 
+                                   constructor_fun_name='depth_segm_attention_resnet50') #
 
         if self.params.use_gpu:
             segm_net.cuda()

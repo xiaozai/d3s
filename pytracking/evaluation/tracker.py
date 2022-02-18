@@ -29,8 +29,8 @@ class Tracker:
 
         self.parameters = self.get_parameters()
 
-        if hasattr(self.parameters, 'longterm'):
-            self.tracker_class = tracker_module.get_tracker_class(longterm=self.parameters.longterm) # depth_segm
+        if hasattr(self.parameters, 'model'):
+            self.tracker_class = tracker_module.get_tracker_class(model=self.parameters.model) # depth_segm
         else:
             self.tracker_class = tracker_module.get_tracker_class() # depth_segm
 
