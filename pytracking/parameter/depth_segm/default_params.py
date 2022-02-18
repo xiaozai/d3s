@@ -108,7 +108,10 @@ def parameters():
 
     params.use_segmentation = True
 
+<<<<<<< HEAD
     params.model = 'depth_only_segm'
+=======
+>>>>>>> f188ff6cde49203d31c14c71335039488c3e368e
     params.segm_net_path = '/home/sgn/Data1/yan/d3s/checkpoints/ltr/depth_segm/depth_only_segm/DepthSegmNet_ep0040.pth.tar'
     params.segm_use_dist = True
     params.segm_normalize_mean = [0.485, 0.456, 0.406]
