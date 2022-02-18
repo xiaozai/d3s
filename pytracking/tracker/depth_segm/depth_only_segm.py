@@ -337,6 +337,7 @@ class DepthOnlySegm(BaseTracker):
 
             if pred_segm_region is None:
                 self.pos = new_pos.clone()
+                print('segment target results is None')
         else:
             self.pos = new_pos.clone()
 
@@ -881,18 +882,19 @@ class DepthOnlySegm(BaseTracker):
 
         # Song : extract depth features
         train_feat_segm_d = segm_net.segm_predictor.depth_feat_extractor(init_patch_d)
+        test_feat_segm_d = train_feat_segm_d.copy()
 
         if init_mask is None:
             iters = 0
             while iters < 1:
                 # Obtain segmentation prediction
                 # segm_pred = segm_net.segm_predictor(test_feat_segm, train_feat_segm, train_masks, test_dist_map)
-                segm_pred = segm_net.segm_predictor(test_feat_segm_rgb, train_feat_segm_d,
+                segm_pred = segm_net.segm_predictor(test_feat_segm_rgb, test_feat_segm_d,
                                                     train_feat_segm_rgb, train_feat_segm_d, # if we use the feature correlation
                                                     train_masks, test_dist_map)
                 # softmax on the prediction (during training this is done internaly when calculating loss)
                 # take only the positive channel as predicted segmentation mask
-                mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy()
+                mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy() # Song [B, 2, H, W]
                 mask = (mask > self.params.init_segm_mask_thr).astype(np.float32)
 
                 if hasattr(self, 'gt_poly'):
@@ -938,7 +940,7 @@ class DepthOnlySegm(BaseTracker):
 
         self.init_mask = mask
         self.mask_pixels = np.array([np.sum(mask)])
-        self.mask = mask
+        # self.mask = mask
         self.masked_img = init_patch_crop_rgb * np.expand_dims(mask, axis=-1)
         self.init_masked_img = init_patch_crop_rgb * np.expand_dims(mask, axis=-1)
 
