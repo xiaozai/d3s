@@ -382,8 +382,8 @@ class DepthSegmNetAttention(nn.Module):
                                         dim=2)
 
         feat_rgbd2, attn_weights2 = self.rgbd_attention2(feat_rgbd_stack2) # [B, Patches, C=768]
-        print('feat_rgbd2 : ', feat_rgbd2.shape, atten_weights2[0].shape) # [B, 1+T, C]
-
+        print('feat_rgbd2 : ', feat_rgbd2.shape, attn_weights2[0].shape) # [B, , C]
+        # feat_rgbd2, featuremaps for each pacth
         out = self.post2(F.upsample(self.f2(feat_rgbd2) + self.s2(out), scale_factor=2))
 
         feat_rgbd_stack1 = torch.cat(((feat_test_rgb[1], feat_test_d[1], feat_train_rgb[1]*mask_neg, feat_train_d[1]*mask_neg)))
