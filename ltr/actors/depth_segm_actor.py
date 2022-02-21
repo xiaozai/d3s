@@ -18,8 +18,14 @@ def draw_axis(ax, img, title, show_minmax=False):
 
 def save_debug(data, pred_mask, vis_data):
 
+    vis_cosine_similarity = True
+
     if len(vis_data) == 2:
         p_rgb, p_d = vis_data
+    elif len(vis_data) == 4:
+        attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data
+        p_rgb, p_d = None, None
+        vis_cosine_similarity = False
     elif len(vis_data) == 5:
         p_rgb, p_d, attn_weights2, attn_weights1, attn_weights0 = vis_data
 
@@ -34,9 +40,6 @@ def save_debug(data, pred_mask, vis_data):
 
     test_dist = data['test_dist'][0, batch_element, :, :] # song
     # print(test_dist.shape)
-
-    p_rgb = p_rgb[batch_element, ...] # [H, W, 2] F + B
-    p_d = p_d[batch_element, ...]
 
     # softmax on the mask prediction (since this is done internaly when calculating loss)
     mask = F.softmax(pred_mask, dim=1)[batch_element, 0, :, :].cpu().detach().numpy().astype(np.float32)
@@ -56,11 +59,6 @@ def save_debug(data, pred_mask, vis_data):
     # predicted_mask = mask.astype(np.float32)
 
     # Song
-    test_dist = (test_dist.detach().cpu().numpy().squeeze()).astype(np.float32)
-    p_rgb = (p_rgb.detach().cpu().numpy().squeeze()).astype(np.float32) # [H, W, 2]
-    p_d = (p_d.detach().cpu().numpy().squeeze()).astype(np.float32)
-
-
     f, ((ax1, ax2, ax3), (ax4, ax5, ax6), (ax7, ax8, ax9)) = plt.subplots(3, 3, figsize=(8, 8))
     draw_axis(ax1, train_img, 'Train image')
     draw_axis(ax4, test_img, 'Test image')
@@ -69,16 +67,24 @@ def save_debug(data, pred_mask, vis_data):
     draw_axis(ax3, test_mask, 'Ground-truth')
     draw_axis(ax6, predicted_mask, 'Prediction', show_minmax=True)
 
-    empty_channel = np.zeros((p_rgb.shape[0], p_rgb.shape[1], 1), dtype=np.uint8)
+    if vis_cosine_similarity:
+        p_rgb = p_rgb[batch_element, ...] # [H, W, 2] F + B
+        p_d = p_d[batch_element, ...]
+        p_rgb = (p_rgb.detach().cpu().numpy().squeeze()).astype(np.float32) # [H, W, 2]
+        p_d = (p_d.detach().cpu().numpy().squeeze()).astype(np.float32)
 
-    p_rgb = (p_rgb * 255).astype(np.uint8)
-    p_rgb = np.concatenate((p_rgb, empty_channel), axis=-1) # [H, W, 3]
+        empty_channel = np.zeros((p_rgb.shape[0], p_rgb.shape[1], 1), dtype=np.uint8)
 
-    p_d = (p_d * 255).astype(np.uint8)
-    p_d = np.concatenate((p_d, empty_channel), axis=-1) # [H, W, 3]
+        p_rgb = (p_rgb * 255).astype(np.uint8)
+        p_rgb = np.concatenate((p_rgb, empty_channel), axis=-1) # [H, W, 3]
 
-    draw_axis(ax7, p_rgb, 'similarity rgb')
-    draw_axis(ax8, p_d, 'similarity d')
+        p_d = (p_d * 255).astype(np.uint8)
+        p_d = np.concatenate((p_d, empty_channel), axis=-1) # [H, W, 3]
+
+        draw_axis(ax7, p_rgb, 'similarity rgb')
+        draw_axis(ax8, p_d, 'similarity d')
+
+    test_dist = (test_dist.detach().cpu().numpy().squeeze()).astype(np.float32)
     draw_axis(ax9, test_dist, 'test_dist')
 
     save_path = os.path.join(data['settings'].env.images_dir, '%03d-%04d.png' % (data['epoch'], data['iter']))
@@ -125,43 +131,3 @@ class DepthSegmActor(BaseActor):
             save_debug(data,masks_pred, vis_data) # vis_data = (p_rgb, p_d) or  (pred_sm_d, attn_weights2, attn_weights1, attn_weights0)
 
         return loss, stats
-
-# class DepthSegmAttentionActor(BaseActor):
-#     """ Actor for training the Segmentation in ATOM"""
-#     def __call__(self, data):
-#         """
-#         args:
-#             data - The input data, should contain the fields 'train_images', 'test_images', 'train_anno',
-#                     'test_proposals' and 'proposal_iou'.
-#
-#         returns:
-#             loss    - the training loss
-#             states  -  dict containing detailed losses
-#         """
-#
-#         test_dist = None
-#         if 'test_dist' in data:
-#             test_dist = data['test_dist'].permute(1, 0, 2, 3)
-#
-#         # Run network to obtain IoU prediction for each proposal in 'test_proposals'
-#         masks_pred, (pred_sm_d, attn_weights2, attn_weights1, attn_weights0) = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
-#                                                                                         data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
-#                                                                                         data['test_images'].permute(1, 0, 2, 3),
-#                                                                                         data['test_depths'].permute(1, 0, 2, 3),
-#                                                                                         data['train_masks'].permute(1, 0, 2, 3),
-#                                                                                         test_dist=test_dist,
-#                                                                                         debug=True) # Song :  vis pos and neg maps
-#
-#         masks_gt = data['test_masks'].permute(1, 0, 2, 3)            # B * 1 * H * W
-#         masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)   # B * 2 * H * W
-#         # Compute loss
-#         loss = self.objective(masks_pred, masks_gt_pair)
-#
-#         # Return training stats
-#         stats = {'Loss/total': loss.item(),
-#                  'Loss/segm': loss.item()}
-#
-#         if 'iter' in data and (data['iter'] - 1) % 50 == 0:
-#             save_debug(data, masks_pred, pred_sm_d, attn_weights2, attn_weights1, attn_weights0)
-#
-#         return loss, stats

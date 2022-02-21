@@ -88,7 +88,7 @@ class Mlp(nn.Module):
         self.fc1 = Linear(config.hidden_size, config.transformer["mlp_dim"])
         self.fc2 = Linear(config.transformer["mlp_dim"], config.hidden_size)
         # self.act_fn = torch.nn.functional.gelu
-        self.act_fn = torch.nn.ReLU(inplace=True)
+        self.act_fn = torch.nn.ReLU(inplace=True) # pytorch 1.1.0 does not have gelu
         self.dropout = Dropout(config.transformer["dropout_rate"])
 
         self._init_weights()
@@ -203,21 +203,24 @@ class Transformer(nn.Module):
         encoded, attn_weights = self.encoder(embedding_output)  # encoded [B, patches, C=768]
         return encoded, attn_weights
 
+
 class CrossAttentionModule(nn.Module):
-    def __init__(self, config_q, config_kv, template_size, search_size, in_channels, vis):
+    def __init__(self, config, img_sz, in_channels, vis=False):
         super(CrossAttentionModule, self).__init__()
-        self.embeddings_query = Embeddings(config_q, img_size=template_size, in_channels=in_channels)
-        self.embedings_keyvalue = Embeddings(config_ky, img_size=search_size, in_channels=in_channels)
+        self.embeddings_query = Embeddings(config, img_size=img_sz, in_channels=in_channels)
+        self.embedings_keyvalue = Embeddings(config, img_size=img_sz, in_channels=in_channels)
 
-        self.query = Linear(config_q.hidden_size, config_q.hidden_size) # 768 -> 768
-        self.key = Linear(config_kv.hidden_size, config_kv.hidden_size)
-        self.value = Linear(config_ky.hidden_size, config_kv.hidden_size)
+        self.query = Linear(config.hidden_size, config.hidden_size)
+        self.key = Linear(config.hidden_size, config.hidden_size)
+        self.value = Linear(config.hidden_size, config.hidden_size)
 
-        self.attn = nn.MultiheadAttention(config_q.hidden_size, config_q.num_heads, batch_first=True)
+        self.attn = nn.MultiheadAttention(config.hidden_size, config.num_heads, batch_first=True)
 
-        self.attention_norm = LayerNorm(config_q.hidden_size, eps=1e-6)
-        self.ffn_norm = LayerNorm(config_q.hidden_size, eps=1e-6)
-        self.ffn = Mlp(config_q)
+        self.attention_norm = LayerNorm(config.hidden_size, eps=1e-6)
+        self.ffn_norm = LayerNorm(config.hidden_size, eps=1e-6)
+        self.ffn = Mlp(config)
+
+        self.vis
 
     def forward(self, template, search_region, key_padding_mask=None):
         ''' one multi-head attention moudle
@@ -227,9 +230,11 @@ class CrossAttentionModule(nn.Module):
 
         output = [B, Patches, C], same as q
         '''
-        query = self.embedding_query(search_region)            # BxpatchesxC
+        query = self.embedding_query(search_region)   # B, Patches, hidden_size
         keyvalue = self.embedding_keyvalue(template)
-        q = self.query(query)
+
+        # One Block,
+        q = self.query(query)                         # B, Patches, hidden_size
         k = self.key(keyvalue)
         v = self.value(keyvalue)
 
@@ -246,7 +251,10 @@ class CrossAttentionModule(nn.Module):
         x = self.ffn(x)
         x = x + h
 
-        return x, weights
+        if self.vis:
+            return x, weights
+        else:
+            return x
 
 
 
@@ -312,29 +320,30 @@ class DepthNet(nn.Module):
         return [feat0, feat1, feat2, feat3] # [4, 16, 32, 64]
 
 
-class DepthSegmNetAttention(nn.Module):
+class DepthSegmNetAttention01(nn.Module):
     def __init__(self):
         super().__init__()
 
         segm_input_dim = (64, 256, 512, 1024)
         segm_inter_dim = (4, 16, 32, 64)
         segm_dim = (64, 64)  # convolutions before cosine similarity
+        feat_sz = (192, 96, 48, 24) # feature maps sizes in ResNet50 and DepthNet
 
         self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
-        config_q = get_b16_config(size=(12, 12))
-        config_kv = get_b16_config(size=(12, 12))
-        self.cross_attn = CrossAttentionModule(config_q, config_kv, (48, 24), (48, 24), 1024, True)
 
-        self.mask_embedding = nn.AvgPool2d(patches_sz, stride=patches_sz) # ignore bg patches in key
+        # feat_test/train, layer3, Bx24x24x1024 => B, 6x6 patches, C=hidden_size
+        patch_sz = 4
+        init_config = get_b16_config(size=(patch_sz, patch_sz))
+        self.cross_attn = CrossAttentionModule(init_config, (feat_sz[3]*2, feat_sz[0]), segm_dim[3], vis=True)
+        self.mask_embedding = nn.AvgPool2d(patch_sz, stride=patch_sz) # ignore bg patches in key， test
 
 
 
         config = get_b16_config(size=(12, 12))
-        self.rgbd_transformers = nn.ModuleList([Transformer(config, (384, 384), 4, True),  # self.rgbd_attention0 32 * 32 patches, 1024
-                                                Transformer(config, (192, 192), 16, True), # self.rgbd_attention1 16 * 16 patches, 256
-                                                Transformer(config, (96, 96), 32, True)])  # self.rgbd_attention2 vis = True img_size = 384, patches=(12, 12), in_channels=32
-
+        self.rgbd_transformers = nn.ModuleList([Transformer(config, (feat_sz[0]*4, feat_sz[0]), segm_inter_dim[0], True),  # 192x192x4 -> 16x16x4 patches
+                                                Transformer(config, (feat_sz[1]*4, feat_sz[1]), segm_inter_dim[1], True),  # 96x94x16  -> 8x8x4 patches
+                                                Transformer(config, (feat_sz[2]*4, feat_sz[2]), segm_inter_dim[2], True)]) # 48x48x32  -> 4x4x4 patches
 
 
         # 1024， 512， 256， 64 -> 64, 32, 16, 4
@@ -344,18 +353,15 @@ class DepthSegmNetAttention(nn.Module):
         self.segment0_d = conv(64, 64, kernel_size=1, padding=0)
         self.segment1_d = conv_no_relu(64, 64)
 
-        # 256 depth feat + 1 dist map + rgb similarity + depth similarity
-        self.mixer = conv(9, segm_inter_dim[3])
 
+        self.s_layers = nn.ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]),
+                                       conv(segm_inter_dim[1], segm_inter_dim[1]),
+                                       conv(segm_inter_dim[2], segm_inter_dim[2]),
+                                       conv(config.hidden_size*2, segm_inter_dim[3])]) # 192 -> 64 !!!!!
 
-        self.s_layers = nn.ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]), # self.s0 64 -> 32
-                                       conv(segm_inter_dim[1], segm_inter_dim[1]), # self.s1 32 -> 32
-                                       conv(segm_inter_dim[2], segm_inter_dim[2]), # self.s2 16 -> 16
-                                       conv(segm_inter_dim[3], segm_inter_dim[2])])# self.s3  4 ->  4
-
-        self.a_layers = nn.ModuleList([conv(config.hidden_size*2, segm_inter_dim[0]),   # self.a0
-                                       conv(config.hidden_size*2, segm_inter_dim[1]),   # self.a1
-                                       conv(config.hidden_size*2, segm_inter_dim[2])])  # self.a2
+        self.a_layers = nn.ModuleList([conv(config.hidden_size*2, segm_inter_dim[0]),
+                                       conv(config.hidden_size*2, segm_inter_dim[1]),
+                                       conv(config.hidden_size*2, segm_inter_dim[2])])
 
         self.f_layers = nn.ModuleList([conv(segm_input_dim[0], segm_inter_dim[0]), # self.f0
                                        conv(segm_input_dim[1], segm_inter_dim[1]), # self.f1
@@ -368,12 +374,13 @@ class DepthSegmNetAttention(nn.Module):
 
         self.post_layers = nn.ModuleList([conv_no_relu(segm_inter_dim[0], 2),          # self.post0
                                           conv(segm_inter_dim[1], segm_inter_dim[0]),  # self.post1
-                                          conv(segm_inter_dim[2], segm_inter_dim[1])]) # self.post2
+                                          conv(segm_inter_dim[2], segm_inter_dim[1]),  # self.post2
+                                          conv(segm_inter_dim[3]+1, segm_inter_dim[2])]) # init_mask + dist -> 32
 
         self.initialize_weights()
 
-        self.topk_pos = 3
-        self.topk_neg = 3
+        # self.topk_pos = 3
+        # self.topk_neg = 3
 
     def initialize_weights(self):
         for m in self.modules():
@@ -385,78 +392,73 @@ class DepthSegmNetAttention(nn.Module):
     def forward(self, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, test_dist=None, debug=False):
         ''' rgb features   : [conv1, layer1, layer2, layer3], Bx64x192x192  -> Bx256x96x96 -> Bx512x48x48 -> Bx1024x24x24
             depth features : [feat0, feat1, feat2, feat3],    Bx4x192x192 -> Bx16x96x96 -> Bx32x48x48 -> Bx64x24x24
-
-            depth_segm = d3s + depth feat
-
-            we also model background feat
         '''
-
-        f_test_rgb = self.segment1_rgb(self.segment0_rgb(feat_test_rgb[3]))
-        f_train_rgb = self.segment1_rgb(self.segment0_rgb(feat_train_rgb[3]))
-
-        f_test_d = self.segment1_d(self.segment0_d(feat_test_d[3]))
-        f_train_d = self.segment1_d(self.segment0_d(feat_train_d[3]))
-
-        mask_pos = F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1])) # [1,1,384, 384] -> [B,1,24,24]
-        mask_neg = 1 - mask_pos
-
-
-        ''' replace cosine similarity with cross attention '''
-        template = torch.cat((f_train_rgb, f_train_d), dim=2)
-        search_region = torch.cat((f_test_rgb, f_test_d), dim=2)
-        mask_neg = torch.cat((mask_neg, mask_neg), dim=2)
-        mask_neg = self.mask_embedding(mask_neg).view(mask_neg.shape[0], -1) # BxPatches
-        mask_neg = torch.where(mask_neg < 0.5, mask_neg, 1) # ignore bg patches in key
-        out = self.cross_attn(template, search_region, key_padding_mask=mask_neg) # B x Patches x C [rgb + d ]
-
-        n_patches = out.shape[1]
-        featmap_sz = math.sqrt(n_patches)
-
-        out = torch.cat((out[:, :n_patches, :], out[:, n_patches:, :]), dim=-1) # BxPatchesx2C
-        out = out.view(out.shape[0], featmap_sz, featmap_sz, -1) # BxHxWx2C
-        # out = self.mixer(segm_layers)
-        out = self.s_layers[3](F.upsample(out, scale_factor=2))
-
-        
 
         # feat maps -> self.attention, -> B, tokens, C
         # Merge RGB and D feature maps into one image, add some background patch
+        out, attn_weights3 = self.init_mask(test_dist, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=3)
         out, attn_weights2 = self.rgbd_fusion(out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=2)
         out, attn_weights1 = self.rgbd_fusion(out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=1)
         out, attn_weights0 = self.rgbd_fusion(out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0)
 
-
         if debug:
-            return out, (pred_sm_rgb, pred_sm_d, attn_weights2, attn_weights1, attn_weights0)
+            return out, (attn_weights3, attn_weights2, attn_weights1, attn_weights0)
         else:
             return out
+
+    def init_mask(self, test_dist, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=3):
+        f_test_rgb = self.segment1_rgb(self.segment0_rgb(feat_test_rgb[layer]))
+        f_train_rgb = self.segment1_rgb(self.segment0_rgb(feat_train_rgb[layer]))
+        f_test_d = self.segment1_d(self.segment0_d(feat_test_d[layer]))
+        f_train_d = self.segment1_d(self.segment0_d(feat_train_d[layer]))
+
+        ''' replace cosine similarity with cross attention '''
+        template = torch.cat((f_train_rgb, f_train_d), dim=2)                   # Bx64x24x24 + Bx64x24x24 -> Bx64x(24+24)x24
+        search_region = torch.cat((f_test_rgb, f_test_d), dim=2)
+
+        # in mask, 1 denotes bg pixels, 0 denotes fg pixels
+        mask = 1 - F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1])) # [1,1,384, 384] -> [B,1,24,24]
+        mask = torch.cat((mask, mask), dim=2)                                                        # Bx1x24x24  + Bx1x24x24  -> Bx1x(24+24)x24
+        mask = self.mask_embedding(mask).view(mask.shape[0], -1)                                     # Bx1x6x6 -> Bx1xPatches
+        mask = (mask>0.5).float()                                                                    # used to ignore bg patches in key
+
+
+        out, attn_weights3 = self.cross_attn(template, search_region, key_padding_mask=mask) # B x Patches x C [rgb + d ]
+        n_patches = out.shape[1]                                                             # RGB + D patches
+        new_feat_sz = math.sqrt(n_patches)
+
+        out = torch.cat((out[:, :n_patches, :], out[:, n_patches:, :]), dim=-1)           # BxPatchesx2C
+        out = out.view(out.shape[0], new_feat_sz, new_feat_sz, -1)                        # BxHxWx2C, hidden_size * 2,  Bx6x6x192
+        out = out.permute(0, 3, 1, 2)                                                     # Bx192x6x6
+        out = F.interpolate(out, size=(f_train_rgb.shape[-2]*2, f_train_rgb.shape[-1]*2)) # Bx192x48x48
+        out = self.s_layers[layer](out)                                                   # Bx192x6x6 -> Bx64x48x48
+
+        dist = F.interpolate(test_dist[0], size=(f_train_rgb.shape[-2]*2, f_train_rgb.shape[-1]*2))  # [B, 1, 48, 48]
+        out = self.post_layers[layer](torch.cat((out, dist), dim=1))                      # [B, 64+1, 48, 48]
+
+        return out, attn_weights3
 
     def rgbd_fusion(self, pre_out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0):
 
         f_test_rgb, f_test_d, f_train_rgb, f_train_d = feat_test_rgb[layer], feat_test_d[layer], feat_train_rgb[layer], feat_train_d[layer]
 
         bg_mask = 1 - F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1])) # Bx1xHxW
-        # F_rgb, F_d, BG_rgb, BG_d, -> BxCx2Hx2W
-        ''' Reduce one BG image, feat_rgbd = cat([feat_rgb, feat_d, feat_BG]) '''
-        feat_rgbd = torch.cat((torch.cat((self.f_layers[layer](f_test_rgb), self.d_layers[layer](f_test_d)), dim=3),
-                               torch.cat((self.f_layers[layer](f_train_rgb*bg_mask), self.d_layers[layer](f_train_d*bg_mask)), dim=3)),
+
+        # F_rgb, F_d, BG_rgb, BG_d, -> BxCx4HxW
+        feat_rgbd = torch.cat((self.f_layers[layer](f_test_rgb),
+                               self.d_layers[layer](f_test_d),
+                               self.f_layers[layer](f_train_rgb*bg_mask),
+                               self.d_layers[layer](f_train_d*bg_mask)),
                                dim=2)
         # feat_rgbd2, featuremaps for each pacth
-        feat_rgbd, attn_weights = self.rgbd_transformers[layer](feat_rgbd)        # [B, Patches, C=768], attn_weights, [B, heads=12, patches, headsize=64]
-        n_patches = feat_rgbd.shape[1] // 4 # for each patch, 16 patches, 64 patches, 256 patches
-        featmap_sz = int(math.sqrt(n_patches))   # for RGB and D feat maps, 4x4, 8x8, 16x16
-
+        feat_rgbd, attn_weights = self.rgbd_transformers[layer](feat_rgbd)      # [B, Patches, C], attn_weights, [B, heads=12, patches, headsize=64]
+        n_patches = feat_rgbd.shape[1] // 4                                     # for each patch, 16 patches, 64 patches, 256 patches
+        featmap_sz = int(math.sqrt(n_patches))                                  # for RGB and D feat maps, 4x4, 8x8, 16x16
         # Only keep test F_rgb and F_D, [B, Patches//2=32/128x512, C=768]
-        feat_rgbd = feat_rgbd[:, :2*n_patches, :] # B, 2*patches, C
-        # featmap_sz rgb, featmap_sz d , featmap_sz rgb, featmap_sz
-
-        feat_rgbd = feat_rgbd.view(feat_rgbd.shape[0], featmap_sz, featmap_sz*2, -1) #
-        feat_rgbd = torch.cat((feat_rgbd[:, :, :featmap_sz, :], feat_rgbd[:, :, featmap_sz:, :]), dim=-1) # cat(f_rgb, f_d),  B x H x W x 2C
-
-
+        feat_rgbd = torch.cat((feat_rgbd[:, :n_patches, :], feat_rgbd[:, n_patches:2*n_patches, :]), dim=-1) # cat(f_rgb, f_d),  B x H x W x 2C
+        feat_rgbd = feat_rgbd.view(feat_rgbd.shape[0], featmap_sz, feat_map_sz, -1)
         feat_rgbd = feat_rgbd.permute(0, 3, 1, 2).contiguous() # [B, 2C, H, W]
-
-        feat_rgbd = F.interpolate(feat_rgbd, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))                     # B x 2C x 4 x 4 ->  B x 2C x 48 x 48
+        feat_rgbd = F.interpolate(feat_rgbd, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))              # B x 2C x 4 x 4 ->  B x 2C x 48 x 48
         out = self.post_layers[layer](F.upsample(self.a_layers[layer](feat_rgbd) + self.s_layers[layer](pre_out), scale_factor=2))
 
         return out, attn_weights
