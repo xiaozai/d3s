@@ -230,8 +230,8 @@ class CrossAttentionModule(nn.Module):
 
         output = [B, Patches, C], same as q
         '''
-        query = self.embedding_query(search_region)   # B, Patches, hidden_size
-        keyvalue = self.embedding_keyvalue(template)
+        query = self.embeddings_query(search_region)   # B, Patches, hidden_size
+        keyvalue = self.embedings_keyvalue(template)
 
         # One Block,
         q = self.query(query)                         # B, Patches, hidden_size
@@ -242,7 +242,8 @@ class CrossAttentionModule(nn.Module):
         q = self.attention_norm(q)
         k = self.attention_norm(k)
         v = self.attention_norm(v)
-
+        print(key_padding_mask.shape)
+        print(k.shape)
         x, weights = self.attn(q, k, v, key_padding_mask=key_padding_mask)
         x = x + h
 
