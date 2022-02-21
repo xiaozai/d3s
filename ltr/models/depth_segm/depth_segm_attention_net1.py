@@ -203,6 +203,51 @@ class Transformer(nn.Module):
         encoded, attn_weights = self.encoder(embedding_output)  # encoded [B, patches, C=768]
         return encoded, attn_weights
 
+class CrossAttentionModule(nn.Module):
+    def __init__(self, config_q, config_kv, template_size, search_size, in_channels, vis):
+        super(CrossAttentionModule, self).__init__()
+        self.embeddings_query = Embeddings(config_q, img_size=template_size, in_channels=in_channels)
+        self.embedings_keyvalue = Embeddings(config_ky, img_size=search_size, in_channels=in_channels)
+
+        self.query = Linear(config_q.hidden_size, config_q.hidden_size) # 768 -> 768
+        self.key = Linear(config_kv.hidden_size, config_kv.hidden_size)
+        self.value = Linear(config_ky.hidden_size, config_kv.hidden_size)
+
+        self.attn = nn.MultiheadAttention(config_q.hidden_size, config_q.num_heads, batch_first=True)
+
+        self.attention_norm = LayerNorm(config_q.hidden_size, eps=1e-6)
+        self.ffn_norm = LayerNorm(config_q.hidden_size, eps=1e-6)
+        self.ffn = Mlp(config_q)
+
+    def forward(self, template, search_region, key_padding_mask=None):
+        ''' one multi-head attention moudle
+        q, k, v = [B, Patches, C],
+        key_padding_mask, shape is (B, Patches),
+        indicating which elements whithin key to ignore for the purpose of attention
+
+        output = [B, Patches, C], same as q
+        '''
+        query = self.embedding_query(search_region)            # BxpatchesxC
+        keyvalue = self.embedding_keyvalue(template)
+        q = self.query(query)
+        k = self.key(keyvalue)
+        v = self.value(keyvalue)
+
+        h = q
+        q = self.attention_norm(q)
+        k = self.attention_norm(k)
+        v = self.attention_norm(v)
+
+        x, weights = self.attn(q, k, v, key_padding_mask=key_padding_mask)
+        x = x + h
+
+        h = x
+        x = self.ffn_norm(x)
+        x = self.ffn(x)
+        x = x + h
+
+        return x, weights
+
 
 
 def get_b16_config(size=(16,16)):
@@ -219,6 +264,7 @@ def get_b16_config(size=(16,16)):
     config.classifier = 'token'
     config.representation_size = None
     return config
+
 
 
 class DepthNet(nn.Module):
@@ -276,6 +322,14 @@ class DepthSegmNetAttention(nn.Module):
 
         self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
+        config_q = get_b16_config(size=(12, 12))
+        config_kv = get_b16_config(size=(12, 12))
+        self.cross_attn = CrossAttentionModule(config_q, config_kv, (48, 24), (48, 24), 1024, True)
+
+        self.mask_embedding = nn.AvgPool2d(patches_sz, stride=patches_sz) # ignore bg patches in key
+
+
+
         config = get_b16_config(size=(12, 12))
         self.rgbd_transformers = nn.ModuleList([Transformer(config, (384, 384), 4, True),  # self.rgbd_attention0 32 * 32 patches, 1024
                                                 Transformer(config, (192, 192), 16, True), # self.rgbd_attention1 16 * 16 patches, 256
@@ -292,6 +346,7 @@ class DepthSegmNetAttention(nn.Module):
 
         # 256 depth feat + 1 dist map + rgb similarity + depth similarity
         self.mixer = conv(9, segm_inter_dim[3])
+
 
         self.s_layers = nn.ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]), # self.s0 64 -> 32
                                        conv(segm_inter_dim[1], segm_inter_dim[1]), # self.s1 32 -> 32
@@ -345,43 +400,24 @@ class DepthSegmNetAttention(nn.Module):
         mask_pos = F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1])) # [1,1,384, 384] -> [B,1,24,24]
         mask_neg = 1 - mask_pos
 
-        # if we use template as Q, search region as K, V
-        # attn_weights is init mask
-        #
-        # multihead_attn = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True) # [B, Seqs, Dims]
-        # attn_output, attn_output_weights = multihead_attn(query, key, value)
 
-        # rgb
-        pred_pos_rgb, pred_neg_rgb = self.similarity_segmentation(f_test_rgb, f_train_rgb, mask_pos, mask_neg)
+        ''' replace cosine similarity with cross attention '''
+        template = torch.cat((f_train_rgb, f_train_d), dim=2)
+        search_region = torch.cat((f_test_rgb, f_test_d), dim=2)
+        mask_neg = torch.cat((mask_neg, mask_neg), dim=2)
+        mask_neg = self.mask_embedding(mask_neg).view(mask_neg.shape[0], -1) # BxPatches
+        mask_neg = torch.where(mask_neg < 0.5, mask_neg, 1) # ignore bg patches in key
+        out = self.cross_attn(template, search_region, key_padding_mask=mask_neg) # B x Patches x C [rgb + d ]
 
-        pred_rgb = torch.cat((torch.unsqueeze(pred_pos_rgb, -1), torch.unsqueeze(pred_neg_rgb, -1)), dim=-1)
-        pred_sm_rgb = F.softmax(pred_rgb, dim=-1) # [1, 24, 24, 2]
+        n_patches = out.shape[1]
+        featmap_sz = math.sqrt(n_patches)
 
-        # depth
-        pred_pos_d, pred_neg_d = self.similarity_segmentation(f_test_d, f_train_d, mask_pos, mask_neg)
-
-        pred_d = torch.cat((torch.unsqueeze(pred_pos_d, -1), torch.unsqueeze(pred_neg_d, -1)), dim=-1)
-        pred_sm_d = F.softmax(pred_d, dim=-1) # [1, 24, 24, 2]
-
-        # dist map (DCF response), in our case , it is response map, in d3s, it is distance map
-        dist = F.interpolate(test_dist[0], size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))                 # [B, 1, 24, 24]
-
-        # mix
-        segm_layers = torch.cat((dist,
-                                 torch.unsqueeze(pred_sm_rgb[:, :, :, 0], dim=1),
-                                 torch.unsqueeze(pred_pos_rgb, dim=1),
-                                 torch.unsqueeze(pred_sm_d[:, :, :, 0], dim=1), # depth may mislead
-                                 torch.unsqueeze(pred_pos_d, dim=1),
-                                 #
-                                 torch.unsqueeze(pred_sm_rgb[:, :, :, 1], dim=1), # RGB BG
-                                 torch.unsqueeze(pred_neg_rgb, dim=1),
-                                 torch.unsqueeze(pred_sm_d[:, :, :, 1], dim=1),   # D BG
-                                 torch.unsqueeze(pred_neg_rgb, dim=1)),
-                                 dim=1)
-
-
-        out = self.mixer(segm_layers)
+        out = torch.cat((out[:, :n_patches, :], out[:, n_patches:, :]), dim=-1) # BxPatchesx2C
+        out = out.view(out.shape[0], featmap_sz, featmap_sz, -1) # BxHxWx2C
+        # out = self.mixer(segm_layers)
         out = self.s_layers[3](F.upsample(out, scale_factor=2))
+
+        
 
         # feat maps -> self.attention, -> B, tokens, C
         # Merge RGB and D feature maps into one image, add some background patch
@@ -401,6 +437,7 @@ class DepthSegmNetAttention(nn.Module):
 
         bg_mask = 1 - F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1])) # Bx1xHxW
         # F_rgb, F_d, BG_rgb, BG_d, -> BxCx2Hx2W
+        ''' Reduce one BG image, feat_rgbd = cat([feat_rgb, feat_d, feat_BG]) '''
         feat_rgbd = torch.cat((torch.cat((self.f_layers[layer](f_test_rgb), self.d_layers[layer](f_test_d)), dim=3),
                                torch.cat((self.f_layers[layer](f_train_rgb*bg_mask), self.d_layers[layer](f_train_d*bg_mask)), dim=3)),
                                dim=2)
@@ -423,20 +460,3 @@ class DepthSegmNetAttention(nn.Module):
         out = self.post_layers[layer](F.upsample(self.a_layers[layer](feat_rgbd) + self.s_layers[layer](pre_out), scale_factor=2))
 
         return out, attn_weights
-
-    def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg):
-        # first normalize train and test features to have L2 norm 1
-        # cosine similarityand reshape last two dimensions into one
-        sim = torch.einsum('ijkl,ijmn->iklmn',
-                           F.normalize(f_test, p=2, dim=1),
-                           F.normalize(f_train, p=2, dim=1))
-        sim_resh = sim.view(sim.shape[0], sim.shape[1], sim.shape[2], sim.shape[3] * sim.shape[4])
-        # reshape masks into vectors for broadcasting [B x 1 x 1 x w * h]
-        # re-weight samples (take out positive ang negative samples)
-        sim_pos = sim_resh * mask_pos.view(mask_pos.shape[0], 1, 1, -1) # [1,24,24,576] * [1,1,1,576] -> [1,24,24,576]
-        sim_neg = sim_resh * mask_neg.view(mask_neg.shape[0], 1, 1, -1)
-        # take top k positive and negative examples
-        # mean over the top positive and negative examples
-        pos_map = torch.mean(torch.topk(sim_pos, self.topk_pos, dim=-1).values, dim=-1)
-        neg_map = torch.mean(torch.topk(sim_neg, self.topk_neg, dim=-1).values, dim=-1)
-        return pos_map, neg_map
