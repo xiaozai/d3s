@@ -231,7 +231,7 @@ class CrossAttentionModule(nn.Module):
         output = [B, Patches, C], same as q
         '''
         query = self.embeddings_query(search_region)   # B, Patches, hidden_size
-        keyvalue = self.embedings_keyvalue(template)
+        keyvalue = self.embedings_keyvalue(template)   # B, Patches, hidden_size
 
         # One Block,
         q = self.query(query)                         # B, Patches, hidden_size
@@ -242,11 +242,13 @@ class CrossAttentionModule(nn.Module):
         q = self.attention_norm(q)
         k = self.attention_norm(k)
         v = self.attention_norm(v)
-        print(key_padding_mask.shape)
-        print(k.shape)
-        key_padding_mask = key_padding_mask.repeat(1, 1, k.shape[-1])
-        print(k.shape)
+
+        # pytorch 1.7.0 does not have batch_first anymore
+        q = q.permute(1, 0, 2) # [Patches, B, C]
+        k = k.permute(1, 0, 2)
+        v = v.permute(1, 0, 2)
         x, weights = self.attn(q, k, v, key_padding_mask=key_padding_mask)
+        x = x.permute(1, 0, 2)
         x = x + h
 
         h = x
@@ -421,13 +423,9 @@ class DepthSegmNetAttention01(nn.Module):
 
         # in mask, 1 denotes bg pixels, 0 denotes fg pixels
         mask = 1 - F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1])) # [B,1,384, 384] -> [B,1,24,24]
-        print(mask.shape)
         mask = torch.cat((mask, mask), dim=2)                                                        # Bx1x24x24  + Bx1x24x24  -> Bx1x(24+24)x24
-        print(mask.shape) # B, 1, 48, 24
         mask = self.mask_embedding(mask).view(mask.shape[0], -1)                                  # Bx1x6x6 -> Bx1xPatches
-        print(mask.shape) # B, 1, 12, 6 -> B, 72, for each patch
         mask = (mask>0.5).float()                                                                    # used to ignore bg patches in key
-        print(mask.shape)
 
         out, attn_weights3 = self.cross_attn(template, search_region, key_padding_mask=mask) # B x Patches x C [rgb + d ]
         n_patches = out.shape[1]                                                             # RGB + D patches
