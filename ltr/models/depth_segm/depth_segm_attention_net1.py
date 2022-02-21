@@ -214,7 +214,7 @@ class CrossAttentionModule(nn.Module):
         self.key = Linear(config.hidden_size, config.hidden_size)
         self.value = Linear(config.hidden_size, config.hidden_size)
 
-        self.attn = nn.MultiheadAttention(config.hidden_size, config.num_heads, batch_first=True)
+        self.attn = nn.MultiheadAttention(config.hidden_size, 3, batch_first=True)
 
         self.attention_norm = LayerNorm(config.hidden_size, eps=1e-6)
         self.ffn_norm = LayerNorm(config.hidden_size, eps=1e-6)
