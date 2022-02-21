@@ -428,9 +428,8 @@ class DepthSegmNetAttention01(nn.Module):
         mask = mask>0.5                                                                    # used to ignore bg patches in key
 
         out, attn_weights3 = self.cross_attn(template, search_region, key_padding_mask=mask) # B x Patches x C [rgb + d ]
-        n_patches = out.shape[1]                                                             # RGB + D patches
-        new_feat_sz = math.sqrt(n_patches)
-
+        n_patches = out.shape[1] // 2                                                            # RGB + D patches
+        new_feat_sz = int(math.sqrt(n_patches))
         out = torch.cat((out[:, :n_patches, :], out[:, n_patches:, :]), dim=-1)           # BxPatchesx2C
         out = out.view(out.shape[0], new_feat_sz, new_feat_sz, -1)                        # BxHxWx2C, hidden_size * 2,  Bx6x6x192
         out = out.permute(0, 3, 1, 2)                                                     # Bx192x6x6
@@ -460,7 +459,7 @@ class DepthSegmNetAttention01(nn.Module):
         featmap_sz = int(math.sqrt(n_patches))                                  # for RGB and D feat maps, 4x4, 8x8, 16x16
         # Only keep test F_rgb and F_D, [B, Patches//2=32/128x512, C=768]
         feat_rgbd = torch.cat((feat_rgbd[:, :n_patches, :], feat_rgbd[:, n_patches:2*n_patches, :]), dim=-1) # cat(f_rgb, f_d),  B x H x W x 2C
-        feat_rgbd = feat_rgbd.view(feat_rgbd.shape[0], featmap_sz, feat_map_sz, -1)
+        feat_rgbd = feat_rgbd.view(feat_rgbd.shape[0], featmap_sz, featmap_sz, -1)
         feat_rgbd = feat_rgbd.permute(0, 3, 1, 2).contiguous() # [B, 2C, H, W]
         feat_rgbd = F.interpolate(feat_rgbd, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))              # B x 2C x 4 x 4 ->  B x 2C x 48 x 48
         out = self.post_layers[layer](F.upsample(self.a_layers[layer](feat_rgbd) + self.s_layers[layer](pre_out), scale_factor=2))
