@@ -335,7 +335,7 @@ class DepthSegmNetAttention01(nn.Module):
         # feat_test/train, layer3, Bx24x24x1024 => B, 6x6 patches, C=hidden_size
         patch_sz = 4
         init_config = get_b16_config(size=(patch_sz, patch_sz))
-        self.cross_attn = CrossAttentionModule(init_config, (feat_sz[3]*2, feat_sz[0]), segm_dim[3], vis=True)
+        self.cross_attn = CrossAttentionModule(init_config, (feat_sz[3]*2, feat_sz[3]), segm_dim[1], vis=True)
         self.mask_embedding = nn.AvgPool2d(patch_sz, stride=patch_sz) # ignore bg patches in key， test
 
 
