@@ -220,7 +220,7 @@ class CrossAttentionModule(nn.Module):
         self.ffn_norm = LayerNorm(config.hidden_size, eps=1e-6)
         self.ffn = Mlp(config)
 
-        self.vis
+        self.vis = vis
 
     def forward(self, template, search_region, key_padding_mask=None):
         ''' one multi-head attention moudle
