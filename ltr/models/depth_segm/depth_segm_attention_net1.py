@@ -214,7 +214,7 @@ class CrossAttentionModule(nn.Module):
         self.key = Linear(config.hidden_size, config.hidden_size)
         self.value = Linear(config.hidden_size, config.hidden_size)
 
-        self.attn = nn.MultiheadAttention(config.hidden_size, 3, batch_first=True)
+        self.attn = nn.MultiheadAttention(config.hidden_size, 3) # batch_first=True) # pytorch 1.7.0 does not have batch_first anymore
 
         self.attention_norm = LayerNorm(config.hidden_size, eps=1e-6)
         self.ffn_norm = LayerNorm(config.hidden_size, eps=1e-6)
