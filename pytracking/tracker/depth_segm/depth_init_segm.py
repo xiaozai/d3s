@@ -371,6 +371,17 @@ class DepthInitSegm(BaseTracker):
 
         # Return new state
         new_state = torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]]))
+        # [x, y, w, h]
+        # just a sanity check so that it does not get out of image
+        if new_state[0] < 0:
+            new_state[0] = 0
+        if new_state[1] < 0:
+            new_state[1] = 0
+        if new_state[0] + new_state[2] >= color.shape[1]:
+            new_state[2] = color.shape[1] - new_state[0]
+        if new_state[1] + new_state[3] >= color.shape[0]:
+            new_state[3] = color.shape[0] - new_state[1]
+
         return new_state.tolist(), self.score_map.max()
 
     def apply_filter(self, sample_x: TensorList):
