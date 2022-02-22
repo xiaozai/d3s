@@ -421,11 +421,12 @@ class DepthSegmNetAttention01(nn.Module):
         template = torch.cat((f_train_rgb, f_train_d), dim=2)                   # Bx64x24x24 + Bx64x24x24 -> Bx64x(24+24)x24
         search_region = torch.cat((f_test_rgb, f_test_d), dim=2)
 
-        # in mask, 1 denotes bg pixels, 0 denotes fg pixels
+        # in mask, 1 denotes bg pixels, 0 denotes fg pixels # used to ignore bg patches in key
         mask = 1 - F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1])) # [B,1,384, 384] -> [B,1,24,24]
         mask = torch.cat((mask, mask), dim=2)                                                        # Bx1x24x24  + Bx1x24x24  -> Bx1x(24+24)x24
-        mask = self.mask_embedding(mask).view(mask.shape[0], -1)                                  # Bx1x6x6 -> Bx1xPatches
-        mask = mask>0.5                                                                    # used to ignore bg patches in key
+        mask = self.mask_embedding(mask).view(mask.shape[0], -1)                                     # Bx1x(6+6)x6 -> Bx1xPatches
+        mask = torch.where(mask>0.5, mask, 0)
+        mask = torch.where(mask>0, 1, mask)
 
         out, attn_weights3 = self.cross_attn(template, search_region, key_padding_mask=mask) # B x Patches x C [rgb + d ]
         n_patches = out.shape[1] // 2                                                            # RGB + D patches
@@ -436,7 +437,9 @@ class DepthSegmNetAttention01(nn.Module):
         out = F.interpolate(out, size=(f_train_rgb.shape[-2]*2, f_train_rgb.shape[-1]*2)) # Bx192x48x48
         out = self.s_layers[layer](out)                                                   # Bx192x6x6 -> Bx64x48x48
 
+
         dist = F.interpolate(test_dist[0], size=(f_train_rgb.shape[-2]*2, f_train_rgb.shape[-1]*2))  # [B, 1, 48, 48]
+        dist = 1 - F.normalize(dist) # use normalize dist , same as response map
         out = self.post_layers[layer](torch.cat((out, dist), dim=1))                      # [B, 64+1, 48, 48]
 
         return out, attn_weights3
