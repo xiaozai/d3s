@@ -20,7 +20,7 @@ def process_attn_maps(att_mat):
     att_mat = att_mat[:, 0, ...].squeeze(1) # [layers=3, B, heads=3, 144, 144]
     att_mat = att_mat.cpu().detach()
     # Average the attention weights across all heads.
-    att_mat = torch.mean(att_mat, dim=1) # [layers, B, 144, 144]
+    att_mat = torch.mean(att_mat, dim=1) # [layers, 144, 144]
     # To account for residual connections, we add an identity matrix to the
     # attention matrix and re-normalize the weights.
     residual_att = torch.eye(att_mat.size(1))
@@ -35,7 +35,7 @@ def process_attn_maps(att_mat):
         joint_attentions[n] = torch.matmul(aug_att_mat[n], joint_attentions[n-1])
 
     # Attention from the output token to the input space.
-    v = joint_attentions[-1]
+    v = joint_attentions[-1] # last layer of multihead attention
     # print(v.shape) # 144x144, tokensxtokens in original papers, token0 is the class
     # select few tokens as output
 

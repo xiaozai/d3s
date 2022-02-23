@@ -69,9 +69,8 @@ class Attention(nn.Module):
 
         attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2)) # Bx12x64x64 * Bx12x64x64 = Bx12x64x64
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
-
         # Song add mask here for background pixels, force background probs is 0
-        attention_scores[:, :, self.patches//2:, :] = 0
+        attention_scores[:, :, :, self.patches//2:] = 0 # Song : KV has haft is bg pixel, Q*BG = 0
 
         attention_probs = self.softmax(attention_scores) # dim=-1 Bx12xpatchesx64
 
