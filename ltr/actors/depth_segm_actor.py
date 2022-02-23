@@ -49,7 +49,7 @@ def process_attn_maps(att_mat):
         mask = v[token, :].reshape(grid_size*4, grid_size).detach().numpy() # 24*6
         out_img[:, idx*grid_size:(idx+1)*grid_size]
 
-    return out_img
+    return (out_img*255).asdtype(np.uint8)
 
 def save_debug(data, pred_mask, vis_data):
 
