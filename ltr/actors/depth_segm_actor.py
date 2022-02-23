@@ -41,7 +41,7 @@ def process_attn_maps(att_mat):
 
     grid_size = int(np.sqrt(aug_att_mat.size(-1)//4)) # for each img,
     out_img = np.zeros((grid_size*4, grid_size*4))
-    for idx in [0, 1, 2, 3]:
+    for idx in [0, v.shape[1]//4, v.shape[1]//2, v.shape[1]//3]:
         token = idx * grid_size
         mask = v[token, :].reshape(grid_size*4, grid_size).detach().numpy() # 24*6
         out_img[:, idx*grid_size:(idx+1)*grid_size]
