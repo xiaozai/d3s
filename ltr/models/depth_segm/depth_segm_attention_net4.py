@@ -64,13 +64,13 @@ class Attention(nn.Module):
         mixed_value_layer = self.value(hidden_states_v)  # [B, Patches, C]
 
         query_layer = self.transpose_for_scores(mixed_query_layer) # [B, patches, C] -> [B, num_attention_heads, patches, attention_head_size]
-        key_layer = self.transpose_for_scores(mixed_key_layer)     # [B, 12, 64, 64], 12 heads, 64 head size, 768 = 12 * 64
+        key_layer = self.transpose_for_scores(mixed_key_layer)     # [B, head=12, patches=64, attention_head_size=64], 12 heads, 64 head size, 768 = 12 * 64
         value_layer = self.transpose_for_scores(mixed_value_layer)
 
-        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2)) # Bx12x64x64 * Bx12x64x64 = Bx12x64x64
+        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2)) # [B, head, patches_q, patches_k]
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
         # Song add mask here for background pixels, force background probs is 0
-        attention_scores[:, :, :, self.patches//2:] = 0 # Song : KV has haft is bg pixel, Q*BG = 0
+        attention_scores[:, :, :, attention_scores.size[-1]//2:] = 0 # Song : KV has haft is bg pixel, Q*K_BG = 0
 
         attention_probs = self.softmax(attention_scores) # dim=-1 Bx12xpatchesx64
 
