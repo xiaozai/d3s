@@ -286,7 +286,7 @@ class Encoder(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(self, config, vis, patches=64):
-        super(Encoder, self).__init__()
+        super(Decoder, self).__init__()
         self.vis = vis
         self.layer = nn.ModuleList()
         self.decoder_norm = LayerNorm(config.hidden_size, eps=1e-6)
@@ -317,7 +317,7 @@ class Transformer(nn.Module):
 
 class CrossAttentionTransformer(nn.Module):
     def __init__(self, config, img_size, in_channels, vis):
-        super(Transformer, self).__init__()
+        super(CrossAttentionTransformer, self).__init__()
         self.embeddings = Embeddings(config, img_size=img_size, in_channels=in_channels)
         self.n_patches = self.embeddings.n_patches
         self.encoder = Encoder(config, vis, patches=self.n_patches)
@@ -329,7 +329,7 @@ class CrossAttentionTransformer(nn.Module):
         kv_encoded, kv_attn_weights = self.encoder(kv_embeddings)   # encoded [B, patches, C=768]
         kv_encoded = kv_encoded[:, :self.n_patches//2, :] # only fg patches
         q_encoded, q_attn_weights = self.decoder(q_embeddings, kv_embeddings, kv_embeddings)
-        return q_encoded, attn_weights
+        return q_encoded, q_attn_weights
 
 
 def get_b16_config(size=(16,16)):
