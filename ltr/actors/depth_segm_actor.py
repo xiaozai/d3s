@@ -24,15 +24,17 @@ def save_debug(data, pred_mask, vis_data):
         p_rgb, p_d = vis_data
     elif len(vis_data) == 4:
         attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data
-        print(attn_weights3.shape)
+        # print(len(attn_weights3), attn_weights3[0].shape) # [B, 3, 144, 144]
 
-        p_rgb, p_d = attn_weights3, attn_weights2
-        n_patches = p_rgbd.shape[1]
-        new_feat_sz = math.sqrt(n_patches)
-        p_rgb = p_rgb.view(p_rgb.shape[0], new_feat_sz, new_feat_sz, -1)
-        p_d = p_d.view(p_d.shape[0], new_feat_sz, new_feat_sz, -1)
+        p_rgb, p_d = attn_weights3[0], attn_weights2[0]
+        p_rgb = p_rgb.permute(0, 2, 3, 1)
+        p_d = p_d.permute(0, 2, 3, 1)
+        # n_patches = p_rgb.shape[1]
+        # new_feat_sz = math.sqrt(n_patches)
+        # p_rgb = p_rgb.view(p_rgb.shape[0], new_feat_sz, new_feat_sz, -1)
+        # p_d = p_d.view(p_d.shape[0], new_feat_sz, new_feat_sz, -1)
         # vis_cosine_similarity = False
-        print(p_rgb.shape)
+        # print(p_rgb.shape)
     elif len(vis_data) == 5:
         p_rgb, p_d, attn_weights2, attn_weights1, attn_weights0 = vis_data
 
@@ -80,13 +82,13 @@ def save_debug(data, pred_mask, vis_data):
         p_rgb = (p_rgb.detach().cpu().numpy().squeeze()).astype(np.float32) # [H, W, 2]
         p_d = (p_d.detach().cpu().numpy().squeeze()).astype(np.float32)
 
-        empty_channel = np.zeros((p_rgb.shape[0], p_rgb.shape[1], 1), dtype=np.uint8)
+        # empty_channel = np.zeros((p_rgb.shape[0], p_rgb.shape[1], 1), dtype=np.uint8)
 
-        p_rgb = (p_rgb * 255).astype(np.uint8)
-        p_rgb = np.concatenate((p_rgb, empty_channel), axis=-1) # [H, W, 3]
+        # p_rgb = (p_rgb * 255).astype(np.uint8)
+        # p_rgb = np.concatenate((p_rgb, empty_channel), axis=-1) # [H, W, 3]
 
-        p_d = (p_d * 255).astype(np.uint8)
-        p_d = np.concatenate((p_d, empty_channel), axis=-1) # [H, W, 3]
+        # p_d = (p_d * 255).astype(np.uint8)
+        # p_d = np.concatenate((p_d, empty_channel), axis=-1) # [H, W, 3]
 
         draw_axis(ax7, p_rgb, 'similarity rgb')
         draw_axis(ax8, p_d, 'similarity d')
