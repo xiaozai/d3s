@@ -16,12 +16,14 @@ def draw_axis(ax, img, title, show_minmax=False):
 
 def process_attn_maps(att_mat):
     att_mat = torch.stack(att_mat).squeeze(1)
+    print(att_mat.shape)
     # Average the attention weights across all heads.
     att_mat = torch.mean(att_mat, dim=1)
-
+    print(att_mat.shape)
     # To account for residual connections, we add an identity matrix to the
     # attention matrix and re-normalize the weights.
     residual_att = torch.eye(att_mat.size(1))
+    print(residual_att.shape)
     aug_att_mat = att_mat + residual_att
     aug_att_mat = aug_att_mat / aug_att_mat.sum(dim=-1).unsqueeze(-1)
 
