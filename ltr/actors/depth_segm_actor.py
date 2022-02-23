@@ -15,6 +15,7 @@ def draw_axis(ax, img, title, show_minmax=False):
     ax.set_title(title, fontsize=9)
 
 def process_attn_maps(att_mat):
+    att_mat = torch.stack(att_mat).squeeze(1)
     # Average the attention weights across all heads.
     att_mat = torch.mean(att_mat, dim=1)
 
