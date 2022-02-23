@@ -40,9 +40,9 @@ def process_attn_maps(att_mat):
     # select few tokens as output
 
     grid_size = int(np.sqrt(aug_att_mat.size(-1)//4)) # for each img,
-    out_img = np.zeros((aug_att_mat.size[0],))
+    out_img = np.zeros((v.shape[0],))
     for idx in range(v.shape[0]):
-        out_img[idx] = np.max(v[idx, :].detach().numpy()) # 24*6
+        out_img[idx] = v[idx, :].detach().numpy().max() # 24*6
     out_img = (out_img*255).astype(np.uint8)
     return out_img.reshape((grid_size*4, grid_size))
 
