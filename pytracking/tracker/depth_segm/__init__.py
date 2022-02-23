@@ -1,4 +1,4 @@
-from .depth_segm import DepthSegmLT
+from .depth_segm_lt import DepthSegmLT
 from .depth_segm_st import DepthSegmST
 # from .depth_init_segm import DepthInitSegm
 # from .depth_only_segm import DepthOnlySegm
