@@ -39,7 +39,7 @@ def run(settings):
     if not os.path.isdir(settings.env.workspace_dir):
         os.mkdir(settings.env.workspace_dir)
 
-    settings.env.images_dir = os.path.join(settings.env.workspace_dir, 'images_rgbd_attn03')
+    settings.env.images_dir = os.path.join(settings.env.workspace_dir, 'images_rgbd_attn04')
     if not os.path.isdir(settings.env.images_dir):
         os.mkdir(settings.env.images_dir)
 
