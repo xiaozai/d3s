@@ -40,16 +40,11 @@ def process_attn_maps(att_mat):
     # select few tokens as output
 
     grid_size = int(np.sqrt(aug_att_mat.size(-1)//4)) # for each img,
-    # 6*6, RGB 0-36, D 36-72, BG 72 - 144
-    num_grid = v.shape[1] // grid_size
-    # RGB : 0 - num_grid // 4, D : num_grid // 4 : num_grid // 2
-    out_img = np.zeros((grid_size*4, grid_size*4))
-    for idx in [0, num_grid//8, num_grid//3, num_grid//6]:
-        token = idx * grid_size
-        mask = v[token, :].reshape(grid_size*4, grid_size).detach().numpy() # 24*6
-        out_img[:, idx*grid_size:(idx+1)*grid_size]
-
-    return out_img
+    out_img = np.zeros((aug_att_mat.size[0],))
+    for idx in range(v.shape[0]):
+        out_img[idx] = np.max(v[idx, :].detach().numpy()) # 24*6
+    out_img = (out_img*255).astype(np.uint8)
+    return out_img.reshape((grid_size*4, grid_size))
 
 def save_debug(data, pred_mask, vis_data):
 
