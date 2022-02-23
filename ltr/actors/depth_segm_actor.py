@@ -36,10 +36,17 @@ def process_attn_maps(att_mat):
 
     # Attention from the output token to the input space.
     v = joint_attentions[-1]
-    grid_size = int(np.sqrt(aug_att_mat.size(-1)))
-    mask = v[0, 1:].reshape(grid_size*2, grid_size//2).detach().numpy()
+    print(v.shape) # 144x144, tokensxtokens in original papers, token0 is the class
+    # select few tokens as output
 
-    return mask
+    grid_size = int(np.sqrt(aug_att_mat.size(-1)//4)) # for each img,
+    out_img = np.zeros((grid_size*4, grid_size*4))
+    for idx in [0, 1, 2, 3]:
+        token = idx * grid_size
+        mask = v[token, :].reshape(grid_size*4, grid_size).detach().numpy() # 24*6
+        out_img[:, idx*grid_size:(idx+1)*grid_size]
+
+    return out_img
 
 def save_debug(data, pred_mask, vis_data):
 
