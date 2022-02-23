@@ -20,7 +20,7 @@ from pytracking.bbox_fit import fit_bbox_to_mask
 from pytracking.mask_to_disk import save_mask
 
 
-class DepthSegmST(BaseTracker):
+class DepthSegm_ST(BaseTracker):
     def initialize_features(self):
         if not getattr(self, 'features_initialized', False):
             self.params.features_filter.initialize()
@@ -367,32 +367,10 @@ class DepthSegmST(BaseTracker):
 
         if self.params.use_segmentation:
             if pred_segm_region is not None:
-                # [x, y, w, h]
-                # just a sanity check so that it does not get out of image
-                if pred_segm_region[0] < 0:
-                    pred_segm_region[0] = 0
-                if pred_segm_region[1] < 0:
-                    pred_segm_region[1] = 0
-                if pred_segm_region[0] + pred_segm_region[2] >= color.shape[1]:
-                    pred_segm_region[2] = color.shape[1] - pred_segm_region[0]
-                if pred_segm_region[1] + pred_segm_region[3] >= color.shape[0]:
-                    pred_segm_region[3] = color.shape[0] - pred_segm_region[1]
-
                 return pred_segm_region, self.score_map.max()
 
         # Return new state
         new_state = torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]]))
-        # [x, y, w, h]
-        # just a sanity check so that it does not get out of image
-        if new_state[0] < 0:
-            new_state[0] = 0
-        if new_state[1] < 0:
-            new_state[1] = 0
-        if new_state[0] + new_state[2] >= color.shape[1]:
-            new_state[2] = color.shape[1] - new_state[0]
-        if new_state[1] + new_state[3] >= color.shape[0]:
-            new_state[3] = color.shape[0] - new_state[1]
-
         return new_state.tolist(), self.score_map.max()
 
     def apply_filter(self, sample_x: TensorList):
@@ -837,10 +815,8 @@ class DepthSegmST(BaseTracker):
 
         # network was renamed therefore we need to specify constructor_module and constructor_fun_name
         segm_net, _ = load_network(self.params.segm_net_path, backbone_pretrained=False,
-                                   constructor_module=self.params.constructor_module,
-                                   constructor_fun_name=self.params.constructor_fun_name) #
-                                   # constructor_module='ltr.models.depth_segm.depth_segm',
-                                   # constructor_fun_name='depth_segm_attention1_resnet50') #
+                                   constructor_module='ltr.models.depth_segm.depth_segm',
+                                   constructor_fun_name='depth_segm_resnet50') # 
 
         if self.params.use_gpu:
             segm_net.cuda()
