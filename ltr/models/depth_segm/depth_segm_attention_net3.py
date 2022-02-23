@@ -488,10 +488,10 @@ class DepthSegmNetAttention03(nn.Module):
         search_region = torch.cat((f_test_rgb, f_test_d, f_train_rgb*bg_mask, f_train_d*bg_mask), dim=2)
 
         out, attn_weights3 = self.cross_attn(template, search_region) # B x Patches x C [rgb + d ]
-
-        n_patches = out.shape[1] // 2                                                        # RGB + D patches
+        print(out.shape)
+        n_patches = out.shape[1] // 4                                                        # RGB + D patches
         new_feat_sz = int(math.sqrt(n_patches))
-        out = torch.cat((out[:, :n_patches, :], out[:, n_patches:, :]), dim=-1)           # BxPatchesx2C
+        out = torch.cat((out[:, :n_patches, :], out[:, n_patches:n_patches*2, :]), dim=-1)           # BxPatchesx2C
         out = out.view(out.shape[0], new_feat_sz, new_feat_sz, -1)                        # BxHxWx2C, hidden_size * 2,  Bx6x6x192
         out = out.permute(0, 3, 1, 2)                                                     # Bx192x6x6
         out = F.interpolate(out, size=(f_train_rgb.shape[-2]*2, f_train_rgb.shape[-1]*2)) # Bx192x48x48
