@@ -24,7 +24,7 @@ def save_debug(data, pred_mask, vis_data):
         p_rgb, p_d = vis_data
     elif len(vis_data) == 4:
         attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data
-        print(atten_weights3.shape)
+        print(attn_weights3.shape)
 
         p_rgb, p_d = attn_weights3, attn_weights2
         n_patches = p_rgbd.shape[1]
