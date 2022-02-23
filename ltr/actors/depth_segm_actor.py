@@ -24,8 +24,15 @@ def save_debug(data, pred_mask, vis_data):
         p_rgb, p_d = vis_data
     elif len(vis_data) == 4:
         attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data
-        p_rgb, p_d = None, None
-        vis_cosine_similarity = False
+        print(atten_weights3.shape)
+
+        p_rgb, p_d = attn_weights3, attn_weights2
+        n_patches = p_rgbd.shape[1]
+        new_feat_sz = math.sqrt(n_patches)
+        p_rgb = p_rgb.view(:, new_feat_sz, new_feat_sz, :)
+        p_d = p_d.view(:, new_feat_sz, new_feat_sz, :)
+        # vis_cosine_similarity = False
+        print(p_rgb.shape)
     elif len(vis_data) == 5:
         p_rgb, p_d, attn_weights2, attn_weights1, attn_weights0 = vis_data
 
