@@ -53,10 +53,15 @@ class Attention(nn.Module):
         x = x.view(*new_x_shape)
         return x.permute(0, 2, 1, 3)
 
-    def forward(self, hidden_states):
-        mixed_query_layer = self.query(hidden_states)  # [B, Patches, C]
-        mixed_key_layer = self.key(hidden_states)      # [B, Patches, C]
-        mixed_value_layer = self.value(hidden_states)  # [B, Patches, C]
+    def forward(self, hidden_states_q, hidden_states_k=None, hidden_states_v=None):
+
+        if hidden_states_k is None and hidden_states_v is None:
+            hidden_states_k = hidden_states_q
+            hidden_states_v = hidden_states_q
+
+        mixed_query_layer = self.query(hidden_states_q)  # [B, Patches, C]
+        mixed_key_layer = self.key(hidden_states_k)      # [B, Patches, C]
+        mixed_value_layer = self.value(hidden_states_v)  # [B, Patches, C]
 
         query_layer = self.transpose_for_scores(mixed_query_layer) # [B, patches, C] -> [B, num_attention_heads, patches, attention_head_size]
         key_layer = self.transpose_for_scores(mixed_key_layer)     # [B, 12, 64, 64], 12 heads, 64 head size, 768 = 12 * 64
@@ -73,66 +78,14 @@ class Attention(nn.Module):
         weights = attention_probs if self.vis else None
         attention_probs = self.attn_dropout(attention_probs)
 
-        context_layer = torch.matmul(attention_probs, value_layer)              # Bx12xPatchesx64 * Bx12x64x64
-        context_layer = context_layer.permute(0, 2, 1, 3).contiguous()          # [B, Patches, heads, head_size]
+        context_layer = torch.matmul(attention_probs, value_layer)                  # Bx12xPatchesx64 * Bx12x64x64
+        context_layer = context_layer.permute(0, 2, 1, 3).contiguous()              # [B, Patches, heads, head_size]
         new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,) # [B, Patches, C=768]
         context_layer = context_layer.view(*new_context_layer_shape)
         attention_output = self.out(context_layer)
         attention_output = self.proj_dropout(attention_output)
         return attention_output, weights
 
-class CrossAttention(nn.Module):
-    def __init__(self, config, vis, patches=64):
-        super(CrossAttention, self).__init__()
-        self.vis = vis
-        self.patches = patches
-        self.num_attention_heads = config.transformer["num_heads"]
-        self.attention_head_size = int(config.hidden_size / self.num_attention_heads)
-        self.all_head_size = self.num_attention_heads * self.attention_head_size # 12 heads * 64
-
-        self.query = Linear(config.hidden_size, self.all_head_size) # 768 -> 768
-        self.key = Linear(config.hidden_size, self.all_head_size)
-        self.value = Linear(config.hidden_size, self.all_head_size)
-
-        self.out = Linear(config.hidden_size, config.hidden_size)
-        self.attn_dropout = Dropout(config.transformer["attention_dropout_rate"])
-        self.proj_dropout = Dropout(config.transformer["attention_dropout_rate"])
-
-        self.softmax = Softmax(dim=-1)
-
-    def transpose_for_scores(self, x):
-        new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
-        x = x.view(*new_x_shape)
-        return x.permute(0, 2, 1, 3)
-
-    def forward(self, hidden_states_q, hidden_states_k, hidden_states_v):
-        mixed_query_layer = self.query(hidden_states_q)  # [B, Patches, C]
-        mixed_key_layer = self.key(hidden_states_k)      # [B, Patches, C]
-        mixed_value_layer = self.value(hidden_states_v)  # [B, Patches, C]
-
-        query_layer = self.transpose_for_scores(mixed_query_layer) # [B, patches, C] -> [B, num_attention_heads, patches, attention_head_size]
-        key_layer = self.transpose_for_scores(mixed_key_layer)     # [B, 12, 64, 64], 12 heads, 64 head size, 768 = 12 * 64
-        value_layer = self.transpose_for_scores(mixed_value_layer)
-
-        ''' what happen if q and kv not same dimension'''
-        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
-        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
-
-        # Song add mask here for background pixels, force background probs is 0
-        attention_scores[:, :, self.patches//2:, :] = 0
-
-        attention_probs = self.softmax(attention_scores) # dim=-1 Bx12xpatchesx64
-
-        weights = attention_probs if self.vis else None
-        attention_probs = self.attn_dropout(attention_probs)
-
-        context_layer = torch.matmul(attention_probs, value_layer)              # Bx12xPatchesx64 * Bx12x64x64
-        context_layer = context_layer.permute(0, 2, 1, 3).contiguous()          # [B, Patches, heads, head_size]
-        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,) # [B, Patches, C=768]
-        context_layer = context_layer.view(*new_context_layer_shape)
-        attention_output = self.out(context_layer)
-        attention_output = self.proj_dropout(attention_output)
-        return attention_output, weights
 
 class Mlp(nn.Module):
     def __init__(self, config):
@@ -231,7 +184,7 @@ class CrossBlock(nn.Module):
         self.attention_norm = LayerNorm(config.hidden_size, eps=1e-6)
         self.ffn_norm = LayerNorm(config.hidden_size, eps=1e-6)
         self.ffn = Mlp(config)
-        self.attn_cross = CrossAttention(config, vis, patches=patches) # cross-attention for key value
+        self.attn_cross = Attention(config, vis, patches=patches) # cross-attention for key value
         self.attn = Attention(config, vis, patches=patches)      # self-attention for query
 
     def forward(self, q, k, v):
@@ -254,7 +207,7 @@ class CrossBlock(nn.Module):
         q = self.attention_norm(q)
         k = self.attention_norm(k)
         v = self.attention_norm(v)
-        x, weights = self.attn_cross(q, k, v)
+        x, weights = self.attn_cross(q, hidden_states_k=k, hidden_states_v=v)
         x = x + h                    # Bx16xC
 
         # x -> Feed Forward -> add & norm
@@ -326,13 +279,13 @@ class CrossAttentionTransformer(nn.Module):
     def forward(self, q_input, kv_input):
         q_embeddings = self.embeddings(q_input)   # [B, N_Patches, C=768], class embeddings + patches
         kv_embeddings = self.embeddings(kv_input)
-        kv_encoded, kv_attn_weights = self.encoder(kv_embeddings)   # encoded [B, patches, C=768]
-        kv_encoded = kv_encoded[:, :self.n_patches//2, :] # only fg patches
+        kv_encoded, kv_attn_weights = self.encoder(kv_embeddings)   # encoded [B, patches, C]
+        kv_encoded = kv_encoded[:, :self.n_patches//2, :]           # only fg patches
         q_encoded, q_attn_weights = self.decoder(q_embeddings, kv_embeddings, kv_embeddings)
         return q_encoded, q_attn_weights
 
 
-def get_b16_config(size=(16,16)):
+def get_config(size=(16,16)):
     """Returns the ViT-B/16 configuration."""
     config = ml_collections.ConfigDict()
     config.patches = ml_collections.ConfigDict({'size': size})
@@ -394,7 +347,7 @@ class DepthNet(nn.Module):
         return [feat0, feat1, feat2, feat3] # [4, 16, 32, 64]
 
 
-class DepthSegmNetAttention03(nn.Module):
+class DepthSegmNetAttention04(nn.Module):
     def __init__(self):
         super().__init__()
 
@@ -408,11 +361,11 @@ class DepthSegmNetAttention03(nn.Module):
 
         # feat_test/train, layer3, Bx24x24x1024 => B, 6x6 patches, C=hidden_size
         patch_sz = 4
-        init_config = get_b16_config(size=(patch_sz, patch_sz))
+        init_config = get_config(size=(patch_sz, patch_sz))
         self.cross_attn = CrossAttentionTransformer(init_config, (feat_sz[3]*4, feat_sz[3]), segm_dim[1], vis=True)
 
 
-        config = get_b16_config(size=(12, 12))
+        config = get_config(size=(12, 12))
         self.rgbd_transformers = nn.ModuleList([Transformer(config, (feat_sz[0]*4, feat_sz[0]), segm_inter_dim[0], True),  # 192x192x4 -> 16x16x4 patches
                                                 Transformer(config, (feat_sz[1]*4, feat_sz[1]), segm_inter_dim[1], True),  # 96x94x16  -> 8x8x4 patches
                                                 Transformer(config, (feat_sz[2]*4, feat_sz[2]), segm_inter_dim[2], True)]) # 48x48x32  -> 4x4x4 patches
@@ -426,28 +379,32 @@ class DepthSegmNetAttention03(nn.Module):
         self.segment1_d = conv_no_relu(64, 64)
 
 
+        # project pre-out feat
         self.s_layers = nn.ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]),
                                        conv(segm_inter_dim[1], segm_inter_dim[1]),
-                                       conv(segm_inter_dim[2], segm_inter_dim[2]),
-                                       conv(config.hidden_size*2, segm_inter_dim[3])]) # 192 -> 64 !!!!!
+                                       conv(segm_inter_dim[2], segm_inter_dim[2])])
 
+        # project attention RGBD feat
         self.a_layers = nn.ModuleList([conv(config.hidden_size*2, segm_inter_dim[0]),
                                        conv(config.hidden_size*2, segm_inter_dim[1]),
-                                       conv(config.hidden_size*2, segm_inter_dim[2])])
+                                       conv(config.hidden_size*2, segm_inter_dim[2]),
+                                       conv(config.hidden_size*2, segm_inter_dim[3])])
 
-        self.f_layers = nn.ModuleList([conv(segm_input_dim[0], segm_inter_dim[0]), # self.f0
-                                       conv(segm_input_dim[1], segm_inter_dim[1]), # self.f1
-                                       conv(segm_input_dim[2], segm_inter_dim[2])])# self.f2
+        # project RGB feat
+        self.f_layers = nn.ModuleList([conv(segm_input_dim[0], segm_inter_dim[0]),
+                                       conv(segm_input_dim[1], segm_inter_dim[1]),
+                                       conv(segm_input_dim[2], segm_inter_dim[2])])
 
+        # project D feat
+        self.d_layers = nn.ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]),
+                                       conv(segm_inter_dim[1], segm_inter_dim[1]),
+                                       conv(segm_inter_dim[2], segm_inter_dim[2])])
 
-        self.d_layers = nn.ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]), # self.d0
-                                       conv(segm_inter_dim[1], segm_inter_dim[1]), # self.d1
-                                       conv(segm_inter_dim[2], segm_inter_dim[2])])# self.d2
-
-        self.post_layers = nn.ModuleList([conv_no_relu(segm_inter_dim[0], 2),          # self.post0
-                                          conv(segm_inter_dim[1], segm_inter_dim[0]),  # self.post1
-                                          conv(segm_inter_dim[2], segm_inter_dim[1]),  # self.post2
-                                          conv(segm_inter_dim[3]+1, segm_inter_dim[2])]) # init_mask + dist -> 32
+        # project out feat
+        self.post_layers = nn.ModuleList([conv_no_relu(segm_inter_dim[0], 2),
+                                          conv(segm_inter_dim[1], segm_inter_dim[0]),
+                                          conv(segm_inter_dim[2], segm_inter_dim[1]),
+                                          conv(segm_inter_dim[3]+1, segm_inter_dim[2])])
 
         self.initialize_weights()
 
@@ -458,14 +415,18 @@ class DepthSegmNetAttention03(nn.Module):
                 nn.init.kaiming_normal_(m.weight.data, mode='fan_in')
                 if m.bias is not None:
                     m.bias.data.zero_()
+            elif isinstance(m, nn.ModuleList):
+                print('is ModuleList')
+                for n in m:
+                    if isinstance(n, nn.Conv2d) or isinstance(n, nn.ConvTranspose2d) or isinstance(n, nn.Linear):
+                        nn.init.kaiming_normal_(n.weight.data, mode='fan_in')
+                        if n.bias is not None:
+                            n.bias.data.zero_()
 
     def forward(self, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, test_dist=None, debug=False):
         ''' rgb features   : [conv1, layer1, layer2, layer3], Bx64x192x192  -> Bx256x96x96 -> Bx512x48x48 -> Bx1024x24x24
             depth features : [feat0, feat1, feat2, feat3],    Bx4x192x192 -> Bx16x96x96 -> Bx32x48x48 -> Bx64x24x24
         '''
-
-        # feat maps -> self.attention, -> B, tokens, C
-        # Merge RGB and D feature maps into one image, add some background patch
         out, attn_weights3 = self.init_mask(test_dist, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=3)
         out, attn_weights2 = self.rgbd_fusion(out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=2)
         out, attn_weights1 = self.rgbd_fusion(out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=1)
@@ -495,7 +456,7 @@ class DepthSegmNetAttention03(nn.Module):
         out = out.view(out.shape[0], new_feat_sz, new_feat_sz, -1)                        # BxHxWx2C, hidden_size * 2,  Bx6x6x192
         out = out.permute(0, 3, 1, 2)                                                     # Bx192x6x6
         out = F.interpolate(out, size=(f_train_rgb.shape[-2]*2, f_train_rgb.shape[-1]*2)) # Bx192x48x48
-        out = self.s_layers[layer](out)                                                   # Bx192x6x6 -> Bx64x48x48
+        out = self.a_layers[layer](out)                                                   # Bx192x6x6 -> Bx64x48x48
 
 
         dist = F.interpolate(test_dist[0], size=(f_train_rgb.shape[-2]*2, f_train_rgb.shape[-1]*2))  # [B, 1, 48, 48]
@@ -510,14 +471,13 @@ class DepthSegmNetAttention03(nn.Module):
 
         bg_mask = 1 - F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1])) # Bx1xHxW
 
-        # F_rgb, F_d, BG_rgb, BG_d, -> BxCx4HxW
-        feat_rgbd = torch.cat((self.f_layers[layer](f_test_rgb),
-                               self.d_layers[layer](f_test_d),
-                               self.f_layers[layer](f_train_rgb*bg_mask),
-                               self.d_layers[layer](f_train_d*bg_mask)),
-                               dim=2)
+        rgbd_inputs = torch.cat((self.f_layers[layer](f_test_rgb),
+                                 self.d_layers[layer](f_test_d),
+                                 self.f_layers[layer](f_train_rgb*bg_mask),
+                                 self.d_layers[layer](f_train_d*bg_mask)),
+                                 dim=2)
         # feat_rgbd2, featuremaps for each pacth
-        feat_rgbd, attn_weights = self.rgbd_transformers[layer](feat_rgbd)      # [B, Patches, C], attn_weights, [B, heads=12, patches, headsize=64]
+        feat_rgbd, attn_weights = self.rgbd_transformers[layer](rgbd_inputs)      # [B, Patches, C], attn_weights, [B, heads=12, patches, headsize=64]
         n_patches = feat_rgbd.shape[1] // 4                                     # for each patch, 16 patches, 64 patches, 256 patches
         featmap_sz = int(math.sqrt(n_patches))                                  # for RGB and D feat maps, 4x4, 8x8, 16x16
         # Only keep test F_rgb and F_D, [B, Patches//2=32/128x512, C=768]

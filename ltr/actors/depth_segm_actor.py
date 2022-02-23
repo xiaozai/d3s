@@ -14,31 +14,55 @@ def draw_axis(ax, img, title, show_minmax=False):
         title = '%s \n min=%.2f max=%.2f' % (title, minval_, maxval_)
     ax.set_title(title, fontsize=9)
 
+def process_attn_maps(att_mat):
+    # Average the attention weights across all heads.
+    att_mat = torch.mean(att_mat, dim=1)
 
+    # To account for residual connections, we add an identity matrix to the
+    # attention matrix and re-normalize the weights.
+    residual_att = torch.eye(att_mat.size(1))
+    aug_att_mat = att_mat + residual_att
+    aug_att_mat = aug_att_mat / aug_att_mat.sum(dim=-1).unsqueeze(-1)
+
+    # Recursively multiply the weight matrices
+    joint_attentions = torch.zeros(aug_att_mat.size())
+    joint_attentions[0] = aug_att_mat[0]
+
+    for n in range(1, aug_att_mat.size(0)):
+        joint_attentions[n] = torch.matmul(aug_att_mat[n], joint_attentions[n-1])
+
+    # Attention from the output token to the input space.
+    v = joint_attentions[-1]
+    grid_size = int(np.sqrt(aug_att_mat.size(-1)))
+    mask = v[0, 1:].reshape(grid_size*2, grid_size//2).detach().numpy()
+    # mask = cv2.resize(mask / mask.max(), im.size)[..., np.newaxis]
+    # result = (mask * im).astype("uint8")
+
+    return mask
 
 def save_debug(data, pred_mask, vis_data):
 
+    batch_element = 0
     vis_cosine_similarity = True
 
     if len(vis_data) == 2:
         p_rgb, p_d = vis_data
+
+        p_rgb = p_rgb[batch_element, ...] # [H, W, 2] F + B
+        p_d = p_d[batch_element, ...]
+        p_rgb = (p_rgb.detach().cpu().numpy().squeeze()).astype(np.float32) # [H, W, 2]
+        p_d = (p_d.detach().cpu().numpy().squeeze()).astype(np.float32)
+
     elif len(vis_data) == 4:
         attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data
         # print(len(attn_weights3), attn_weights3[0].shape) # [B, 3, 144, 144]
+        p_rgb = process_attn_maps(attn_weights3)
+        p_d = process_attn_maps(attn_weights2)
 
-        p_rgb, p_d = attn_weights3[0], attn_weights2[0]
-        p_rgb = p_rgb.permute(0, 2, 3, 1)
-        p_d = p_d.permute(0, 2, 3, 1)
-        # n_patches = p_rgb.shape[1]
-        # new_feat_sz = math.sqrt(n_patches)
-        # p_rgb = p_rgb.view(p_rgb.shape[0], new_feat_sz, new_feat_sz, -1)
-        # p_d = p_d.view(p_d.shape[0], new_feat_sz, new_feat_sz, -1)
-        # vis_cosine_similarity = False
-        # print(p_rgb.shape)
     elif len(vis_data) == 5:
         p_rgb, p_d, attn_weights2, attn_weights1, attn_weights0 = vis_data
 
-    batch_element = 0
+
     dir_path = data['settings'].env.images_dir
 
     train_img = data['train_images'][:, batch_element, :, :].permute(1, 2, 0)
@@ -77,10 +101,7 @@ def save_debug(data, pred_mask, vis_data):
     draw_axis(ax6, predicted_mask, 'Prediction', show_minmax=True)
 
     if vis_cosine_similarity:
-        p_rgb = p_rgb[batch_element, ...] # [H, W, 2] F + B
-        p_d = p_d[batch_element, ...]
-        p_rgb = (p_rgb.detach().cpu().numpy().squeeze()).astype(np.float32) # [H, W, 2]
-        p_d = (p_d.detach().cpu().numpy().squeeze()).astype(np.float32)
+
 
         # empty_channel = np.zeros((p_rgb.shape[0], p_rgb.shape[1], 1), dtype=np.uint8)
 
