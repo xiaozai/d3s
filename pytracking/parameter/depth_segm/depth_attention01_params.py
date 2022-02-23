@@ -110,7 +110,7 @@ def parameters():
 
     params.model = 'depth_segm_st'
     params.constructor_module = 'ltr.models.depth_segm.depth_segm'
-    params.constructor_fun_name = 'depth_segm_attention1_resnet50'
+    params.constructor_fun_name = 'depth_segm_attention01_resnet50'
     params.segm_net_path = '/home/yan/Data2/d3s/checkpoints/ltr/depth_segm/depth_segm_attention1/DepthSegmNet_ep0040.pth.tar'
     params.segm_use_dist = True
     params.segm_normalize_mean = [0.485, 0.456, 0.406]
