@@ -416,7 +416,6 @@ class DepthSegmNetAttention04(nn.Module):
                 if m.bias is not None:
                     m.bias.data.zero_()
             elif isinstance(m, nn.ModuleList):
-                print('is ModuleList')
                 for n in m:
                     if isinstance(n, nn.Conv2d) or isinstance(n, nn.ConvTranspose2d) or isinstance(n, nn.Linear):
                         nn.init.kaiming_normal_(n.weight.data, mode='fan_in')

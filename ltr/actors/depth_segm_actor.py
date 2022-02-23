@@ -18,6 +18,7 @@ def process_attn_maps(att_mat):
     # use batch 0
     att_mat = torch.stack(att_mat)
     att_mat = att_mat[:, 0, ...].squeeze(1) # [layers=3, B, heads=3, 144, 144]
+    att_mat = att_mat.cpu().detach()
     # Average the attention weights across all heads.
     att_mat = torch.mean(att_mat, dim=1) # [layers, B, 144, 144]
     # To account for residual connections, we add an identity matrix to the
@@ -37,7 +38,7 @@ def process_attn_maps(att_mat):
     v = joint_attentions[-1]
     grid_size = int(np.sqrt(aug_att_mat.size(-1)))
     mask = v[0, 1:].reshape(grid_size*2, grid_size//2).detach().numpy()
-    
+
     return mask
 
 def save_debug(data, pred_mask, vis_data):
