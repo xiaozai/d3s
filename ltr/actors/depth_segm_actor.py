@@ -143,41 +143,43 @@ class DepthSegmActor(BaseActor):
         if 'test_dist' in data:
             test_dist = data['test_dist'].permute(1, 0, 2, 3)
 
-        # Run network to obtain IoU prediction for each proposal in 'test_proposals'
-        masks_pred, vis_data = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
-                                        data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
-                                        data['test_images'].permute(1, 0, 2, 3),
-                                        data['test_depths'].permute(1, 0, 2, 3),
-                                        data['train_masks'].permute(1, 0, 2, 3),
-                                        test_dist=test_dist,
-                                        debug=True) # Song :  vis pos and neg maps
+        if self.target_size:
+            # Run network to obtain IoU prediction for each proposal in 'test_proposals'
+            masks_pred, size_pred, vis_data = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
+                                                       data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
+                                                       data['test_images'].permute(1, 0, 2, 3),
+                                                       data['test_depths'].permute(1, 0, 2, 3),
+                                                       data['train_masks'].permute(1, 0, 2, 3),
+                                                       test_dist=test_dist,
+                                                       debug=True) # Song :  vis pos and neg
+        else:
+            masks_pred, vis_data = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
+                                            data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
+                                            data['test_images'].permute(1, 0, 2, 3),
+                                            data['test_depths'].permute(1, 0, 2, 3),
+                                            data['train_masks'].permute(1, 0, 2, 3),
+                                            test_dist=test_dist,
+                                            debug=True) # Song :  vis pos and neg maps
 
-        if self.target_size :
-            masks_pred, size_pred = masks_pred
 
         masks_gt = data['test_masks'].permute(1, 0, 2, 3) # C, B, H, W -> # B * 1 * H * W
         masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)   # B * 2 * H * W
 
+        loss = self.objective(masks_pred, masks_gt_pair)
 
-        # target size loss, mse loss
+        stats = {'Loss/total': loss.item(),
+                 'Loss/segm': loss.item(),
+                 'Loss/size': 0}
+
         if self.target_size:
-            # Compute loss
-            loss_segm = self.objective(masks_pred, masks_gt_pair)
+            sz_gt = torch.sum(masks_gt.view(masks_gt.shape[0], -1), 1).unsqueeze(-1) # [B, 1]
+            # loss_sz = torch.mean(torch.div(torch.abs(sz_gt - size_pred), sz_gt)) # B, 1
+            loss_sz = self.target_sz_objective(sz_gt, size_pred)
 
-            sz_gt = torch.sum(masks_gt.view(masks_gt.shape[0], -1), 1)
-            loss_sz = torch.divide(self.target_sz_objective(size_pred, sz_gt), (sz_gt + 1e-10))
+            loss = loss + 0.001*loss_sz
+            stats['Loss/total'] = loss.item()
+            stats['Loss/size'] = 0.001*loss_sz.item()
 
-            loss = loss_segm + loss_sz
-
-            stats = {'Loss/total': loss.item(),
-                     'Loss/segm': loss_segm.item(),
-                     'Loss/size': loss_sz.item()}
-        else:
-            # Compute loss
-            loss = self.objective(masks_pred, masks_gt_pair)
-            # Return training stats
-            stats = {'Loss/total': loss.item(),
-                 'Loss/segm': loss.item()}
 
         if 'iter' in data and (data['iter'] - 1) % 50 == 0:
             save_debug(data,masks_pred, vis_data) # vis_data = (p_rgb, p_d) or  (pred_sm_d, attn_weights2, attn_weights1, attn_weights0)

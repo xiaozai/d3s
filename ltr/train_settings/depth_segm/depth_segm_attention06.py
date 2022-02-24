@@ -39,7 +39,7 @@ def run(settings):
     if not os.path.isdir(settings.env.workspace_dir):
         os.mkdir(settings.env.workspace_dir)
 
-    settings.env.images_dir = os.path.join(settings.env.workspace_dir, 'images_rgbd_attn05')
+    settings.env.images_dir = os.path.join(settings.env.workspace_dir, 'images_rgbd_attn06')
     if not os.path.isdir(settings.env.images_dir):
         os.mkdir(settings.env.images_dir)
 
@@ -107,11 +107,12 @@ def run(settings):
 
     # Set objective
     objective = nn.BCEWithLogitsLoss()
-    target_sz_objective = nn.MSELoss()
+    target_sz_objective = nn.SmoothL1Loss() # nn.MSELoss()
 
     # Create actor, which wraps network and objective
     actor = actors.DepthSegmActor(net=net, objective=objective,
-                                  target_sz_objective=target_sz_objective, target_size=True)
+                                  target_sz_objective=target_sz_objective,
+                                  target_size=True)
 
     # Optimizer
     optimizer = optim.Adam(actor.net.segm_predictor.parameters(), lr=1e-3)
