@@ -283,7 +283,7 @@ class CrossAttentionTransformer(nn.Module):
         kv_embeddings = self.embeddings(kv_input)
         if mask is not None:
             mask = self.mask_embeddings(mask) # B, 1, H//patchsize, w//size
-            mask = mask.view(mask.shape[0], 1, -1) # B, 1, patches
+            mask = torch.tensor(mask.view(mask.shape[0], 1, -1), dtype=torch.uint8) # B, 1, patches
         kv_encoded, kv_attn_weights = self.encoder(kv_embeddings)   # encoded [B, patches, C]
         # kv_encoded = kv_encoded[:, :self.n_patches//2, :]           # only fg patches
         q_encoded, q_attn_weights = self.decoder(q_embeddings, kv_embeddings, kv_embeddings, mask=mask)
