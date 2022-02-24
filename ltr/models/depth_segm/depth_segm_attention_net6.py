@@ -455,17 +455,17 @@ class DepthSegmNetAttention06(nn.Module):
 
         out, attn_weights3 = self.cross_attn(template, search_region, mask=mask) # B x Patches x C [rgb + d ]
 
-        # Song: try to add target size estimation
-        target_sz = self.t_layer0(out) # Bx192x6x6 -> Bx2x6x6
-        target_sz = self.t_layer1(target_sz.view(target_sz.shape[0], -1))
-
         n_patches = out.shape[1] // 2  # RGB + D patches
         new_feat_sz = int(math.sqrt(n_patches))
         out = torch.cat((out[:, :n_patches, :], out[:, n_patches:, :]), dim=-1)                     # BxPatchesx2C
         out = out.view(out.shape[0], new_feat_sz, new_feat_sz, -1)                                  # BxHxWx2C, hidden_size * 2,  Bx6x6x192
         out = out.permute(0, 3, 1, 2)                                                               # Bx192x6x6
+
+        # Song: try to add target size estimation
+        target_sz = self.t_layer0(out) # Bx192x6x6 -> Bx2x6x6
+        target_sz = self.t_layer1(target_sz.view(target_sz.shape[0], -1))
+
         out = self.a_layers[layer](out)                                                             # Bx192x6x6
-        #
         out = F.interpolate(out, size=(f_train_rgb.shape[-2]*2, f_train_rgb.shape[-1]*2))            # Bx192x48x48
         dist = F.interpolate(test_dist[0], size=(f_train_rgb.shape[-2]*2, f_train_rgb.shape[-1]*2))  # [B, 1, 48, 48]
         out = self.post_layers[layer](torch.cat((out, dist), dim=1))                                 # [B, 32, 48, 48]
