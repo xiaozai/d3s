@@ -463,7 +463,7 @@ class DepthSegmNetAttention06(nn.Module):
 
         # Song: try to add target size estimation
         target_sz = self.t_layer0(out) # Bx192x6x6 -> Bx2x6x6
-        target_sz = self.t_layer1(target_sz.view(target_sz.shape[0], -1))
+        target_sz = self.t_layer1(torch.reshape(target_sz, (target_sz.shape[0], -1)))
 
         out = self.a_layers[layer](out)                                                             # Bx192x6x6
         out = F.interpolate(out, size=(f_train_rgb.shape[-2]*2, f_train_rgb.shape[-1]*2))            # Bx192x48x48
