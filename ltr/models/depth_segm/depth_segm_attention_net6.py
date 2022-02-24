@@ -403,7 +403,7 @@ class DepthSegmNetAttention06(nn.Module):
                                        conv(segm_inter_dim[2], segm_inter_dim[2])])
 
         # project out feat
-        self.post_layers = nn.ModuleList([conv(segm_inter_dim[0], 2), # conv_no_relu(segm_inter_dim[0], 2),
+        self.post_layers = nn.ModuleList([conv(segm_inter_dim[0], 2),           # conv_no_relu(segm_inter_dim[0], 2),
                                           conv(segm_inter_dim[1], segm_inter_dim[0]),
                                           conv(segm_inter_dim[2], segm_inter_dim[1]),
                                           conv(segm_inter_dim[3]+1, segm_inter_dim[2])])
@@ -436,6 +436,8 @@ class DepthSegmNetAttention06(nn.Module):
         out, attn_weights1 = self.rgbd_fusion(out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=1)
         out, attn_weights0 = self.rgbd_fusion(out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0)
 
+        out = F.softmax(out, dim=1)
+        
         if debug:
             return out, target_sz, (attn_weights3, attn_weights2, attn_weights1, attn_weights0)
         else:
