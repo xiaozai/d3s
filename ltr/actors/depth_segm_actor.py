@@ -165,7 +165,7 @@ class DepthSegmActor(BaseActor):
             loss_segm = self.objective(masks_pred, masks_gt_pair)
 
             sz_gt = torch.sum(masks_gt.view(masks_gt.shape[0], -1), 1)
-            loss_sz = self.target_sz_objective(size_pred, sz_gt)
+            loss_sz = self.target_sz_objective(size_pred, sz_gt) / (sz_gt + 1e-10)
 
             loss = loss_segm + loss_sz
 
