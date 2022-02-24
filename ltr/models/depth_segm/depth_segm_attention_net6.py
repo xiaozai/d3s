@@ -403,7 +403,7 @@ class DepthSegmNetAttention06(nn.Module):
                                        conv(segm_inter_dim[2], segm_inter_dim[2])])
 
         # project out feat
-        self.post_layers = nn.ModuleList([conv_no_relu(segm_inter_dim[0], 2),
+        self.post_layers = nn.ModuleList([conv(segm_inter_dim[0], 2), # conv_no_relu(segm_inter_dim[0], 2),
                                           conv(segm_inter_dim[1], segm_inter_dim[0]),
                                           conv(segm_inter_dim[2], segm_inter_dim[1]),
                                           conv(segm_inter_dim[3]+1, segm_inter_dim[2])])

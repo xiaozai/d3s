@@ -171,6 +171,9 @@ class DepthSegmActor(BaseActor):
 
         loss = self.objective(masks_pred, masks_gt_pair)
 
+        if torch.isnan(loss):
+            loss = torch.tensor(0.5)
+            
         stats = {'Loss/total': loss.item(),
                  'Loss/segm': loss.item(),
                  'Loss/size': 0}
