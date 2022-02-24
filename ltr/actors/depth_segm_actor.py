@@ -175,7 +175,7 @@ class DepthSegmActor(BaseActor):
 
             stats = {'Loss/total': loss.item(),
                      'Loss/segm': loss_segm.item(),
-                     'Loss/size', loss_sz.item()}
+                     'Loss/size': loss_sz.item()}
         else:
             # Compute loss
             loss = self.objective(masks_pred, masks_gt_pair)
