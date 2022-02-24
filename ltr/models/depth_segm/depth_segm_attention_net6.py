@@ -347,7 +347,7 @@ class DepthNet(nn.Module):
         return [feat0, feat1, feat2, feat3] # [4, 16, 32, 64]
 
 
-class DepthSegmNetAttention05(nn.Module):
+class DepthSegmNetAttention06(nn.Module):
     def __init__(self):
         super().__init__()
 
@@ -358,17 +358,18 @@ class DepthSegmNetAttention05(nn.Module):
 
         self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
-
-        # feat_test/train, layer3, Bx24x24x1024 => B, 6x6 patches, C=hidden_size
+        # feat_test/train, layer3, Bx24x24x1024 => B, 6x6 patches * 2, C=hidden_size
         patch_sz = 4
+        n_patches = (feat_sz[3] // patch_sz) ** 2 * 2 # 72 patches
         init_config = get_config(size=(patch_sz, patch_sz))
-        self.cross_attn = CrossAttentionTransformer(init_config, (feat_sz[3]*4, feat_sz[3]), segm_dim[1], vis=True)
+        self.cross_attn = CrossAttentionTransformer(init_config, (feat_sz[3]*2, feat_sz[3]), segm_dim[1], vis=True)
+
 
 
         config = get_config(size=(12, 12))
-        self.rgbd_transformers = nn.ModuleList([Transformer(config, (feat_sz[0]*4, feat_sz[0]), segm_inter_dim[0], True),  # 192x192x4 -> 16x16x4 patches
-                                                Transformer(config, (feat_sz[1]*4, feat_sz[1]), segm_inter_dim[1], True),  # 96x94x16  -> 8x8x4 patches
-                                                Transformer(config, (feat_sz[2]*4, feat_sz[2]), segm_inter_dim[2], True)]) # 48x48x32  -> 4x4x4 patches
+        self.rgbd_transformers = nn.ModuleList([Transformer(config, (feat_sz[0]*2, feat_sz[0]), segm_inter_dim[0], True),  # 192x192x4 -> 16x16x4 patches
+                                                Transformer(config, (feat_sz[1]*2, feat_sz[1]), segm_inter_dim[1], True),  # 96x94x16  -> 8x8x4 patches
+                                                Transformer(config, (feat_sz[2]*2, feat_sz[2]), segm_inter_dim[2], True)]) # 48x48x32  -> 4x4x4 patches
 
 
         # 1024， 512， 256， 64 -> 64, 32, 16, 4
@@ -385,10 +386,11 @@ class DepthSegmNetAttention05(nn.Module):
                                        conv(segm_inter_dim[2], segm_inter_dim[2])])
 
         # project attention RGBD feat
-        self.a_layers = nn.ModuleList([conv(config.hidden_size*2, segm_inter_dim[0]),
-                                       conv(config.hidden_size*2, segm_inter_dim[1]),
-                                       conv(config.hidden_size*2, segm_inter_dim[2]),
-                                       conv(config.hidden_size*2, segm_inter_dim[3])])
+        rgbd_channels = config.hidden_size * 2 # RGB + D
+        self.a_layers = nn.ModuleList([conv(rgbd_channels, segm_inter_dim[0]),
+                                       conv(rgbd_channels, segm_inter_dim[1]),
+                                       conv(rgbd_channels, segm_inter_dim[2]),
+                                       conv(rgbd_channels, segm_inter_dim[3])])
 
         # project RGB feat
         self.f_layers = nn.ModuleList([conv(segm_input_dim[0], segm_inter_dim[0]),
@@ -406,8 +408,8 @@ class DepthSegmNetAttention05(nn.Module):
                                           conv(segm_inter_dim[2], segm_inter_dim[1]),
                                           conv(segm_inter_dim[3]+1, segm_inter_dim[2])])
 
-        self.t_layer0 = conv(192, 2)
-        self.t_layer1 = nn.Linear(72, 1)
+        self.t_layer0 = conv(rgbd_channels, 2)
+        self.t_layer1 = nn.Linear(n_patches, 1)
 
         self.initialize_weights()
 
@@ -435,7 +437,7 @@ class DepthSegmNetAttention05(nn.Module):
         out, attn_weights0 = self.rgbd_fusion(out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0)
 
         if debug:
-            return out, target_sz, (attn_weights3, attn_weights2, attn_weights1, attn_weights0)
+            return (out, target_sz), (attn_weights3, attn_weights2, attn_weights1, attn_weights0)
         else:
             return out
 
@@ -459,28 +461,24 @@ class DepthSegmNetAttention05(nn.Module):
 
         n_patches = out.shape[1] // 2  # RGB + D patches
         new_feat_sz = int(math.sqrt(n_patches))
-        out = torch.cat((out[:, :n_patches, :], out[:, n_patches:, :]), dim=-1)           # BxPatchesx2C
-        out = out.view(out.shape[0], new_feat_sz, new_feat_sz, -1)                        # BxHxWx2C, hidden_size * 2,  Bx6x6x192
-        out = out.permute(0, 3, 1, 2)                                                     # Bx192x6x6
-        out = self.a_layers[layer](out)                                                   # Bx192x6x6
-
-        out = F.interpolate(out, size=(f_train_rgb.shape[-2]*2, f_train_rgb.shape[-1]*2)) # Bx192x48x48
+        out = torch.cat((out[:, :n_patches, :], out[:, n_patches:, :]), dim=-1)                     # BxPatchesx2C
+        out = out.view(out.shape[0], new_feat_sz, new_feat_sz, -1)                                  # BxHxWx2C, hidden_size * 2,  Bx6x6x192
+        out = out.permute(0, 3, 1, 2)                                                               # Bx192x6x6
+        out = self.a_layers[layer](out)                                                             # Bx192x6x6
+        #
+        out = F.interpolate(out, size=(f_train_rgb.shape[-2]*2, f_train_rgb.shape[-1]*2))            # Bx192x48x48
         dist = F.interpolate(test_dist[0], size=(f_train_rgb.shape[-2]*2, f_train_rgb.shape[-1]*2))  # [B, 1, 48, 48]
-        out = self.post_layers[layer](torch.cat((out, dist), dim=1))                      # [B, 64+1, 48, 48] -> [B, 32, 48, 48]
+        out = self.post_layers[layer](torch.cat((out, dist), dim=1))                                 # [B, 32, 48, 48]
 
         return out, target_sz, attn_weights3
 
     def rgbd_fusion(self, pre_out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0):
 
-        f_test_rgb, f_test_d, f_train_rgb, f_train_d = feat_test_rgb[layer], feat_test_d[layer], feat_train_rgb[layer], feat_train_d[layer]
+        f_test_rgb, f_test_d = feat_test_rgb[layer], feat_test_d[layer]
+        # f_train_rgb, f_train_d = feat_train_rgb[layer], feat_train_d[layer]
 
-        # bg_mask = 1 - F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1])) # Bx1xHxW
-
-        rgbd_inputs = torch.cat((self.f_layers[layer](f_test_rgb),
-                                 self.d_layers[layer](f_test_d)),
-                                 dim=2)
-        # feat_rgbd2, featuremaps for each pacth
-        feat_rgbd, attn_weights = self.rgbd_transformers[layer](rgbd_inputs)    # [B, Patches, C], attn_weights, [B, heads=12, patches, headsize=64]
+        feat_rgbd = torch.cat((self.f_layers[layer](f_test_rgb), self.d_layers[layer](f_test_d)), dim=2)
+        feat_rgbd, attn_weights = self.rgbd_transformers[layer](feat_rgbd)      # [B, Patches, C], attn_weights, [B, heads=12, patches, headsize=64]
         n_patches = feat_rgbd.shape[1] // 2                                     # for each patch, 16 patches, 64 patches, 256 patches
         featmap_sz = int(math.sqrt(n_patches))                                  # for RGB and D feat maps, 4x4, 8x8, 16x16
         # Only keep test F_rgb and F_D, [B, Patches//2=32/128x512, C=768]
