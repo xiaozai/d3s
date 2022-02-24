@@ -72,6 +72,7 @@ def save_debug(data, pred_mask, vis_data):
 
     train_img = data['train_images'][:, batch_element, :, :].permute(1, 2, 0)
     train_depth = data['train_depths'][:, batch_element, :, :].permute(1, 2, 0)
+    train_mask = data['train_masks'][0, batch_element, :, :]
     test_img = data['test_images'][:, batch_element, :, :].permute(1, 2, 0)
     test_depth = data['test_depths'][:, batch_element, :, :].permute(1, 2, 0)
     test_mask = data['test_masks'][0, batch_element, :, :]
@@ -93,33 +94,36 @@ def save_debug(data, pred_mask, vis_data):
     train_depth = (train_depth.cpu().numpy().squeeze()).astype(np.float32)
     test_img = (test_img.cpu().numpy()).astype(np.uint8)
     test_depth = (test_depth.cpu().numpy().squeeze()).astype(np.float32)
+    train_mask = (train_mask.cpu().numpy()).astype(np.float32)
     test_mask = (test_mask.cpu().numpy()).astype(np.float32)
     test_dist = (test_dist.detach().cpu().numpy().squeeze()).astype(np.float32)
     test_conf = 1 - test_dist / np.max(test_dist)
 
     # Song
-    num_axis = 7 + len(vis_data)
-    if len(vis_data) == 2:
-        f, ((ax1, ax2, ax3), (ax4, ax5, ax6), (ax7, ax8, ax9)) = plt.subplots(3, 3, figsize=(9, 9))
-    elif len(vis_data) == 4:
-        f, ((ax1, ax2, ax3), (ax4, ax5, ax6), (ax7, ax8, ax9), (ax10, ax11, ax12)) = plt.subplots(4, 3, figsize=(9, 9))
+    f, ((ax1, ax2, ax3, ax4), (ax5, ax6, ax7, ax8), (ax9, ax10, ax11, ax12)) = plt.subplots(3, 4, figsize=(9, 9))
+
     draw_axis(ax1, train_img, 'Train image')
-    draw_axis(ax4, test_img, 'Test image')
+    draw_axis(ax3, test_img, 'Test image')
     draw_axis(ax2, train_depth, 'Train depth')
-    draw_axis(ax5, test_depth, 'Test depth')
-    draw_axis(ax3, test_mask, 'Ground-truth')
-    draw_axis(ax6, predicted_mask, 'Prediction', show_minmax=True)
-    draw_axis(ax7, test_dist, 'test_dist')
+    draw_axis(ax4, test_depth, 'Test depth')
+    draw_axis(ax5, train_mask, 'train mask')
+    draw_axis(ax6, test_mask, 'Ground-truth')
+    draw_axis(ax7, predicted_mask, 'Prediction', show_minmax=True)
+    draw_axis(ax8, test_dist, 'test_dist')
+
+
 
     if len(vis_data) == 2:
-        draw_axis(ax8, p_rgb, 'similarity rgb')
-        draw_axis(ax9, p_d, 'similarity d')
+        draw_axis(ax9, test_conf, 'test_dist')
+        draw_axis(ax10, p_rgb, 'similarity rgb')
+        draw_axis(ax11, p_d, 'similarity d')
+
     elif len(vis_data) == 4:
-        draw_axis(ax8, attn_weights3, 'attn_weights3')
-        draw_axis(ax9, attn_weights2, 'attn_weights2')
-        draw_axis(ax10, attn_weights1, 'attn_weights1')
-        draw_axis(ax11, attn_weights0, 'attn_weights0')
-        draw_axis(ax12, test_conf, 'dist2conf')
+        draw_axis(ax9, attn_weights3, 'attn_weights3')
+        draw_axis(ax10, attn_weights2, 'attn_weights2')
+        draw_axis(ax11, attn_weights1, 'attn_weights1')
+        draw_axis(ax12, attn_weights0, 'attn_weights0')
+
 
     save_path = os.path.join(data['settings'].env.images_dir, '%03d-%04d.png' % (data['epoch'], data['iter']))
     plt.savefig(save_path)
@@ -176,9 +180,9 @@ class DepthSegmActor(BaseActor):
             # loss_sz = torch.mean(torch.div(torch.abs(sz_gt - size_pred), sz_gt)) # B, 1
             loss_sz = self.target_sz_objective(sz_gt, size_pred)
 
-            loss = loss + 0.001*loss_sz
+            loss = loss + 0.0001*loss_sz
             stats['Loss/total'] = loss.item()
-            stats['Loss/size'] = 0.001*loss_sz.item()
+            stats['Loss/size'] = 0.0001*loss_sz.item()
 
 
         if 'iter' in data and (data['iter'] - 1) % 50 == 0:
