@@ -12,7 +12,7 @@ class BaseActor:
         """
         self.net = net
         self.objective = objective
-        self.target_size = target_sz # Song
+        self.target_size = target_size # Song
 
     def __call__(self, data: TensorDict):
         """ Called in each training iteration. Should pass in input data through the network, calculate the loss, and
