@@ -14,10 +14,10 @@ def draw_axis(ax, img, title, show_minmax=False):
         title = '%s \n min=%.2f max=%.2f' % (title, minval_, maxval_)
     ax.set_title(title, fontsize=9)
 
-def process_attn_maps(att_mat):
+def process_attn_maps(att_mat, batch_element):
     # use batch 0
     att_mat = torch.stack(att_mat)
-    att_mat = att_mat[:, 0, ...].squeeze(1) # [layers=3, B, heads=3, 144, 144]
+    att_mat = att_mat[:, batch_element, ...].squeeze(1) # [layers=3, B, heads=3, 144, 144]
     att_mat = att_mat.cpu().detach()
     # Average the attention weights across all heads.
     att_mat = torch.mean(att_mat, dim=1) # [layers, 144, 144]
@@ -44,12 +44,12 @@ def process_attn_maps(att_mat):
     for idx in range(v.shape[0]):
         out_img[idx] = v[idx, :].detach().numpy().max() # 24*6
     out_img = (out_img*255).astype(np.uint8)
-    return out_img.reshape((grid_size*4, grid_size))
+    return out_img.reshape((grid_size*2, grid_size))
 
 def save_debug(data, pred_mask, vis_data):
 
     batch_element = 0
-    vis_cosine_similarity = True
+    # vis_cosine_similarity = True
 
     if len(vis_data) == 2:
         p_rgb, p_d = vis_data
@@ -61,12 +61,11 @@ def save_debug(data, pred_mask, vis_data):
 
     elif len(vis_data) == 4:
         attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data
-        # print(len(attn_weights3), attn_weights3[0].shape) # [B, 3, 144, 144]
-        p_rgb = process_attn_maps(attn_weights3)
-        p_d = process_attn_maps(attn_weights2)
 
-    elif len(vis_data) == 5:
-        p_rgb, p_d, attn_weights2, attn_weights1, attn_weights0 = vis_data
+        attn_weights3 = process_attn_maps(attn_weights3, batch_element)
+        attn_weights2 = process_attn_maps(attn_weights2, batch_element)
+        attn_weights1 = process_attn_maps(attn_weights1, batch_element)
+        attn_weights0 = process_attn_maps(attn_weights0, batch_element)
 
 
     dir_path = data['settings'].env.images_dir
@@ -95,33 +94,32 @@ def save_debug(data, pred_mask, vis_data):
     test_img = (test_img.cpu().numpy()).astype(np.uint8)
     test_depth = (test_depth.cpu().numpy().squeeze()).astype(np.float32)
     test_mask = (test_mask.cpu().numpy()).astype(np.float32)
-    # predicted_mask = mask.astype(np.float32)
+    test_dist = (test_dist.detach().cpu().numpy().squeeze()).astype(np.float32)
+    test_conf = 1 - test_dist / np.max(test_dist)
 
     # Song
-    f, ((ax1, ax2, ax3), (ax4, ax5, ax6), (ax7, ax8, ax9)) = plt.subplots(3, 3, figsize=(8, 8))
+    num_axis = 7 + len(vis_data)
+    if len(vis_data) == 2:
+        f, ((ax1, ax2, ax3), (ax4, ax5, ax6), (ax7, ax8, ax9)) = plt.subplots(3, 3, figsize=(9, 9))
+    elif len(vis_data) == 4:
+        f, ((ax1, ax2, ax3), (ax4, ax5, ax6), (ax7, ax8, ax9), (ax10, ax11, ax12)) = plt.subplots(4, 3, figsize=(9, 9))
     draw_axis(ax1, train_img, 'Train image')
     draw_axis(ax4, test_img, 'Test image')
     draw_axis(ax2, train_depth, 'Train depth')
     draw_axis(ax5, test_depth, 'Test depth')
     draw_axis(ax3, test_mask, 'Ground-truth')
     draw_axis(ax6, predicted_mask, 'Prediction', show_minmax=True)
+    draw_axis(ax7, test_dist, 'test_dist')
 
-    if vis_cosine_similarity:
-
-
-        # empty_channel = np.zeros((p_rgb.shape[0], p_rgb.shape[1], 1), dtype=np.uint8)
-
-        # p_rgb = (p_rgb * 255).astype(np.uint8)
-        # p_rgb = np.concatenate((p_rgb, empty_channel), axis=-1) # [H, W, 3]
-
-        # p_d = (p_d * 255).astype(np.uint8)
-        # p_d = np.concatenate((p_d, empty_channel), axis=-1) # [H, W, 3]
-
-        draw_axis(ax7, p_rgb, 'similarity rgb')
-        draw_axis(ax8, p_d, 'similarity d')
-
-    test_dist = (test_dist.detach().cpu().numpy().squeeze()).astype(np.float32)
-    draw_axis(ax9, test_dist, 'test_dist')
+    if len(vis_data) == 2:
+        draw_axis(ax8, p_rgb, 'similarity rgb')
+        draw_axis(ax9, p_d, 'similarity d')
+    elif len(vis_data) == 4:
+        draw_axis(ax8, attn_weights3, 'attn_weights3')
+        draw_axis(ax9, attn_weights2, 'attn_weights2')
+        draw_axis(ax10, attn_weights1, 'attn_weights1')
+        draw_axis(ax11, attn_weights0, 'attn_weights0')
+        draw_axis(ax12, test_conf, 'dist2conf')
 
     save_path = os.path.join(data['settings'].env.images_dir, '%03d-%04d.png' % (data['epoch'], data['iter']))
     plt.savefig(save_path)
@@ -159,18 +157,30 @@ class DepthSegmActor(BaseActor):
         else:
             size_pred = None
 
-        masks_gt = data['test_masks'].permute(1, 0, 2, 3)            # B * 1 * H * W
+        masks_gt = data['test_masks'].permute(1, 0, 2, 3) # C, B, H, W -> # B * 1 * H * W
         masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)   # B * 2 * H * W
+
 
         # target size loss, mse loss
         if target_size:
+            # Compute loss
+            loss_segm = self.objective(masks_pred, masks_gt_pair)
+
             print(masks_gt.shape, size_pred.shape)
+            sz_gt = torch.sum(masks_gt.view(masks_gt.shape[0], -1), 1)
+            loss_sz = self.target_sz_objective(size_pred, sz_gt)
+            print(loss_sz)
 
-        # Compute loss
-        loss = self.objective(masks_pred, masks_gt_pair)
+            loss = loss_segm + loss_sz
 
-        # Return training stats
-        stats = {'Loss/total': loss.item(),
+            stats = {'Loss/total': loss.item(),
+                     'Loss/segm': loss_segm.item(),
+                     'Loss/size', loss_sz.item()}
+        else:
+            # Compute loss
+            loss = self.objective(masks_pred, masks_gt_pair)
+            # Return training stats
+            stats = {'Loss/total': loss.item(),
                  'Loss/segm': loss.item()}
 
         if 'iter' in data and (data['iter'] - 1) % 50 == 0:
