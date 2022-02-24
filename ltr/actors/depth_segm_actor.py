@@ -128,7 +128,7 @@ def save_debug(data, pred_mask, vis_data):
 
 class DepthSegmActor(BaseActor):
     """ Actor for training the Segmentation in ATOM"""
-    def __call__(self, data, target_size=False):
+    def __call__(self, data):
         """
         args:
             data - The input data, should contain the fields 'train_images', 'test_images', 'train_anno',
@@ -152,17 +152,15 @@ class DepthSegmActor(BaseActor):
                                         test_dist=test_dist,
                                         debug=True) # Song :  vis pos and neg maps
 
-        if target_size :
+        if self.target_size :
             masks_pred, size_pred = masks_pred
-        else:
-            size_pred = None
 
         masks_gt = data['test_masks'].permute(1, 0, 2, 3) # C, B, H, W -> # B * 1 * H * W
         masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)   # B * 2 * H * W
 
 
         # target size loss, mse loss
-        if target_size:
+        if self.target_size:
             # Compute loss
             loss_segm = self.objective(masks_pred, masks_gt_pair)
 

@@ -110,7 +110,7 @@ def run(settings):
     target_sz_objective = nn.MSELoss()
 
     # Create actor, which wraps network and objective
-    actor = actors.DepthSegmActor(net=net, objective=objective)
+    actor = actors.DepthSegmActor(net=net, objective=objective, target_size=True)
 
     # Optimizer
     optimizer = optim.Adam(actor.net.segm_predictor.parameters(), lr=1e-3)

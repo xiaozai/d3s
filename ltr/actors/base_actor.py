@@ -4,7 +4,7 @@ from pytracking import TensorDict
 class BaseActor:
     """ Base class for actor. The actor class handles the passing of the data through the network
     and calculation the loss"""
-    def __init__(self, net, objective):
+    def __init__(self, net, objective, target_size=False):
         """
         args:
             net - The network to train
@@ -12,6 +12,7 @@ class BaseActor:
         """
         self.net = net
         self.objective = objective
+        self.target_size = target_sz # Song
 
     def __call__(self, data: TensorDict):
         """ Called in each training iteration. Should pass in input data through the network, calculate the loss, and
