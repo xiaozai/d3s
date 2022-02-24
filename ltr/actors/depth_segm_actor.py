@@ -176,13 +176,21 @@ class DepthSegmActor(BaseActor):
                  'Loss/size': 0}
 
         if self.target_size:
-            sz_gt = torch.sum(masks_gt.view(masks_gt.shape[0], -1), 1).unsqueeze(-1) # [B, 1]
-            # loss_sz = torch.mean(torch.div(torch.abs(sz_gt - size_pred), sz_gt)) # B, 1
-            loss_sz = self.target_sz_objective(sz_gt, size_pred)
+            train_masks = data['train_masks'].permute(1, 0, 2, 3)
+            train_sz = torch.sum(train_masks.view(train_masks.shape[0], -1), 1).unsqueeze(-1) # [B, 1]
+            test_sz = torch.sum(masks_gt.view(masks_gt.shape[0], -1), 1).unsqueeze(-1) # [B, 1]
 
-            loss = loss + 0.0001*loss_sz
+            sz_scale_gt = torch.div(train_sz, test_sz+1e-10)
+
+            # loss_sz = torch.mean(torch.div(torch.abs(sz_gt - size_pred), sz_gt+1e-10)) # B, 1
+            loss_sz = self.target_sz_objective(sz_scale_gt, size_pred)
+            # loss_sz = torch.nan_to_num(loss_szzz)
+            if torch.isnan(loss_sz):
+                loss_sz = torch.tensor(0)
+
+            loss = loss + loss_sz
             stats['Loss/total'] = loss.item()
-            stats['Loss/size'] = 0.0001*loss_sz.item()
+            stats['Loss/size'] = loss_sz.item()
 
 
         if 'iter' in data and (data['iter'] - 1) % 50 == 0:

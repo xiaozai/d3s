@@ -461,10 +461,12 @@ class DepthSegmNetAttention06(nn.Module):
         out = out.view(out.shape[0], new_feat_sz, new_feat_sz, -1)                                  # BxHxWx2C, hidden_size * 2,  Bx6x6x192
         out = out.permute(0, 3, 1, 2)                                                               # Bx192x6x6
 
+        ''' Song add one more embeddings to embeddings for target scale'''
         # Song: try to add target size estimation
         target_sz = self.t_layer0(out) # Bx192x6x6 -> Bx2x6x6
         target_sz = self.t_layer1(torch.reshape(target_sz, (target_sz.shape[0], -1)))
-        target_sz = F.relu(target_sz)
+        # target_sz = F.relu(target_sz)
+        target_sz = torch.sigmoid(target_sz) * 2
 
         out = self.a_layers[layer](out)                                                             # Bx192x6x6
         out = F.interpolate(out, size=(f_train_rgb.shape[-2]*2, f_train_rgb.shape[-1]*2))            # Bx192x48x48
