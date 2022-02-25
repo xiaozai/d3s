@@ -293,6 +293,7 @@ class CrossAttentionTransformer(nn.Module):
                                      in_channels=in_channels,
                                      use_target_sz=use_target_sz)
         self.n_patches = self.embeddings.n_patches
+        self.patch_sz = config.patches['size']
         self.encoder = Encoder(config, vis, patches=self.n_patches)
         self.decoder = Decoder(config, vis, patches=self.n_patches)
 
@@ -301,7 +302,7 @@ class CrossAttentionTransformer(nn.Module):
         kv_embeddings = self.embeddings(kv_input) # [B, N_Patches + 1, C]
         if mask is not None:
             # mask = self.mask_embeddings(mask) # B, 1, H//patchsize, w//size
-            mask = F.interpolate(mask, scale_factor=1/config.patches["size"])
+            mask = F.interpolate(mask, scale_factor=1/self.patch_sz)
             sz_mask = torch.ones(mask.shape[0], 1, 1)
             mask = torch.cat((sz_mask, mask.view(mask.shape[0], 1, -1)), dim=-1) # B, 1, patches+1
             mask = torch.tensor(mask, dtype=torch.bool) # B, 1, patches+1
