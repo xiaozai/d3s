@@ -69,11 +69,12 @@ class Attention(nn.Module):
 
         attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2)) # [B, head, patches_q, patches_k]
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
-
+        print(query_layer.shape, key_layer.shape, value_layer.shape)
         if mask is not None:
             attention_scores = attention_scores.masked_fill(~mask.unsqueeze(1), float('-inf'))
 
         attention_probs = self.softmax(attention_scores) # dim=-1 [B, head, P_q, P_k]
+        print(attention_probs.shape)
         # it has nan values
         #Flatten:
         shape = attention_probs.shape
@@ -83,6 +84,7 @@ class Attention(nn.Module):
         #Reshape back:
         attention_probs = tensor_reshaped.reshape(tensor_reshaped.shape[0],*shape[1:])
 
+        print(attention_probs.shape)
 
         weights = attention_probs if self.vis else None
         attention_probs = self.attn_dropout(attention_probs)
