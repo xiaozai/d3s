@@ -188,7 +188,7 @@ class DepthSegmActor(BaseActor):
 
             loss_sz = self.target_sz_objective(test_sz/img_sz, size_pred/img_sz)
 
-            loss = loss + 100 * loss_sz
+            loss = loss + 10 * loss_sz
             stats['Loss/total'] = loss.item()
             stats['Loss/size'] = loss_sz.item()
 
