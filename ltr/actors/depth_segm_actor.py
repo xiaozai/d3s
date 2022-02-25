@@ -14,7 +14,7 @@ def draw_axis(ax, img, title, show_minmax=False):
         title = '%s \n min=%.2f max=%.2f' % (title, minval_, maxval_)
     ax.set_title(title, fontsize=9)
 
-def process_attn_maps(att_mat, batch_element):
+def process_attn_maps(att_mat, batch_element, train_mask):
     # use batch 0
     att_mat = torch.stack(att_mat)
     att_mat = att_mat[:, batch_element, ...].squeeze(1) # [layers=3, B, heads=3, 144, 144]
@@ -40,10 +40,16 @@ def process_attn_maps(att_mat, batch_element):
     # select few tokens as output
 
     grid_size = int(np.sqrt(aug_att_mat.size(-1)//2)) # for each img,
+    mask = np.resize(train_mask, (grid_size, gride_size))
+    mask = np.concatenate((mask, mask), axis=0)
+    mask = np.reshape(mask, (grid_size*grid_size*2,))
+
     out_img = np.zeros((v.shape[0],))
     for idx in range(v.shape[0]):
-        out_img[idx] = v[idx, :].detach().numpy().max() # 24*6
-    out_img = (out_img*255).astype(np.uint8)
+        # out_img[idx] = v[idx, :].detach().numpy().max() # 24*6
+        pixel = v[idx, :].detach().numpy() * mask # (144, keep probs for foreground pixels
+        out_img[idx] = np.mean(pixel.argsort()[-3:][::-1])
+    # out_img = (out_img*255).astype(np.uint8)
     return out_img.reshape((grid_size*2, grid_size))
 
 def save_debug(data, pred_mask, vis_data):
@@ -61,11 +67,11 @@ def save_debug(data, pred_mask, vis_data):
 
     elif len(vis_data) == 4:
         attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data
-
-        attn_weights3 = process_attn_maps(attn_weights3, batch_element)
-        attn_weights2 = process_attn_maps(attn_weights2, batch_element)
-        attn_weights1 = process_attn_maps(attn_weights1, batch_element)
-        attn_weights0 = process_attn_maps(attn_weights0, batch_element)
+        train_mask = train_mask = data['train_masks'][0, batch_element, :, :].cpu().numpy().astype(np.float32)
+        attn_weights3 = process_attn_maps(attn_weights3, batch_element, train_mask)
+        attn_weights2 = process_attn_maps(attn_weights2, batch_element, train_mask)
+        attn_weights1 = process_attn_maps(attn_weights1, batch_element, train_mask)
+        attn_weights0 = process_attn_maps(attn_weights0, batch_element, train_mask)
 
 
     dir_path = data['settings'].env.images_dir
