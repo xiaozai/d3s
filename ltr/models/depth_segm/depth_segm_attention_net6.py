@@ -303,7 +303,7 @@ class CrossAttentionTransformer(nn.Module):
         if mask is not None:
             # mask = self.mask_embeddings(mask) # B, 1, H//patchsize, w//size
             mask = F.interpolate(mask, scale_factor=1.0/self.patch_sz[0])
-            sz_mask = torch.ones(mask.shape[0], 1, 1)
+            sz_mask = torch.ones(mask.shape[0], 1, 1).to('cuda')
             mask = torch.cat((sz_mask, mask.view(mask.shape[0], 1, -1)), dim=-1) # B, 1, patches+1
             mask = torch.tensor(mask, dtype=torch.bool) # B, 1, patches+1
 
