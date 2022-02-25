@@ -48,9 +48,9 @@ def process_attn_maps(att_mat, batch_element, train_mask):
     for idx in range(v.shape[0]):
         # out_img[idx] = v[idx, :].detach().numpy().max() # 24*6
         pixel = v[idx, :].detach().numpy() * mask # (144, keep probs for foreground pixels
-        out_img[idx] = np.mean(pixel.argsort()[-3:][::-1])
-        print(out_img[idx])
-    out_img = (out_img*255).astype(np.uint8)
+        out_img[idx] = pixel.max()
+    # out_img = (out_img*255).astype(np.uint8)
+    print(out_img)
     return out_img.reshape((grid_size*2, grid_size))
 
 def save_debug(data, pred_mask, vis_data):
