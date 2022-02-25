@@ -69,12 +69,20 @@ class Attention(nn.Module):
 
         attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2)) # [B, head, patches_q, patches_k]
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
-        # Song add mask here for background pixels, force background probs is 0
-        # attention_scores[:, :, :, attention_scores.size()[-1]//2:] = 0 # Song : KV has haft is bg pixel, Q*K_BG = 0
+
         if mask is not None:
             attention_scores = attention_scores.masked_fill(~mask.unsqueeze(1), float('-inf'))
 
-        attention_probs = self.softmax(attention_scores) # dim=-1 [B, Head, P_q, P_k]
+        attention_probs = self.softmax(attention_scores) # dim=-1 [B, head, P_q, P_k]
+        # it has nan values
+        #Flatten:
+        shape = attention_probs.shape
+        tensor_reshaped = attention_probs.reshape(shape[0],-1)
+        #Drop all rows containing any nan:
+        tensor_reshaped = tensor_reshaped[~torch.any(tensor_reshaped.isnan(),dim=1)]
+        #Reshape back:
+        attention_probs = tensor_reshaped.reshape(tensor_reshaped.shape[0],*shape[1:])
+
 
         weights = attention_probs if self.vis else None
         attention_probs = self.attn_dropout(attention_probs)
