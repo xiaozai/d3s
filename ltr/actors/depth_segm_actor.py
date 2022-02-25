@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 import os
-
+import skimage.measure
 
 def draw_axis(ax, img, title, show_minmax=False):
     ax.imshow(img)
@@ -34,13 +34,10 @@ def process_attn_maps(att_mat, batch_element, train_mask):
     for n in range(1, aug_att_mat.size(0)):
         joint_attentions[n] = torch.matmul(aug_att_mat[n], joint_attentions[n-1])
 
-    # Attention from the output token to the input space.
     v = joint_attentions[-1] # last layer of multihead attention
-    # print(v.shape) # 144x144, tokensxtokens in original papers, token0 is the class
-    # select few tokens as output
 
     grid_size = int(np.sqrt(aug_att_mat.size(-1)//2)) # for each img,
-    import skimage.measure
+
     block_size = train_mask.shape[0]//grid_size
     mask = skimage.measure.block_reduce(train_mask, (block_size, block_size), np.max)
     mask = np.concatenate((mask, mask), axis=0)
@@ -48,11 +45,9 @@ def process_attn_maps(att_mat, batch_element, train_mask):
 
     out_img = np.zeros((v.shape[0],))
     for idx in range(v.shape[0]):
-        # out_img[idx] = v[idx, :].detach().numpy().max() # 24*6
-        pixel = v[idx, :].detach().numpy() * mask # (144, keep probs for foreground pixels
+        pixel = v[idx, :].detach().numpy() * mask 
         out_img[idx] = pixel.max()
-    # out_img = (out_img*255).astype(np.uint8)
-    # print(out_img)
+
     return out_img.reshape((grid_size*2, grid_size))
 
 def save_debug(data, pred_mask, vis_data):
