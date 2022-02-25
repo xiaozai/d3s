@@ -40,7 +40,7 @@ def process_attn_maps(att_mat, batch_element, train_mask):
     # select few tokens as output
 
     grid_size = int(np.sqrt(aug_att_mat.size(-1)//2)) # for each img,
-    print(train_mask.max())
+    print(train_mask.max(), train_mask.shape, grid_size)
     import skimage.measure
     mask = skimage.measure.block_reduce(train_mask, (grid_size, grid_size), np.max)
     print(mask.shape)
