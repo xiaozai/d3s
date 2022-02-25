@@ -76,13 +76,13 @@ class Attention(nn.Module):
         attention_probs = self.softmax(attention_scores) # dim=-1 [B, head, P_q, P_k]
         print(attention_probs.shape)
         # it has nan values
-        #Flatten:
-        shape = attention_probs.shape
-        tensor_reshaped = attention_probs.reshape(shape[0],-1)
-        #Drop all rows containing any nan:
-        tensor_reshaped = tensor_reshaped[~torch.any(tensor_reshaped.isnan(),dim=1)]
-        #Reshape back:
-        attention_probs = tensor_reshaped.reshape(tensor_reshaped.shape[0],*shape[1:])
+        # #Flatten:
+        # shape = attention_probs.shape
+        # tensor_reshaped = attention_probs.reshape(shape[0],-1)
+        # #Drop all rows containing any nan:
+        # tensor_reshaped = tensor_reshaped[~torch.any(tensor_reshaped.isnan(),dim=1)]
+        # #Reshape back:
+        # attention_probs = tensor_reshaped.reshape(tensor_reshaped.shape[0],*shape[1:])
 
         print(attention_probs.shape)
 
