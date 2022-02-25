@@ -163,7 +163,7 @@ class Embeddings(nn.Module):
         x = x.flatten(2)             # [B, C, H*W=patches]
         x = x.transpose(-1, -2)      # [B, tokens, C]
 
-        if self.target_sz:
+        if self.use_target_sz:
             B = x.shape[0]
             sz_tokens = self.sz_token.expand(B, -1, -1) # B, 1, C
             x = torch.cat((sz_tokens, x), dim=1) # [B, 1+N, C]
