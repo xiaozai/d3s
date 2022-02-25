@@ -107,7 +107,7 @@ def run(settings):
 
     # Set objective
     objective = nn.BCEWithLogitsLoss()
-    target_sz_objective = nn.SmoothL1Loss() # nn.MSELoss()
+    target_sz_objective = nn.MSELoss() # nn.SmoothL1Loss() # 
 
     # Create actor, which wraps network and objective
     actor = actors.DepthSegmActor(net=net, objective=objective,

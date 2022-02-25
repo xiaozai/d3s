@@ -117,7 +117,7 @@ class Mlp(nn.Module):
 class Embeddings(nn.Module):
     """Construct the embeddings from patch, position embeddings.
     """
-    def __init__(self, config, img_size, in_channels=3):
+    def __init__(self, config, img_size, in_channels=3, use_target_sz=False):
         super(Embeddings, self).__init__()
 
         # self.hybrid = None
@@ -137,20 +137,28 @@ class Embeddings(nn.Module):
                                        out_channels=config.hidden_size,
                                        kernel_size=patch_size,
                                        stride=patch_size)
-        # self.position_embeddings = nn.Parameter(torch.zeros(1, n_patches+1, config.hidden_size))
-        self.position_embeddings = nn.Parameter(torch.zeros(1, n_patches, config.hidden_size))
-        # self.cls_token = nn.Parameter(torch.zeros(1, 1, config.hidden_size))
+
+        self.use_target_sz = use_target_sz
+
+        if self.use_target_sz:
+            self.position_embeddings = nn.Parameter(torch.zeros(1, n_patches+1, config.hidden_size))
+            self.sz_token = nn.Parameter(torch.zeros(1, 1, config.hidden_size))
+        else:
+            self.position_embeddings = nn.Parameter(torch.zeros(1, n_patches, config.hidden_size))
+
 
         self.dropout = Dropout(config.transformer["dropout_rate"])
 
     def forward(self, x):
-        B = x.shape[0]
-        # cls_tokens = self.cls_token.expand(B, -1, -1) # B, 1, C
 
         x = self.patch_embeddings(x) # [B, C, H/stride, W/stride]
         x = x.flatten(2)             # [B, C, H*W=patches]
         x = x.transpose(-1, -2)      # [B, tokens, C]
-        # x = torch.cat((cls_tokens, x), dim=1) # [B, 1+N, C]
+
+        if self.target_sz:
+            B = x.shape[0]
+            sz_tokens = self.sz_token.expand(B, -1, -1) # B, 1, C
+            x = torch.cat((sz_tokens, x), dim=1) # [B, 1+N, C]
 
         embeddings = x + self.position_embeddings
         embeddings = self.dropout(embeddings)
@@ -270,22 +278,27 @@ class Transformer(nn.Module):
         return encoded, attn_weights
 
 class CrossAttentionTransformer(nn.Module):
-    def __init__(self, config, img_size, in_channels, vis):
+    def __init__(self, config, img_size, in_channels, vis, use_target_sz=False):
         super(CrossAttentionTransformer, self).__init__()
-        self.embeddings = Embeddings(config, img_size=img_size, in_channels=in_channels)
-        self.mask_embeddings = nn.MaxPool2d(config.patches["size"], stride=config.patches["size"])
+        self.embeddings = Embeddings(config,
+                                     img_size=img_size,
+                                     in_channels=in_channels,
+                                     use_target_sz=use_target_sz)
         self.n_patches = self.embeddings.n_patches
         self.encoder = Encoder(config, vis, patches=self.n_patches)
         self.decoder = Decoder(config, vis, patches=self.n_patches)
 
     def forward(self, q_input, kv_input, mask=None):
-        q_embeddings = self.embeddings(q_input)   # [B, N_Patches, C=768], class embeddings + patches
-        kv_embeddings = self.embeddings(kv_input)
+        q_embeddings = self.embeddings(q_input)   # [B, N_Patches + 1, C], class embeddings + patches
+        kv_embeddings = self.embeddings(kv_input) # [B, N_Patches + 1, C]
         if mask is not None:
-            mask = self.mask_embeddings(mask) # B, 1, H//patchsize, w//size
-            mask = torch.tensor(mask.view(mask.shape[0], 1, -1), dtype=torch.bool) # B, 1, patches
-        kv_encoded, kv_attn_weights = self.encoder(kv_embeddings)   # encoded [B, patches, C]
-        # kv_encoded = kv_encoded[:, :self.n_patches//2, :]           # only fg patches
+            # mask = self.mask_embeddings(mask) # B, 1, H//patchsize, w//size
+            mask = F.interpolate(mask, scale_factor=1/config.patches["size"])
+            sz_mask = torch.ones(mask.shape[0], 1, 1)
+            mask = torch.cat((sz_mask, mask.view(mask.shape[0], 1, -1)), dim=-1) # B, 1, patches+1
+            mask = torch.tensor(mask, dtype=torch.bool) # B, 1, patches+1
+
+        kv_encoded, kv_attn_weights = self.encoder(kv_embeddings)   # encoded [B, patches+1, C]
         q_encoded, q_attn_weights = self.decoder(q_embeddings, kv_embeddings, kv_embeddings, mask=mask)
         return q_encoded, q_attn_weights
 
@@ -360,9 +373,12 @@ class DepthSegmNetAttention06(nn.Module):
 
         # feat_test/train, layer3, Bx24x24x1024 => B, 6x6 patches * 2, C=hidden_size
         patch_sz = 4
-        n_patches = (feat_sz[3] // patch_sz) ** 2 * 2 # 72 patches
+        n_patches = (feat_sz[3] // patch_sz) ** 2 * 2      # 72 patches
         init_config = get_config(size=(patch_sz, patch_sz))
-        self.cross_attn = CrossAttentionTransformer(init_config, (feat_sz[3]*2, feat_sz[3]), segm_dim[1], vis=True)
+        self.cross_attn = CrossAttentionTransformer(init_config, (feat_sz[3]*2, feat_sz[3]), segm_dim[1],
+                                                    vis=True, use_target_sz=True)
+
+        self.head = nn.Linear(init_config.hidden_size, 1)
 
 
 
@@ -408,8 +424,6 @@ class DepthSegmNetAttention06(nn.Module):
                                           conv(segm_inter_dim[2], segm_inter_dim[1]),
                                           conv(segm_inter_dim[3]+1, segm_inter_dim[2])])
 
-        self.t_layer0 = conv(rgbd_channels, 2)
-        self.t_layer1 = nn.Linear(n_patches, 1)
 
         self.initialize_weights()
 
@@ -437,7 +451,7 @@ class DepthSegmNetAttention06(nn.Module):
         out, attn_weights0 = self.rgbd_fusion(out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0)
 
         out = F.softmax(out, dim=1)
-        
+
         if debug:
             return out, target_sz, (attn_weights3, attn_weights2, attn_weights1, attn_weights0)
         else:
@@ -457,25 +471,22 @@ class DepthSegmNetAttention06(nn.Module):
 
         out, attn_weights3 = self.cross_attn(template, search_region, mask=mask) # B x Patches x C [rgb + d ]
 
+        target_sz = torch.sigmoid(self.head(out[:, 0])) * 2 # BxC -> Bx1
+
+
+        out = out[:, 1:, :]
         n_patches = out.shape[1] // 2  # RGB + D patches
         new_feat_sz = int(math.sqrt(n_patches))
         out = torch.cat((out[:, :n_patches, :], out[:, n_patches:, :]), dim=-1)                     # BxPatchesx2C
         out = out.view(out.shape[0], new_feat_sz, new_feat_sz, -1)                                  # BxHxWx2C, hidden_size * 2,  Bx6x6x192
         out = out.permute(0, 3, 1, 2)                                                               # Bx192x6x6
 
-        ''' Song add one more embeddings to embeddings for target scale'''
-        # Song: try to add target size estimation
-        target_sz = self.t_layer0(out) # Bx192x6x6 -> Bx2x6x6
-        target_sz = self.t_layer1(torch.reshape(target_sz, (target_sz.shape[0], -1)))
-        # target_sz = F.relu(target_sz)
-        target_sz = torch.sigmoid(target_sz) * 2
-
         out = self.a_layers[layer](out)                                                             # Bx192x6x6
         out = F.interpolate(out, size=(f_train_rgb.shape[-2]*2, f_train_rgb.shape[-1]*2))            # Bx192x48x48
         dist = F.interpolate(test_dist[0], size=(f_train_rgb.shape[-2]*2, f_train_rgb.shape[-1]*2))  # [B, 1, 48, 48]
         out = self.post_layers[layer](torch.cat((out, dist), dim=1))                                 # [B, 32, 48, 48]
 
-        return out, target_sz, attn_weights3
+        return out, target_sz, attn_weights3[:, :, 1:, :] # attn_weights = Head, Batch, P1, P2
 
     def rgbd_fusion(self, pre_out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0):
 
