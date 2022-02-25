@@ -43,6 +43,7 @@ def process_attn_maps(att_mat, batch_element, train_mask):
     print(train_mask.max())
     import skimage.measure
     mask = skimage.measure.block_reduce(train_mask, (grid_size, grid_size), np.max)
+    print(mask.shape)
     mask = np.concatenate((mask, mask), axis=0)
     mask = np.reshape(mask, (grid_size*grid_size*2,))
     print(mask.max())
