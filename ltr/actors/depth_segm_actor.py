@@ -49,6 +49,7 @@ def process_attn_maps(att_mat, batch_element, train_mask):
         # out_img[idx] = v[idx, :].detach().numpy().max() # 24*6
         pixel = v[idx, :].detach().numpy() * mask # (144, keep probs for foreground pixels
         out_img[idx] = np.mean(pixel.argsort()[-3:][::-1])
+        print(out_img[idx])
     out_img = (out_img*255).astype(np.uint8)
     return out_img.reshape((grid_size*2, grid_size))
 
@@ -125,10 +126,10 @@ def save_debug(data, pred_mask, vis_data):
         draw_axis(ax11, p_d, 'similarity d')
 
     elif len(vis_data) == 4:
-        draw_axis(ax9, attn_weights3, 'attn_weights3')
-        draw_axis(ax10, attn_weights2, 'attn_weights2')
-        draw_axis(ax11, attn_weights1, 'attn_weights1')
-        draw_axis(ax12, attn_weights0, 'attn_weights0')
+        draw_axis(ax9, attn_weights3, 'attn_weights3', show_minmax=True)
+        draw_axis(ax10, attn_weights2, 'attn_weights2', show_minmax=True)
+        draw_axis(ax11, attn_weights1, 'attn_weights1', show_minmax=True)
+        draw_axis(ax12, attn_weights0, 'attn_weights0', show_minmax=True)
 
 
     save_path = os.path.join(data['settings'].env.images_dir, '%03d-%04d.png' % (data['epoch'], data['iter']))
