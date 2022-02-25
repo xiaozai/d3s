@@ -62,10 +62,11 @@ class LTRTrainer(BaseTrainer):
             loss, stats = self.actor(data)
 
             # backward pass and update weights
-            if loader.training:
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
+            if not torch.isnan(loss):
+                if loader.training:
+                    self.optimizer.zero_grad()
+                    loss.backward()
+                    self.optimizer.step()
 
             # update statistics
             batch_size = data['train_images'].shape[loader.stack_dim]

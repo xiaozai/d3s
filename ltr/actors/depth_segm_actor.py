@@ -173,7 +173,7 @@ class DepthSegmActor(BaseActor):
 
         if torch.isnan(loss):
             print('loss segm is Nan .....')
-            loss = torch.tensor(0.5)
+            # loss = torch.tensor(0.5)
 
         stats = {'Loss/total': loss.item(),
                  'Loss/segm': loss.item(),
@@ -189,8 +189,8 @@ class DepthSegmActor(BaseActor):
             # loss_sz = torch.mean(torch.div(torch.abs(sz_gt - size_pred), sz_gt+1e-10)) # B, 1
             loss_sz = self.target_sz_objective(sz_scale_gt, size_pred)
             # loss_sz = torch.nan_to_num(loss_szzz)
-            if torch.isnan(loss_sz):
-                loss_sz = torch.tensor(0)
+            # if torch.isnan(loss_sz):
+            #     loss_sz = torch.tensor(0)
 
             loss = loss + loss_sz
             stats['Loss/total'] = loss.item()
