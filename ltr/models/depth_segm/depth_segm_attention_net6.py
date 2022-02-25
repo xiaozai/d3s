@@ -495,7 +495,8 @@ class DepthSegmNetAttention06(nn.Module):
         dist = F.interpolate(test_dist[0], size=(f_train_rgb.shape[-2]*2, f_train_rgb.shape[-1]*2))  # [B, 1, 48, 48]
         out = self.post_layers[layer](torch.cat((out, dist), dim=1))                                 # [B, 32, 48, 48]
 
-        return out, target_sz, attn_weights3[:, :, 1:, :] # attn_weights = Head, Batch, P1, P2
+        attn_weights3 = [aw[:, :, 1:, 1:] for aw in attn_weights3]
+        return out, target_sz, attn_weights3 # attn_weights = Head, Batch, P1, P2
 
     def rgbd_fusion(self, pre_out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0):
 

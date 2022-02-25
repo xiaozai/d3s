@@ -182,13 +182,13 @@ class DepthSegmActor(BaseActor):
         if self.target_size:
             # train_masks = data['train_masks'].permute(1, 0, 2, 3)
 
-            img_sz = train_masks.shape[-1] * train_masks.shape[-2] * 1.0 # H * W
+            img_sz = masks_gt.shape[-1] * masks_gt.shape[-2] * 1.0 # H * W
             # train_sz = torch.sum(train_masks.view(train_masks.shape[0], -1), 1).unsqueeze(-1) # [B, 1]
             test_sz = torch.sum(masks_gt.view(masks_gt.shape[0], -1), 1).unsqueeze(-1) # [B, 1]
 
             loss_sz = self.target_sz_objective(test_sz/img_sz, size_pred/img_sz)
 
-            loss = loss + loss_sz
+            loss = loss + 100 * loss_sz
             stats['Loss/total'] = loss.item()
             stats['Loss/size'] = loss_sz.item()
 
