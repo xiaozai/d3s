@@ -911,13 +911,16 @@ class DepthSegmST(BaseTracker):
             while iters < 1:
                 # Obtain segmentation prediction
                 # segm_pred = segm_net.segm_predictor(test_feat_segm, train_feat_segm, train_masks, test_dist_map)
-                segm_pred = segm_net.segm_predictor(test_feat_segm_rgb, train_feat_segm_d,
+                segm_pred, sz_pred = segm_net.segm_predictor(test_feat_segm_rgb, train_feat_segm_d,
                                                     train_feat_segm_rgb, train_feat_segm_d, # if we use the feature correlation
                                                     train_masks, test_dist_map)
+
                 # softmax on the prediction (during training this is done internaly when calculating loss)
                 # take only the positive channel as predicted segmentation mask
                 mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy()
                 mask = (mask > self.params.init_segm_mask_thr).astype(np.float32)
+
+                print('pred targetsz and mask sz : ', sz_pred.cpu().numpy().squeeze(), np.sum(mask))
 
                 if hasattr(self, 'gt_poly'):
                     # dilate polygon-based mask
@@ -1021,7 +1024,7 @@ class DepthSegmST(BaseTracker):
             test_dist_map = None
 
         # Obtain segmentation prediction
-        segm_pred = self.segm_net.segm_predictor(test_feat_segm_rgb, test_feat_d,
+        segm_pred, sz_pred = self.segm_net.segm_predictor(test_feat_segm_rgb, test_feat_d,
                                                  self.train_feat_segm_rgb, self.train_feat_segm_d,
                                                  train_masks, test_dist_map)
         # softmax on the prediction (during training this is done internaly when calculating loss)
@@ -1030,6 +1033,9 @@ class DepthSegmST(BaseTracker):
         if self.params.save_mask:
             mask_real = copy.copy(mask)
         mask = (mask > self.params.segm_mask_thr).astype(np.uint8)
+
+        print('pred targetsz and mask sz : ', sz_pred.cpu().numpy().squeeze(), np.sum(mask))
+        
         self.mask = mask
         self.masked_img = patch_rgb * np.expand_dims(mask, axis=-1)
 

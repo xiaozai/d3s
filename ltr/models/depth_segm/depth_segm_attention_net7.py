@@ -71,19 +71,11 @@ class Attention(nn.Module):
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
 
         if mask is not None:
+            mask = torch.tensor(mask, dtype=torch.uint8).to('cuda')
             attention_scores = attention_scores.masked_fill(~mask.unsqueeze(1), 0) # float('-inf'))
+            # attention_scores = attention_scores.masked_fill((1-mask).unsqueeze(1), 0) # float('-inf'))
 
         attention_probs = self.softmax(attention_scores) # dim=-1 [B, head, P_q, P_k]
-
-        # it has nan values
-        # #Flatten:
-        # shape = attention_probs.shape
-        # tensor_reshaped = attention_probs.reshape(shape[0],-1)
-        # #Drop all rows containing any nan:
-        # tensor_reshaped = tensor_reshaped[~torch.any(tensor_reshaped.isnan(),dim=1)]
-        # #Reshape back:
-        # attention_probs = tensor_reshaped.reshape(tensor_reshaped.shape[0],*shape[1:])
-
 
         weights = attention_probs if self.vis else None
         attention_probs = self.attn_dropout(attention_probs)
@@ -471,7 +463,7 @@ class DepthSegmNetAttention07(nn.Module):
         if debug:
             return out, target_sz, (attn_weights3, attn_weights2, attn_weights1, attn_weights0)
         else:
-            return out
+            return out, target_sz
 
     def init_mask(self, test_dist, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=3):
         f_test_rgb = self.segment1_rgb(self.segment0_rgb(feat_test_rgb[layer]))

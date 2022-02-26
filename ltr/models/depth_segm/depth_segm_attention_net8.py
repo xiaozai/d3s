@@ -437,7 +437,7 @@ class DepthSegmNetAttention(nn.Module):
         if debug:
             return out, target_sz, (attn_weights3, attn_weights2, attn_weights1, attn_weights0)
         else:
-            return out
+            return out, target_sz
 
     def attn_module(self, pre_out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0):
 
