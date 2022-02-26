@@ -45,7 +45,7 @@ def process_attn_maps(att_mat, batch_element, train_mask):
 
     out_img = np.zeros((v.shape[0],))
     for idx in range(v.shape[0]):
-        pixel = v[idx, :].detach().numpy() * mask 
+        pixel = v[idx, :].detach().numpy() * mask
         out_img[idx] = pixel.max()
 
     return out_img.reshape((grid_size*2, grid_size))
@@ -153,7 +153,7 @@ class DepthSegmActor(BaseActor):
 
         if self.target_size:
             # Run network to obtain IoU prediction for each proposal in 'test_proposals'
-            masks_pred, size_pred, vis_data = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
+            masks_pred, scale_pred, vis_data = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
                                                        data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
                                                        data['test_images'].permute(1, 0, 2, 3),
                                                        data['test_depths'].permute(1, 0, 2, 3),
@@ -186,13 +186,14 @@ class DepthSegmActor(BaseActor):
         if self.target_size:
             # train_masks = data['train_masks'].permute(1, 0, 2, 3)
 
-            img_sz = masks_gt.shape[-1] * masks_gt.shape[-2] * 1.0 # H * W
-            # train_sz = torch.sum(train_masks.view(train_masks.shape[0], -1), 1).unsqueeze(-1) # [B, 1]
+            # img_sz = masks_gt.shape[-1] * masks_gt.shape[-2] * 1.0 # H * W
+            train_sz = torch.sum(train_masks.view(train_masks.shape[0], -1), 1).unsqueeze(-1) # [B, 1]
             test_sz = torch.sum(masks_gt.view(masks_gt.shape[0], -1), 1).unsqueeze(-1) # [B, 1]
+            scale_gt = test_sz / (train_sz + 1e-20)
 
-            loss_sz = self.target_sz_objective(test_sz/img_sz, size_pred/img_sz)
+            loss_sz = self.target_sz_objective(scale_gt, scale_pred)
 
-            loss = loss + 10 * loss_sz
+            loss = loss + loss_sz
             stats['Loss/total'] = loss.item()
             stats['Loss/size'] = loss_sz.item()
 

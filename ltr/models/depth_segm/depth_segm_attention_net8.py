@@ -253,18 +253,6 @@ class CrossAtten(nn.Module):
         encoded = self.decoder_norm(query)
         return encoded, attn_weights
 
-
-# class Transformer(nn.Module):
-#     def __init__(self, config, img_size, in_channels, vis):
-#         super(Transformer, self).__init__()
-#         self.embeddings = Embeddings(config, img_size=img_size, in_channels=in_channels)
-#         self.atten = SelfAtten(config, vis, patches=self.embeddings.n_patches)
-#
-#     def forward(self, input_ids):
-#         embedding_output = self.embeddings(input_ids)         # [B, N_Patches, C=768], class embeddings + patches
-#         encoded, attn_weights = self.atten(embedding_output)  # encoded [B, patches, C=768]
-#         return encoded, attn_weights
-
 class CrossAttentionTransformer(nn.Module):
     def __init__(self, config, img_size, in_channels, vis, use_target_sz=False):
         super(CrossAttentionTransformer, self).__init__()
@@ -453,8 +441,8 @@ class DepthSegmNetAttention(nn.Module):
         out, attn_weights = self.transformers[layer](template, search_region, mask=mask)      # [B, Patches, C], attn_weights, [B, heads=12, patches, headsize=64]
 
         if layer == 3:
-            # target scale estimation
-            target_sz = torch.sigmoid(self.head(out[:, 0])) * 2 # BxC -> Bx1
+            # target scale estimation, target size change scale in [0, 2] compared to the template target sz
+            target_sz = torch.sigmoid(self.head(out[:, 0])) * 2 # BxC -> Bx1,
             out = out[:, 1:, :]
             attn_weights = [aw[:, :, 1:, 1:] for aw in attn_weights]
 
