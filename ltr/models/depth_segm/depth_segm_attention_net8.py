@@ -452,9 +452,8 @@ class DepthSegmNetAttention(nn.Module):
         out = out.view(out.shape[0], featmap_sz, featmap_sz, -1)
         out = out.permute(0, 3, 1, 2).contiguous() # [B, 2C, H, W]
         out = F.interpolate(out, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))              # B x 2C x 4 x 4 ->  B x 2C x 48 x 48
-        pre_out = F.interpolate(pre_out, size=(f_test_rgb.shape[-2]*2, f_test_rgb.shape[-1]*2))
-
-        print(out.shape, pre_out.shape)
+        pre_out = F.interpolate(pre_out, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))
+        # print(out.shape, pre_out.shape) # [B, 192, 24, 24], [B, 1, 48, 48]
         out = self.post_layers[layer](F.upsample(self.a_layers[layer](out) + self.s_layers[layer](pre_out), scale_factor=2))
 
         if layer == 3:
