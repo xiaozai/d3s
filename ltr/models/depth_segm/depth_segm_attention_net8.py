@@ -350,16 +350,15 @@ class DepthSegmNetAttention(nn.Module):
 
         self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
-        self.head = nn.Linear(init_config.hidden_size, 1) # target size estimation
-
         config3 = get_config(size=(4, 4)) # 4x4 ? 6*6?
         config = get_config(size=(6, 6))  # 8*8, 16*16, 32*32 patches
 
         self.transformers = nn.ModuleList([CrossAttentionTransformer(config, (feat_sz[0]*2, feat_sz[0]), segm_inter_dim[0], vis=True),  # 192x192x4 -> 16x16x4 patches
                                            CrossAttentionTransformer(config, (feat_sz[1]*2, feat_sz[1]), segm_inter_dim[1], vis=True),  # 96x94x16  -> 8x8x4 patches
                                            CrossAttentionTransformer(config, (feat_sz[2]*2, feat_sz[2]), segm_inter_dim[2], vis=True),
-                                           CrossAttentionTransformer(config, (feat_sz[3]*2, feat_sz[3]), segm_inter_dim[3], vis=True, use_target_sz=True)]) # 48x48x32  -> 4x4x4 patches
+                                           CrossAttentionTransformer(config3, (feat_sz[3]*2, feat_sz[3]), segm_inter_dim[3], vis=True, use_target_sz=True)]) # 48x48x32  -> 4x4x4 patches
 
+        self.head = nn.Linear(config3.hidden_size, 1) # target size estimation
 
         # project pre-out feat
         self.s_layers = nn.ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]),
