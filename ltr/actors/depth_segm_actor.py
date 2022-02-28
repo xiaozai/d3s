@@ -16,9 +16,23 @@ def draw_axis(ax, img, title, show_minmax=False):
     ax.set_title(title, fontsize=9)
 
 def cat_attn_feat(attn_weights):
+    ''' attn_weights channels : 32, 16, 4, 2 => 4*8, 4*4, 2*2, 1*2'''
     C, H, W = attn_weights.shape
-    edge = int(math.sqrt(C))+1
-    attn_maps = np.zeros((edge*H, edge*W), dtype=np.float32)
+    if C == 32:
+        edge = 4
+        attn_maps = np.zeros((edge*H*2, edge*W), dtype=np.float32)
+    elif C == 16:
+        edge = 4
+        attn_maps = np.zeros((edge*H, edge*W), dtype=np.float32)
+    elif C == 4:
+        edge = 2
+        attn_maps = np.zeros((edge*H, edge*W), dtype=np.float32)
+    elif C == 2:
+        edge = 2
+        attn_maps = np.zeros((H, edge*W), dtype=np.float32)
+
+    # edge = int(math.sqrt(C))+1
+    # attn_maps = np.zeros((edge*H, edge*W), dtype=np.float32)
     for idx in range(C):
         attn = attn_weights[idx] # H, W
         hid = idx // edge
