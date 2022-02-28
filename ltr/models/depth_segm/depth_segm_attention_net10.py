@@ -455,7 +455,7 @@ class DepthSegmNetAttention(nn.Module):
 
         n_patches = joint_attentions.shape[1] // 2                              # for each patch, 16 patches, 64 patches, 256 patches
         featmap_sz = int(math.sqrt(n_patches))                                  # for RGB and D feat maps, 4x4, 8x8, 16x16
-        attention_map = joint_attentions[:, :n_patches, :] + joint_attentions[:, n_patches:, :] # F_rgb + F_d
+        attention_map = torch.max(joint_attentions[:, :n_patches, :], joint_attentions[:, n_patches:, :]) # F_rgb + F_d
         # attention_map = torch.cat((joint_attentions[:, :n_patches, :], joint_attentions[:, n_patches:, :]), dim=-1) # B, P_q, 2P_kv
         attention_map = attention_map.view(attention_map.shape[0], featmap_sz, featmap_sz, -1).permute(0, 3, 1, 2)  # .contiguous() # [B, P_kv, H, W]
 
@@ -463,5 +463,5 @@ class DepthSegmNetAttention(nn.Module):
         pre_attn = F.interpolate(pre_attn, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))
 
         out = self.post_layers[layer](F.upsample(self.a_layers[layer](attention_map) + self.s_layers[layer](pre_attn), scale_factor=2))
-
+        out = torch.cat((out[:, 0, :, :].squeeze(1), (1-out[:, 0, :, :].squeeze(1))))
         return out, feat_rgbd
