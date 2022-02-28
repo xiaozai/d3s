@@ -286,11 +286,11 @@ def get_config(size=(16,16)):
     """Returns the ViT-B/16 configuration."""
     config = ml_collections.ConfigDict()
     config.patches = ml_collections.ConfigDict({'size': size})
-    config.hidden_size = 96 # 768
+    config.hidden_size = 48 # 96 # 768
     config.transformer = ml_collections.ConfigDict()
-    config.transformer.mlp_dim = 1024 # 3072
-    config.transformer.num_heads = 3 # 12
-    config.transformer.num_layers = 3 # 12
+    config.transformer.mlp_dim = 256 # 512 # 1024 # 3072
+    config.transformer.num_heads = 2 # 12
+    config.transformer.num_layers = 2 # 3 # 12
     config.transformer.attention_dropout_rate = 0.0
     config.transformer.dropout_rate = 0.1
     return config
@@ -349,7 +349,7 @@ class DepthSegmNetAttention(nn.Module):
         self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
 
-        config0 = get_config(size=(8, 8)) # 192*192 -> 12*12 patches
+        config0 = get_config(size=(12, 12)) # 192*192 -> 16*16 patches
         config1 = get_config(size=(8, 8)) # 96*96 -> 12*12 patches
         config2 = get_config(size=(4, 4)) # 48*48 -> 12*12 patches
         config3 = get_config(size=(2, 2)) # 24*24 -> 12*12 patches
@@ -462,7 +462,6 @@ class DepthSegmNetAttention(nn.Module):
 
         attention_map = F.interpolate(attention_map, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))            # B x 2P_kv x 4 x 4 ->  B x 2P_kv x 48 x 48
         pre_attn = F.interpolate(pre_attn, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))
-
         out = self.post_layers[layer](F.upsample(self.a_layers[layer](attention_map) + self.s_layers[layer](pre_attn), scale_factor=2))
 
         return out, feat_rgbd
