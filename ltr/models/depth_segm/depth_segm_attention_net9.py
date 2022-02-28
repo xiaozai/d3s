@@ -353,8 +353,8 @@ class DepthSegmNetAttention(nn.Module):
 
         crossAttnTransformer0 = CrossAttentionTransformer(config, (feat_sz[0]*2, feat_sz[0]), segm_inter_dim[0], vis=True)
         crossAttnTransformer1 = CrossAttentionTransformer(config, (feat_sz[1]*2, feat_sz[1]), segm_inter_dim[1], vis=True)
-        crossAttnTransformer2 = CrossAttentionTransformer(config, (feat_sz[2]*2, feat_sz[2]), segm_inter_dim[2], vis=True),
-        crossAttnTransformer3 = CrossAttentionTransformer(config3, (feat_sz[3]*2, feat_sz[3]), segm_inter_dim[3], vis=True, use_target_sz=False)
+        crossAttnTransformer2 = CrossAttentionTransformer(config, (feat_sz[2]*2, feat_sz[2]), segm_inter_dim[2], vis=True)
+        crossAttnTransformer3 = CrossAttentionTransformer(config3, (feat_sz[3]*2, feat_sz[3]), segm_inter_dim[3], vis=True)
         self.transformers = nn.ModuleList([crossAttnTransformer0, crossAttnTransformer1, crossAttnTransformer2, crossAttnTransformer3])
 
         # project pre-out feat
