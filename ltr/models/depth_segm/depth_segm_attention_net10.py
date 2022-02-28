@@ -449,9 +449,9 @@ class DepthSegmNetAttention(nn.Module):
         # aug_att_mat = aug_att_mat / aug_att_mat.sum(dim=-1).unsqueeze(-1)       # [layers, B, P_q, P_kv] / [layers, B, P_q]
 
         # Recursively multiply the weight matrices
-        joint_attentions = aug_att_mat[0]
-        for l in range(1, aug_att_mat.size(0)):
-            joint_attentions = torch.matmul(aug_att_mat[l], joint_attentions)   # [B, P_q, P_kv]
+        joint_attentions = attn_weights[0] # aug_att_mat !!!!
+        for l in range(1, attn_weights.size(0)):
+            joint_attentions = torch.matmul(attn_weights[l], joint_attentions)   # [B, P_q, P_kv]
 
         n_patches = joint_attentions.shape[1] // 2                              # for each patch, 16 patches, 64 patches, 256 patches
         featmap_sz = int(math.sqrt(n_patches))                                  # for RGB and D feat maps, 4x4, 8x8, 16x16
