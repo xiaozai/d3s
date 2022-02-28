@@ -286,11 +286,11 @@ def get_config(size=(16,16)):
     """Returns the ViT-B/16 configuration."""
     config = ml_collections.ConfigDict()
     config.patches = ml_collections.ConfigDict({'size': size})
-    config.hidden_size = 48 # 96 # 768
+    config.hidden_size = 96 # 768
     config.transformer = ml_collections.ConfigDict()
-    config.transformer.mlp_dim = 256 # 512 # 1024 # 3072
+    config.transformer.mlp_dim = 1024 # 3072
     config.transformer.num_heads = 3 # 12
-    config.transformer.num_layers = 3 # 3 # 12
+    config.transformer.num_layers = 3 # 12
     config.transformer.attention_dropout_rate = 0.0
     config.transformer.dropout_rate = 0.1
     return config
@@ -350,9 +350,9 @@ class DepthSegmNetAttention(nn.Module):
 
 
         config0 = get_config(size=(12, 12)) # 192*192 -> 16*16 patches
-        config1 = get_config(size=(8, 8)) # 96*96 -> 12*12 patches
-        config2 = get_config(size=(4, 4)) # 48*48 -> 12*12 patches
-        config3 = get_config(size=(2, 2)) # 24*24 -> 12*12 patches
+        config1 = get_config(size=(12, 12)) # 96*96 -> 12*12 patches
+        config2 = get_config(size=(8, 8)) # 48*48 -> 12*12 patches
+        config3 = get_config(size=(4, 4)) # 24*24 -> 6*6 patches
 
         crossAttnTransformer0 = CrossAttentionTransformer(config0, (feat_sz[0]*2, feat_sz[0]), segm_inter_dim[0], vis=True)
         crossAttnTransformer1 = CrossAttentionTransformer(config1, (feat_sz[1]*2, feat_sz[1]), segm_inter_dim[1], vis=True)
