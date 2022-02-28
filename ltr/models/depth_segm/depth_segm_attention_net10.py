@@ -349,10 +349,10 @@ class DepthSegmNetAttention(nn.Module):
         self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
 
-        config0 = get_config(size=(12, 12)) # 192*192 -> 16*16 patches
+        config0 = get_config(size=(16, 16)) # 192*192 -> 16*16 patches
         config1 = get_config(size=(12, 12)) # 96*96 -> 12*12 patches
         config2 = get_config(size=(8, 8)) # 48*48 -> 12*12 patches
-        config3 = get_config(size=(4, 4)) # 24*24 -> 6*6 patches
+        config3 = get_config(size=(6, 6)) # 24*24 -> 6*6 patches
 
         crossAttnTransformer0 = CrossAttentionTransformer(config0, (feat_sz[0]*2, feat_sz[0]), segm_inter_dim[0], vis=True)
         crossAttnTransformer1 = CrossAttentionTransformer(config1, (feat_sz[1]*2, feat_sz[1]), segm_inter_dim[1], vis=True)
