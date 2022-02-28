@@ -419,8 +419,7 @@ class DepthSegmNetAttention(nn.Module):
         attn_weights1, feat_rgbd1 = self.attn_module(attn_weights2, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=1)
         attn_weights0, feat_rgbd0 = self.attn_module(attn_weights1, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0)
 
-        # feat_rgbd = F.softmax(out, dim=1)
-        out = F.softmax(attn_weights0)
+        # out = F.softmax(attn_weights0, dim=1)
 
         if debug:
             return out, (attn_weights3, attn_weights2, attn_weights1, attn_weights0) # B, C, H, W
