@@ -10,3 +10,4 @@ from .depth_segm_attention_net5 import DepthSegmNetAttention05
 from .depth_segm_attention_net6 import DepthSegmNetAttention06
 from .depth_segm_attention_net7 import DepthSegmNetAttention07
 from .depth_segm_attention_net8 import DepthSegmNetAttention as DepthSegmNetAttention08
+from .depth_segm_attention_net9 import DepthSegmNetAttention as DepthSegmNetAttention09
