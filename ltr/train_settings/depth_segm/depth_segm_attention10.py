@@ -116,7 +116,7 @@ def run(settings):
     actor = actors.DepthSegmActor_no_targetsz(net=net, objective=objective)
 
     # Optimizer
-    optimizer = optim.Adam(actor.net.segm_predictor.parameters(), lr=1e-2)
+    optimizer = optim.Adam(actor.net.segm_predictor.parameters(), lr=1e-1)
 
     # Learning rate scheduler
     lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.2)
