@@ -17,7 +17,7 @@ def draw_axis(ax, img, title, show_minmax=False):
 
 def cat_attn_feat(attn_weights):
     C, H, W = attn_weights.shape
-    edge = math.sqrt(C)+1
+    edge = int(math.sqrt(C))+1
     attn_maps = np.zeros((edge*H, edge*W), dtype=np.float32)
     for idx in range(C):
         attn = attn_weights[idx] # H, W
