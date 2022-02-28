@@ -363,10 +363,10 @@ class DepthSegmNetAttention(nn.Module):
                                        conv(segm_inter_dim[2], segm_inter_dim[2]),
                                        conv(1, segm_inter_dim[3], kernel_size=1, padding=0)])
         # attention layers
-        self.a_layers = nn.ModuleList([conv(crossAttnTransformer0.n_patches, segm_inter_dim[0]),
-                                       conv(crossAttnTransformer1.n_patches, segm_inter_dim[1]),
-                                       conv(crossAttnTransformer2.n_patches, segm_inter_dim[2]),
-                                       conv(crossAttnTransformer3.n_patches, segm_inter_dim[3])])
+        self.a_layers = nn.ModuleList([conv(crossAttnTransformer0.n_patches*2, segm_inter_dim[0]),
+                                       conv(crossAttnTransformer1.n_patches*2, segm_inter_dim[1]),
+                                       conv(crossAttnTransformer2.n_patches*2, segm_inter_dim[2]),
+                                       conv(crossAttnTransformer3.n_patches*2, segm_inter_dim[3])])
 
         # project RGB feat
         self.f_layers = nn.ModuleList([conv(segm_input_dim[0], segm_inter_dim[0]),
@@ -383,7 +383,7 @@ class DepthSegmNetAttention(nn.Module):
                                                      conv_no_relu(segm_inter_dim[3], segm_inter_dim[3]))])
 
         # project out feat
-        self.post_layers = nn.ModuleList([conv(segm_inter_dim[0], 2),           # conv_no_relu(segm_inter_dim[0], 2),
+        self.post_layers = nn.ModuleList([conv_no_relu(segm_inter_dim[0], 2),           # conv_no_relu(segm_inter_dim[0], 2),
                                           conv(segm_inter_dim[1], segm_inter_dim[0]),
                                           conv(segm_inter_dim[2], segm_inter_dim[1]),
                                           conv(segm_inter_dim[3], segm_inter_dim[2])])
@@ -440,32 +440,27 @@ class DepthSegmNetAttention(nn.Module):
         ''' Use attn_weights as input , [layers, B, heads, P_q, P_kv], P_q == P_kv'''
         attn_weights = torch.stack(attn_weights)
         attn_weights = torch.mean(attn_weights, dim=2) # [layers, B, P_q, P_kv] average the attention weights across all heads
-        # patch_q = attn_weights.shape[-2]
-        # patch_kv = attn_weights.shape[-1]
-        # # To account for residual connections, we add an identity matrix to the
-        # # attention matrix and re-normalize the weights.
-        # residual_att = torch.eye(patch_q, m=patch_kv).to('cuda')                # [P_q, P_kv]
-        # aug_att_mat = attn_weights + residual_att                               # [layers, B, P_q, P_kv]
-        # aug_att_mat = aug_att_mat / aug_att_mat.sum(dim=-1).unsqueeze(-1)       # [layers, B, P_q, P_kv] / [layers, B, P_q]
+        patch_q = attn_weights.shape[-2]
+        patch_kv = attn_weights.shape[-1]
+        # To account for residual connections, we add an identity matrix to the
+        # attention matrix and re-normalize the weights.
+        residual_att = torch.eye(patch_q, m=patch_kv).to('cuda')                # [P_q, P_kv]
+        aug_att_mat = attn_weights + residual_att                               # [layers, B, P_q, P_kv]
+        aug_att_mat = aug_att_mat / aug_att_mat.sum(dim=-1).unsqueeze(-1)       # [layers, B, P_q, P_kv] / [layers, B, P_q]
 
         # Recursively multiply the weight matrices
-        joint_attentions = attn_weights[0] # aug_att_mat !!!!
-        for l in range(1, attn_weights.size(0)):
-            joint_attentions = torch.matmul(attn_weights[l], joint_attentions)   # [B, P_q, P_kv]
+        joint_attentions = aug_att_mat[0]
+        for l in range(1, aug_att_mat.size(0)):
+            joint_attentions = torch.matmul(aug_att_mat[l], joint_attentions)   # [B, P_q, P_kv]
 
         n_patches = joint_attentions.shape[1] // 2                              # for each patch, 16 patches, 64 patches, 256 patches
         featmap_sz = int(math.sqrt(n_patches))                                  # for RGB and D feat maps, 4x4, 8x8, 16x16
-        attention_map = torch.max(joint_attentions[:, :n_patches, :], joint_attentions[:, n_patches:, :]) # F_rgb + F_d
-        # attention_map = torch.cat((joint_attentions[:, :n_patches, :], joint_attentions[:, n_patches:, :]), dim=-1) # B, P_q, 2P_kv
-        attention_map = attention_map.view(attention_map.shape[0], featmap_sz, featmap_sz, -1).permute(0, 3, 1, 2)  # .contiguous() # [B, P_kv, H, W]
+        attention_map = torch.cat((joint_attentions[:, :n_patches, :], joint_attentions[:, n_patches:, :]), dim=-1) # B, P_q, 2P_kv
+        attention_map = attention_map.view(attention_map.shape[0], featmap_sz, featmap_sz, -1).permute(0, 3, 1, 2)  # .contiguous() # [B, 2P_kv, H, W]
 
         attention_map = F.interpolate(attention_map, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))            # B x 2P_kv x 4 x 4 ->  B x 2P_kv x 48 x 48
-
-        if layer == 3:
-            pre_attn = F.normalize(pre_attn)
         pre_attn = F.interpolate(pre_attn, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))
 
         out = self.post_layers[layer](F.upsample(self.a_layers[layer](attention_map) + self.s_layers[layer](pre_attn), scale_factor=2))
-        # if layer == 0:
-        #     out = torch.cat((out[:, 0, :, :].unsqueeze(1), (1-out[:, 0, :, :].unsqueeze(1))), dim=1)
+
         return out, feat_rgbd
