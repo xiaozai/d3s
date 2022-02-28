@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import cv2
 import os
 import skimage.measure
+import math
 
 def draw_axis(ax, img, title, show_minmax=False):
     ax.imshow(img)
@@ -13,6 +14,17 @@ def draw_axis(ax, img, title, show_minmax=False):
         minval_, maxval_, _, _ = cv2.minMaxLoc(img)
         title = '%s \n min=%.2f max=%.2f' % (title, minval_, maxval_)
     ax.set_title(title, fontsize=9)
+
+def cat_attn_feat(attn_weights):
+    C, H, W = attn_weights.shape
+    edge = math.sqrt(C)+1
+    attn_maps = np.zeros((edge*H, edge*W), dtype=np.float32)
+    for idx in range(C):
+        attn = attn_weights[idx] # H, W
+        hid = idx // edge
+        wid = idx % edge
+        attn_maps[hid*H:(hid+1)*H, wid*W:(wid+1)*W] = attn
+    return attn_maps
 
 def process_attn_maps(att_mat, batch_element, train_mask):
     # use batch 0
@@ -133,6 +145,75 @@ def save_debug(data, pred_mask, vis_data):
     plt.savefig(save_path)
     plt.close(f)
 
+def save_debug_attnweights(data, pred_mask, vis_data):
+
+    batch_element = 0
+
+    attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data # B,C,H,W
+    train_mask = train_mask = data['train_masks'][0, batch_element, :, :].cpu().numpy().astype(np.float32)
+    attn_weights3 = attn_weights3[batch_element, :, :, :].cpu().detach().numpy().squeeze().astype(np.float32) # C, H, W
+    attn_weights2 = attn_weights2[batch_element, :, :, :].cpu().detach().numpy().squeeze().astype(np.float32) # C, H, W
+    attn_weights1 = attn_weights1[batch_element, :, :, :].cpu().detach().numpy().squeeze().astype(np.float32) # C, H, W
+    attn_weights0 = attn_weights0[batch_element, :, :, :].cpu().detach().numpy().squeeze().astype(np.float32) # C, H, W
+
+    attn_maps3 = cat_attn_feat(attn_weights3) # NewH * newW
+    attn_maps2 = cat_attn_feat(attn_weights2)
+    attn_maps1 = cat_attn_feat(attn_weights1)
+    attn_maps0 = cat_attn_feat(attn_weights0)
+
+
+    dir_path = data['settings'].env.images_dir
+
+    train_img = data['train_images'][:, batch_element, :, :].permute(1, 2, 0)
+    train_depth = data['train_depths'][:, batch_element, :, :].permute(1, 2, 0)
+    train_mask = data['train_masks'][0, batch_element, :, :]
+    test_img = data['test_images'][:, batch_element, :, :].permute(1, 2, 0)
+    test_depth = data['test_depths'][:, batch_element, :, :].permute(1, 2, 0)
+    test_mask = data['test_masks'][0, batch_element, :, :]
+
+    test_dist = data['test_dist'][0, batch_element, :, :] # song
+    # print(test_dist.shape)
+
+    # softmax on the mask prediction (since this is done internaly when calculating loss)
+    mask = F.softmax(pred_mask, dim=1)[batch_element, 0, :, :].cpu().detach().numpy().astype(np.float32)
+    predicted_mask = (mask > 0.5).astype(np.float32) * mask
+
+    mu = torch.Tensor(data['settings'].normalize_mean).to(torch.device('cuda')).view(1, 1, 3)
+    std = torch.Tensor(data['settings'].normalize_std).to(torch.device('cuda')).view(1, 1, 3)
+
+    train_img = 255 * (train_img * std + mu)
+    test_img = 255 * (test_img * std + mu)
+
+    train_img = (train_img.cpu().numpy()).astype(np.uint8)
+    train_depth = (train_depth.cpu().numpy().squeeze()).astype(np.float32)
+    test_img = (test_img.cpu().numpy()).astype(np.uint8)
+    test_depth = (test_depth.cpu().numpy().squeeze()).astype(np.float32)
+    train_mask = (train_mask.cpu().numpy()).astype(np.float32)
+    test_mask = (test_mask.cpu().numpy()).astype(np.float32)
+    test_dist = (test_dist.detach().cpu().numpy().squeeze()).astype(np.float32)
+    test_conf = 1 - test_dist / np.max(test_dist)
+
+    # Song
+    f, ((ax1, ax2, ax3, ax4), (ax5, ax6, ax7, ax8), (ax9, ax10, ax11, ax12)) = plt.subplots(3, 4, figsize=(20, 20))
+
+    draw_axis(ax1, train_img, 'Train image')
+    draw_axis(ax3, test_img, 'Test image')
+    draw_axis(ax2, train_depth, 'Train depth')
+    draw_axis(ax4, test_depth, 'Test depth')
+    draw_axis(ax5, train_mask, 'train mask')
+    draw_axis(ax6, test_mask, 'Ground-truth')
+    draw_axis(ax7, predicted_mask, 'Prediction', show_minmax=True)
+    draw_axis(ax8, test_dist, 'test_dist')
+    draw_axis(ax9, attn_maps3, 'attn_weights3', show_minmax=True)
+    draw_axis(ax10, attn_maps2, 'attn_weights2', show_minmax=True)
+    draw_axis(ax11, attn_maps1, 'attn_weights1', show_minmax=True)
+    draw_axis(ax12, attn_maps0, 'attn_weights0', show_minmax=True)
+
+
+    save_path = os.path.join(data['settings'].env.images_dir, '%03d-%04d.png' % (data['epoch'], data['iter']))
+    plt.savefig(save_path)
+    plt.close(f)
+
 
 class DepthSegmActor(BaseActor):
     """ Actor for training the Segmentation in ATOM"""
@@ -200,5 +281,47 @@ class DepthSegmActor(BaseActor):
 
         if 'iter' in data and (data['iter'] - 1) % 50 == 0:
             save_debug(data,masks_pred, vis_data) # vis_data = (p_rgb, p_d) or  (pred_sm_d, attn_weights2, attn_weights1, attn_weights0)
+
+        return loss, stats
+
+
+class DepthSegmActor_no_targetsz(BaseActor):
+    """ Actor for training the Segmentation in ATOM"""
+    def __call__(self, data):
+        """
+        args:
+            data - The input data, should contain the fields 'train_images', 'test_images', 'train_anno',
+                    'test_proposals' and 'proposal_iou'.
+
+        returns:
+            loss    - the training loss
+            states  -  dict containing detailed losses
+        """
+
+        test_dist = None
+        if 'test_dist' in data:
+            test_dist = data['test_dist'].permute(1, 0, 2, 3)
+
+
+        masks_pred, vis_data = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
+                                        data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
+                                        data['test_images'].permute(1, 0, 2, 3),
+                                        data['test_depths'].permute(1, 0, 2, 3),
+                                        data['train_masks'].permute(1, 0, 2, 3),
+                                        test_dist=test_dist,
+                                        debug=True) # Song :  vis pos and neg maps
+
+
+        masks_gt = data['test_masks'].permute(1, 0, 2, 3) # C, B, H, W -> # B * 1 * H * W
+        masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)   # B * 2 * H * W
+
+        loss = self.objective(masks_pred, masks_gt_pair)
+
+        stats = {'Loss/total': loss.item(),
+                 'Loss/segm': loss.item(),
+                 'Loss/size': 0}
+
+        if 'iter' in data and (data['iter'] - 1) % 50 == 0:
+            save_debug_attnweights(data, masks_pred, vis_data) # vis_data = (p_rgb, p_d) or  (pred_sm_d, attn_weights2, attn_weights1, attn_weights0)
 
         return loss, stats

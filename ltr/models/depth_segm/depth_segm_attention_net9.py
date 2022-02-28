@@ -275,7 +275,7 @@ class CrossAttentionTransformer(nn.Module):
             if self.use_target_sz:
                 sz_mask = torch.ones(mask.shape[0], 1, 1).to('cuda')
                 mask = torch.cat((sz_mask, mask), dim=-1) # B, 1, patches+1
-            mask = torch.tensor(mask, dtype=torch.bool) # B, 1, patches+1
+            mask = torch.tensor(mask, dtype=torch.bool)   # B, 1, patches+1
 
         kv_encoded, kv_attn_weights = self.s_atten(kv_embeddings)   # encoded [B, patches+1, C]
         q_encoded, q_attn_weights = self.c_atten(q_embeddings, kv_embeddings, kv_embeddings, mask=mask)
@@ -351,25 +351,22 @@ class DepthSegmNetAttention(nn.Module):
         config3 = get_config(size=(4, 4)) # 4x4 ? 6*6?
         config = get_config(size=(12, 12)) # 4*4, 8*8, 16*16 patches
 
-        self.transformers = nn.ModuleList([CrossAttentionTransformer(config, (feat_sz[0]*2, feat_sz[0]), segm_inter_dim[0], vis=True),  # 192x192x4 -> 16x16x4 patches
-                                           CrossAttentionTransformer(config, (feat_sz[1]*2, feat_sz[1]), segm_inter_dim[1], vis=True),  # 96x94x16  -> 8x8x4 patches
-                                           CrossAttentionTransformer(config, (feat_sz[2]*2, feat_sz[2]), segm_inter_dim[2], vis=True),
-                                           CrossAttentionTransformer(config3, (feat_sz[3]*2, feat_sz[3]), segm_inter_dim[3], vis=True, use_target_sz=True)]) # 48x48x32  -> 4x4x4 patches
-
-        self.head = nn.Linear(config3.hidden_size, 1) # target size estimation
+        crossAttnTransformer0 = CrossAttentionTransformer(config, (feat_sz[0]*2, feat_sz[0]), segm_inter_dim[0], vis=True)
+        crossAttnTransformer1 = CrossAttentionTransformer(config, (feat_sz[1]*2, feat_sz[1]), segm_inter_dim[1], vis=True)
+        crossAttnTransformer2 = CrossAttentionTransformer(config, (feat_sz[2]*2, feat_sz[2]), segm_inter_dim[2], vis=True),
+        crossAttnTransformer3 = CrossAttentionTransformer(config3, (feat_sz[3]*2, feat_sz[3]), segm_inter_dim[3], vis=True, use_target_sz=False)
+        self.transformers = nn.ModuleList([crossAttnTransformer0, crossAttnTransformer1, crossAttnTransformer2, crossAttnTransformer3])
 
         # project pre-out feat
         self.s_layers = nn.ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]),
                                        conv(segm_inter_dim[1], segm_inter_dim[1]),
                                        conv(segm_inter_dim[2], segm_inter_dim[2]),
                                        conv(1, segm_inter_dim[3], kernel_size=1, padding=0)])
-
-        # project attention RGBD feat
-        rgbd_channels = config.hidden_size * 2 # RGB + D
-        self.a_layers = nn.ModuleList([conv(rgbd_channels, segm_inter_dim[0]),
-                                       conv(rgbd_channels, segm_inter_dim[1]),
-                                       conv(rgbd_channels, segm_inter_dim[2]),
-                                       conv(rgbd_channels, segm_inter_dim[3])])
+        # attention layers
+        self.a_layers = nn.ModuleList([conv(crossAttnTransformer0.n_patches*2, segm_inter_dim[0]),
+                                       conv(crossAttnTransformer1.n_patches*2, segm_inter_dim[1]),
+                                       conv(crossAttnTransformer2.n_patches*2, segm_inter_dim[2]),
+                                       conv(crossAttnTransformer3.n_patches*2, segm_inter_dim[3])])
 
         # project RGB feat
         self.f_layers = nn.ModuleList([conv(segm_input_dim[0], segm_inter_dim[0]),
@@ -409,24 +406,25 @@ class DepthSegmNetAttention(nn.Module):
                             n.bias.data.zero_()
 
     def forward(self, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, test_dist=None, debug=False):
-        ''' rgb features   : [conv1, layer1, layer2, layer3], Bx64x192x192  -> Bx256x96x96 -> Bx512x48x48 -> Bx1024x24x24
-            depth features : [feat0, feat1, feat2, feat3],    Bx4x192x192 -> Bx16x96x96 -> Bx32x48x48 -> Bx64x24x24
+        ''' rgb features   : [conv1, layer1, layer2, layer3], Bx64x192x192 -> Bx256x96x96 -> Bx512x48x48 -> Bx1024x24x24
+            depth features : [feat0, feat1, feat2, feat3],    Bx4x192x192  -> Bx16x96x96  -> Bx32x48x48  -> Bx64x24x24
 
             what happens we use attn weights maps as input??
         '''
-        out, target_sz, attn_weights3 = self.attn_module(test_dist[0], feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=3)
-        out, attn_weights2 = self.attn_module(out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=2)
-        out, attn_weights1 = self.attn_module(out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=1)
-        out, attn_weights0 = self.attn_module(out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0)
+        attn_weights3, feat_rgbd3 = self.attn_module(test_dist[0], feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=3)
+        attn_weights2, feat_rgbd2 = self.attn_module(attn_weights3, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=2)
+        attn_weights1, feat_rgbd1 = self.attn_module(attn_weights2, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=1)
+        attn_weights0, feat_rgbd0 = self.attn_module(attn_weights1, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0)
 
-        out = F.softmax(out, dim=1)
+        # feat_rgbd = F.softmax(out, dim=1)
+        out = F.softmax(attn_weights0)
 
         if debug:
-            return out, target_sz, (attn_weights3, attn_weights2, attn_weights1, attn_weights0)
+            return out, (attn_weights3, attn_weights2, attn_weights1, attn_weights0) # B, C, H, W
         else:
-            return out, target_sz
+            return out
 
-    def attn_module(self, pre_out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0):
+    def attn_module(self, pre_attn, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0):
 
         f_test_rgb, f_test_d = feat_test_rgb[layer], feat_test_d[layer]
         f_train_rgb, f_train_d = feat_train_rgb[layer], feat_train_d[layer]
@@ -436,28 +434,33 @@ class DepthSegmNetAttention(nn.Module):
         template = torch.cat((self.f_layers[layer](f_train_rgb), self.d_layers[layer](f_train_d)), dim=2)
         search_region = torch.cat((self.f_layers[layer](f_test_rgb), self.d_layers[layer](f_test_d)), dim=2)
 
+        feat_rgbd, attn_weights = self.transformers[layer](template, search_region, mask=mask)  # [B, P_q, C], # [layers, B, heads, P_q, P_kv]
 
-        out, attn_weights = self.transformers[layer](template, search_region, mask=mask)  # [B, 1+P_q, C],
-        # attn_weights, # [layers=3, B, heads=3, 1+P_q, 1+P_kv]
 
-        if layer == 3:
-            # target scale estimation, target size change scale in [0, 2] compared to the template target sz
-            target_sz = torch.sigmoid(self.head(out[:, 0])) * 2 # BxC -> Bx1,
-            out = out[:, 1:, :]
-            attn_weights = [aw[:, :, 1:, 1:] for aw in attn_weights] # [layers, B, heads, P_q, P_kv]
+        ''' Use attn_weights as input , [layers, B, heads, P_q, P_kv], P_q == P_kv'''
+        attn_weights = torch.stack(attn_weights)
+        attn_weights = torch.mean(attn_weights, dim=2) # [layers, B, P_q, P_kv] average the attention weights across all heads
+        patch_q = attn_weights.shape[-2]
+        patch_kv = attn_weights.shape[-1]
+        # To account for residual connections, we add an identity matrix to the
+        # attention matrix and re-normalize the weights.
+        residual_att = torch.eye(patch_q, m=patch_kv).to('cuda')                # [P_q, P_kv]
+        aug_att_mat = attn_weights + residual_att                               # [layers, B, P_q, P_kv]
+        aug_att_mat = aug_att_mat / aug_att_mat.sum(dim=-1).unsqueeze(-1)       # [layers, B, P_q, P_kv] / [layers, B, P_q]
 
-        n_patches = out.shape[1] // 2                                           # for each patch, 16 patches, 64 patches, 256 patches
+        # Recursively multiply the weight matrices
+        joint_attentions = aug_att_mat[0]
+        for l in range(1, aug_att_mat.size(0)):
+            joint_attentions = torch.matmul(aug_att_mat[l], joint_attentions)   # [B, P_q, P_kv]
+
+        n_patches = joint_attentions.shape[1] // 2                              # for each patch, 16 patches, 64 patches, 256 patches
         featmap_sz = int(math.sqrt(n_patches))                                  # for RGB and D feat maps, 4x4, 8x8, 16x16
-        # Only keep test F_rgb and F_D, [B, Patches//2=32/128x512, C=768]
-        out = torch.cat((out[:, :n_patches, :], out[:, n_patches:, :]), dim=-1) # cat(f_rgb, f_d),  B x H x W x 2C
-        out = out.view(out.shape[0], featmap_sz, featmap_sz, -1)
-        out = out.permute(0, 3, 1, 2).contiguous() # [B, 2C, H, W]
-        out = F.interpolate(out, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))              # B x 2C x 4 x 4 ->  B x 2C x 48 x 48
-        pre_out = F.interpolate(pre_out, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))
-        # print(out.shape, pre_out.shape) # [B, 192, 24, 24], [B, 1, 48, 48]
-        out = self.post_layers[layer](F.upsample(self.a_layers[layer](out) + self.s_layers[layer](pre_out), scale_factor=2))
+        attention_map = torch.cat((joint_attentions[:, :n_patches, :], joint_attentions[:, n_patches:, :]), dim=-1) # B, P_q, 2P_kv
+        attention_map = attention_map.view(attention_map.shape[0], featmap_sz, featmap_sz, -1).permute(0, 3, 1, 2)  # .contiguous() # [B, 2P_kv, H, W]
 
-        if layer == 3:
-            return out, target_sz, attn_weights
-        else:
-            return out, attn_weights
+        attention_map = F.interpolate(attention_map, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))            # B x 2P_kv x 4 x 4 ->  B x 2P_kv x 48 x 48
+        pre_attn = F.interpolate(pre_attn, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))
+
+        out = self.post_layers[layer](F.upsample(self.a_layers[layer](attention_map) + self.s_layers[layer](pre_attn), scale_factor=2))
+
+        return out, feat_rgbd
