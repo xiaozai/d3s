@@ -348,15 +348,12 @@ class DepthSegmNetAttention(nn.Module):
 
         self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
+        config3 = get_config(size=(4, 4)) # 4x4 ? 6*6?
+        config = get_config(size=(12, 12)) # 4*4, 8*8, 16*16 patches
 
-        config0 = get_config(size=(16, 16)) # 192*192 -> 16*16 patches
-        config1 = get_config(size=(12, 12)) # 96*96 -> 12*12 patches
-        config2 = get_config(size=(8, 8)) # 48*48 -> 12*12 patches
-        config3 = get_config(size=(6, 6)) # 24*24 -> 6*6 patches
-
-        crossAttnTransformer0 = CrossAttentionTransformer(config0, (feat_sz[0]*2, feat_sz[0]), segm_inter_dim[0], vis=True)
-        crossAttnTransformer1 = CrossAttentionTransformer(config1, (feat_sz[1]*2, feat_sz[1]), segm_inter_dim[1], vis=True)
-        crossAttnTransformer2 = CrossAttentionTransformer(config2, (feat_sz[2]*2, feat_sz[2]), segm_inter_dim[2], vis=True)
+        crossAttnTransformer0 = CrossAttentionTransformer(config, (feat_sz[0]*2, feat_sz[0]), segm_inter_dim[0], vis=True)
+        crossAttnTransformer1 = CrossAttentionTransformer(config, (feat_sz[1]*2, feat_sz[1]), segm_inter_dim[1], vis=True)
+        crossAttnTransformer2 = CrossAttentionTransformer(config, (feat_sz[2]*2, feat_sz[2]), segm_inter_dim[2], vis=True)
         crossAttnTransformer3 = CrossAttentionTransformer(config3, (feat_sz[3]*2, feat_sz[3]), segm_inter_dim[3], vis=True)
         self.transformers = nn.ModuleList([crossAttnTransformer0, crossAttnTransformer1, crossAttnTransformer2, crossAttnTransformer3])
 
@@ -366,10 +363,10 @@ class DepthSegmNetAttention(nn.Module):
                                        conv(segm_inter_dim[2], segm_inter_dim[2]),
                                        conv(1, segm_inter_dim[3], kernel_size=1, padding=0)])
         # attention layers
-        self.a_layers = nn.ModuleList([conv(crossAttnTransformer0.n_patches*2, segm_inter_dim[0]),
-                                       conv(crossAttnTransformer1.n_patches*2, segm_inter_dim[1]),
-                                       conv(crossAttnTransformer2.n_patches*2, segm_inter_dim[2]),
-                                       conv(crossAttnTransformer3.n_patches*2, segm_inter_dim[3])])
+        self.a_layers = nn.ModuleList([conv(crossAttnTransformer0.n_patches, segm_inter_dim[0]),
+                                       conv(crossAttnTransformer1.n_patches, segm_inter_dim[1]),
+                                       conv(crossAttnTransformer2.n_patches, segm_inter_dim[2]),
+                                       conv(crossAttnTransformer3.n_patches, segm_inter_dim[3])])
 
         # project RGB feat
         self.f_layers = nn.ModuleList([conv(segm_input_dim[0], segm_inter_dim[0]),
@@ -419,7 +416,8 @@ class DepthSegmNetAttention(nn.Module):
         attn_weights1, feat_rgbd1 = self.attn_module(attn_weights2, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=1)
         attn_weights0, feat_rgbd0 = self.attn_module(attn_weights1, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0)
 
-        # out = F.softmax(attn_weights0, dim=1)
+        # feat_rgbd = F.softmax(out, dim=1)
+        # out = F.softmax(attn_weights0)
 
         if debug:
             return attn_weights0, (attn_weights3, attn_weights2, attn_weights1, attn_weights0) # B, C, H, W
@@ -457,11 +455,13 @@ class DepthSegmNetAttention(nn.Module):
 
         n_patches = joint_attentions.shape[1] // 2                              # for each patch, 16 patches, 64 patches, 256 patches
         featmap_sz = int(math.sqrt(n_patches))                                  # for RGB and D feat maps, 4x4, 8x8, 16x16
-        attention_map = torch.cat((joint_attentions[:, :n_patches, :], joint_attentions[:, n_patches:, :]), dim=-1) # B, P_q, 2P_kv
-        attention_map = attention_map.view(attention_map.shape[0], featmap_sz, featmap_sz, -1).permute(0, 3, 1, 2)  # .contiguous() # [B, 2P_kv, H, W]
+        attention_map = joint_attentions[:, :n_patches, :] + joint_attentions[:, n_patches:, :] # F_rgb + F_d
+        # attention_map = torch.cat((joint_attentions[:, :n_patches, :], joint_attentions[:, n_patches:, :]), dim=-1) # B, P_q, 2P_kv
+        attention_map = attention_map.view(attention_map.shape[0], featmap_sz, featmap_sz, -1).permute(0, 3, 1, 2)  # .contiguous() # [B, P_kv, H, W]
 
         attention_map = F.interpolate(attention_map, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))            # B x 2P_kv x 4 x 4 ->  B x 2P_kv x 48 x 48
         pre_attn = F.interpolate(pre_attn, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))
+
         out = self.post_layers[layer](F.upsample(self.a_layers[layer](attention_map) + self.s_layers[layer](pre_attn), scale_factor=2))
 
         return out, feat_rgbd
