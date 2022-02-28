@@ -461,6 +461,8 @@ class DepthSegmNetAttention(nn.Module):
 
         attention_map = F.interpolate(attention_map, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))            # B x 2P_kv x 4 x 4 ->  B x 2P_kv x 48 x 48
 
+        if layer == 3:
+            pre_attn = F.normalize(pre_attn)
         pre_attn = F.interpolate(pre_attn, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))
 
         out = self.post_layers[layer](F.upsample(self.a_layers[layer](attention_map) + self.s_layers[layer](pre_attn), scale_factor=2))
