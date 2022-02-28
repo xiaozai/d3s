@@ -289,8 +289,8 @@ def get_config(size=(16,16)):
     config.hidden_size = 48 # 96 # 768
     config.transformer = ml_collections.ConfigDict()
     config.transformer.mlp_dim = 256 # 512 # 1024 # 3072
-    config.transformer.num_heads = 2 # 12
-    config.transformer.num_layers = 2 # 3 # 12
+    config.transformer.num_heads = 3 # 12
+    config.transformer.num_layers = 3 # 3 # 12
     config.transformer.attention_dropout_rate = 0.0
     config.transformer.dropout_rate = 0.1
     return config
