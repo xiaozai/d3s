@@ -318,8 +318,7 @@ class DepthSegmActor_no_targetsz(BaseActor):
         loss = self.objective(masks_pred, masks_gt_pair)
 
         stats = {'Loss/total': loss.item(),
-                 'Loss/segm': loss.item(),
-                 'Loss/size': 0}
+                 'Loss/segm': loss.item()}
 
         if 'iter' in data and (data['iter'] - 1) % 50 == 0:
             save_debug_attnweights(data, masks_pred, vis_data) # vis_data = (p_rgb, p_d) or  (pred_sm_d, attn_weights2, attn_weights1, attn_weights0)
