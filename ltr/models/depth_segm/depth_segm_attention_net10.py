@@ -440,13 +440,13 @@ class DepthSegmNetAttention(nn.Module):
         ''' Use attn_weights as input , [layers, B, heads, P_q, P_kv], P_q == P_kv'''
         attn_weights = torch.stack(attn_weights)
         attn_weights = torch.mean(attn_weights, dim=2) # [layers, B, P_q, P_kv] average the attention weights across all heads
-        patch_q = attn_weights.shape[-2]
-        patch_kv = attn_weights.shape[-1]
-        # To account for residual connections, we add an identity matrix to the
-        # attention matrix and re-normalize the weights.
-        residual_att = torch.eye(patch_q, m=patch_kv).to('cuda')                # [P_q, P_kv]
-        aug_att_mat = attn_weights + residual_att                               # [layers, B, P_q, P_kv]
-        aug_att_mat = aug_att_mat / aug_att_mat.sum(dim=-1).unsqueeze(-1)       # [layers, B, P_q, P_kv] / [layers, B, P_q]
+        # patch_q = attn_weights.shape[-2]
+        # patch_kv = attn_weights.shape[-1]
+        # # To account for residual connections, we add an identity matrix to the
+        # # attention matrix and re-normalize the weights.
+        # residual_att = torch.eye(patch_q, m=patch_kv).to('cuda')                # [P_q, P_kv]
+        # aug_att_mat = attn_weights + residual_att                               # [layers, B, P_q, P_kv]
+        # aug_att_mat = aug_att_mat / aug_att_mat.sum(dim=-1).unsqueeze(-1)       # [layers, B, P_q, P_kv] / [layers, B, P_q]
 
         # Recursively multiply the weight matrices
         joint_attentions = aug_att_mat[0]
@@ -464,6 +464,6 @@ class DepthSegmNetAttention(nn.Module):
         pre_attn = F.interpolate(pre_attn, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))
 
         out = self.post_layers[layer](F.upsample(self.a_layers[layer](attention_map) + self.s_layers[layer](pre_attn), scale_factor=2))
-        if layer == 0:
-            out = torch.cat((out[:, 0, :, :].unsqueeze(1), (1-out[:, 0, :, :].unsqueeze(1))), dim=1)
+        # if layer == 0:
+        #     out = torch.cat((out[:, 0, :, :].unsqueeze(1), (1-out[:, 0, :, :].unsqueeze(1))), dim=1)
         return out, feat_rgbd
