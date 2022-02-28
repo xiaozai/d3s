@@ -460,8 +460,10 @@ class DepthSegmNetAttention(nn.Module):
         attention_map = attention_map.view(attention_map.shape[0], featmap_sz, featmap_sz, -1).permute(0, 3, 1, 2)  # .contiguous() # [B, P_kv, H, W]
 
         attention_map = F.interpolate(attention_map, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))            # B x 2P_kv x 4 x 4 ->  B x 2P_kv x 48 x 48
+
         pre_attn = F.interpolate(pre_attn, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))
 
         out = self.post_layers[layer](F.upsample(self.a_layers[layer](attention_map) + self.s_layers[layer](pre_attn), scale_factor=2))
-        out = torch.cat((out[:, 0, :, :].squeeze(1), (1-out[:, 0, :, :].squeeze(1))))
+        if layer == 0:
+            out = torch.cat((out[:, 0, :, :].unsqueeze(1), (1-out[:, 0, :, :].unsqueeze(1))), dim=1)
         return out, feat_rgbd
