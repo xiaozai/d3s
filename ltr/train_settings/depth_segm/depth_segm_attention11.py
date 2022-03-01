@@ -56,14 +56,14 @@ def run(settings):
     # The augmentation transform applied to the training set (individually to each image in the pair)
     transform_train = torchvision.transforms.Compose([dltransforms.ToTensorAndJitter(0.2),
                                                       torchvision.transforms.Normalize(mean=settings.normalize_mean,
-                                                                                       std=settings.normalize_std),
-                                                      torchvision.transforms.RandomRotation(degrees=(0, 180))])
+                                                                                       std=settings.normalize_std)])
+                                                      # torchvision.transforms.RandomRotation(degrees=(0, 180))])
 
     # The augmentation transform applied to the validation set (individually to each image in the pair)
     transform_val = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
                                                     torchvision.transforms.Normalize(mean=settings.normalize_mean,
-                                                                                     std=settings.normalize_std),
-                                                    torchvision.transforms.RandomRotation(degrees=(0, 180))])
+                                                                                     std=settings.normalize_std)])
+                                                    # torchvision.transforms.RandomRotation(degrees=(0, 180))])
 
     # Data processing to do on the training pairs
     data_processing_train = depth_segm_processing.DepthSegmProcessing(search_area_factor=settings.search_area_factor,

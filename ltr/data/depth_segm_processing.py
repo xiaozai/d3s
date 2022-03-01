@@ -190,6 +190,8 @@ class DepthSegmProcessing(BaseProcessing):
             data[s + '_images'] = [self.transform[s](x) for x in crops_img] # 1 * 3 * H * W
             data[s + '_anno'] = boxes
             data[s + '_masks'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_mask] # 1, 1*384*384
+            ''' Song random rotated image '''
+            # data[s + '_masks'] = [self.transform[s](x) for x in crops_mask]
 
             ''' Song's comments :
                 depth is normalized when dataset._get_frame(

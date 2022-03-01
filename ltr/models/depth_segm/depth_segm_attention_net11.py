@@ -73,7 +73,7 @@ class Attention(nn.Module):
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
 
         if mask is not None:
-            mask = torch.tensor(mask, dtype=torch.uint8).to('cuda')
+            mask = torch.tensor(mask, dtype=torch.bool).to(attention_scores.device) # .to('cuda')
             attention_scores = attention_scores.masked_fill(~mask.unsqueeze(1), 0) # float('-inf'))
 
         attention_probs = self.softmax(attention_scores) # dim=-1 [B, head, P_q, P_k]
@@ -315,20 +315,25 @@ class DepthNet(nn.Module):
         self.maxpool2 = nn.MaxPool2d(2, stride=2)
         self.maxpool3 = nn.MaxPool2d(2, stride=2)
 
-        self.conv0 = nn.Conv2d(input_dim, inter_dim[0], kernel_size=3, stride=1, padding=0, dilation=1, bias=True),
-        self.b0 = nn.BatchNorm2d(inter_dim[0]),
+        # self.dc = depth_conv
+
+        self.conv0 = nn.Conv2d(input_dim, inter_dim[0], kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
+        self.b0 = nn.BatchNorm2d(inter_dim[0])
         self.relu0 = nn.ReLU(inplace=True)
 
-        self.conv1 = nn.Conv2d(inter_dim[0], inter_dim[1], kernel_size=3, stride=1, padding=0, dilation=1, bias=True),
-        self.b1 = nn.BatchNorm2d(inter_dim[1]),
+        self.conv1 = nn.Conv2d(inter_dim[0], inter_dim[1], kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
+        # self.dc1 = DepthConv.apply
+        self.b1 = nn.BatchNorm2d(inter_dim[1])
         self.relu1 = nn.ReLU(inplace=True)
 
-        self.conv2 = nn.Conv2d(inter_dim[1], inter_dim[2], kernel_size=3, stride=1, padding=0, dilation=1, bias=True),
-        self.b2 = nn.BatchNorm2d(inter_dim[2]),
+        self.conv2 = nn.Conv2d(inter_dim[1], inter_dim[2], kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
+        # self.dc2 = DepthConv.apply
+        self.b2 = nn.BatchNorm2d(inter_dim[2])
         self.relu2 = nn.ReLU(inplace=True)
 
-        self.conv3 = nn.Conv2d(inter_dim[2], inter_dim[3], kernel_size=3, stride=1, padding=0, dilation=1, bias=True),
-        self.b3 = nn.BatchNorm2d(inter_dim[3]),
+        self.conv3 = nn.Conv2d(inter_dim[2], inter_dim[3], kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
+        # self.dc3 = DepthConv.apply
+        self.b3 = nn.BatchNorm2d(inter_dim[3])
         self.relu3 = nn.ReLU(inplace=True)
 
         self.initialize()
@@ -342,31 +347,45 @@ class DepthNet(nn.Module):
 
     def forward(self, dp):
 
-        print(self.conv0.weight.data)
-        feat0 = depth_conv(dp,dp,self.conv0.weight.data, None,stride=1,padding=0,dilation=1)
+        feat0 = depth_conv(dp,dp,self.conv0.weight, self.conv0.bias)
+        # feat0 = self.dc([dp, dp, self.conv0.weight.data, self.conv0.bias.data])
         feat0 = self.b0(feat0)
         feat0 = self.relu0(feat0)
         feat0 = self.maxpool0(feat0)
 
         dp1 = F.interpolate(dp, size=(feat0.shape[-2], feat0.shape[-1]))
-        feat1 = depth_conv(feat0,dp1,self.conv1.weight.data, None,stride=1,padding=0,dilation=1)
+        feat1 = depth_conv(feat0,dp1,self.conv1.weight, self.conv1.bias)
+        # feat1 = self.dc([feat0, dp1, self.conv1.weight.data, self.conv1.bias.data])
         feat1 = self.b1(feat1)
         feat1 = self.relu1(feat1)
         feat1 = self.maxpool1(feat1)
 
         dp2 = F.interpolate(dp, size=(feat1.shape[-2], feat1.shape[-1]))
-        feat2 = depth_conv(feat1,dp2,self.conv2.weight.data, None,stride=1,padding=0,dilation=1)
+        feat2 = depth_conv(feat1,dp2,self.conv2.weight, self.conv2.bias)
+        # feat2 = self.dc([feat1, dp2, self.conv2.weight.data, self.conv2.bias.data])
         feat2 = self.b2(feat2)
         feat2 = self.relu2(feat2)
         feat2 = self.maxpool2(feat2)
 
         dp3 = F.interpolate(dp, size=(feat2.shape[-2], feat2.shape[-1]))
-        feat3 = depth_conv(feat2,dp3,self.conv3.weight.data, None,stride=1,padding=0,dilation=1)
+        feat3 = depth_conv(feat2,dp3,self.conv3.weight, self.conv3.bias)
+        # feat3 = self.dc([feat2, dp3, self.conv3.weight.data, self.conv3.bias.data])
         feat3 = self.b3(feat3)
         feat3 = self.relu3(feat3)
         feat3 = self.maxpool3(feat3)
 
         return [feat0, feat1, feat2, feat3] # [4, 16, 32, 64]
+
+# class DepthConv(torch.autograd.Function):
+#     @staticmethod
+#     def forward(ctx, input):
+#         result = depth_conv(input[0],input[1], input[2], bias=input[3],stride=1,padding=0,dilation=1)
+#         ctx.save_for_backward(result)
+#         return result
+#     @staticmethod
+#     def backward(ctx, grad_output):
+#         restult, = ctx.saved_tensors
+#         return grad_output * result
 
 
 class DepthSegmNetAttention(nn.Module):
@@ -462,7 +481,6 @@ class DepthSegmNetAttention(nn.Module):
         f_train_rgb, f_train_d = feat_train_rgb[layer], feat_train_d[layer]
         mask = F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1])) # Bx1xHxW
         mask = torch.cat((mask, mask), dim=2)
-
         template = torch.cat((self.f_layers[layer](f_train_rgb), self.d_layers[layer](f_train_d)), dim=2)
         search_region = torch.cat((self.f_layers[layer](f_test_rgb), self.d_layers[layer](f_test_d)), dim=2)
 
