@@ -116,7 +116,7 @@ def run(settings):
     actor = actors.DepthSegmActor_no_targetsz(net=net, objective=objective)
 
     # Optimizer
-    optimizer = optim.Adam(actor.net.segm_predictor.parameters(), lr=1e-1)
+    optimizer = optim.Adam(actor.net.segm_predictor.parameters(), lr=1e-3)
 
     # Learning rate scheduler
     lr_scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=15, gamma=0.2)
@@ -125,4 +125,4 @@ def run(settings):
     trainer = LTRTrainer(actor, [loader_train, loader_val], optimizer, settings, lr_scheduler)
 
     # Run training (set fail_safe=False if you are debugging)
-    trainer.train(80, load_latest=True, fail_safe=False)
+    trainer.train(40, load_latest=True, fail_safe=False)

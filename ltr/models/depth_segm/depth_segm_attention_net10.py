@@ -363,10 +363,10 @@ class DepthSegmNetAttention(nn.Module):
                                        conv(segm_inter_dim[2], segm_inter_dim[2]),
                                        conv(1, segm_inter_dim[3], kernel_size=1, padding=0)])
         # attention layers
-        self.a_layers = nn.ModuleList([conv(crossAttnTransformer0.n_patches*2, segm_inter_dim[0]),
-                                       conv(crossAttnTransformer1.n_patches*2, segm_inter_dim[1]),
-                                       conv(crossAttnTransformer2.n_patches*2, segm_inter_dim[2]),
-                                       conv(crossAttnTransformer3.n_patches*2, segm_inter_dim[3])])
+        self.a_layers = nn.ModuleList([conv(crossAttnTransformer0.n_patches, segm_inter_dim[0]),
+                                       conv(crossAttnTransformer1.n_patches, segm_inter_dim[1]),
+                                       conv(crossAttnTransformer2.n_patches, segm_inter_dim[2]),
+                                       conv(crossAttnTransformer3.n_patches, segm_inter_dim[3])])
 
         # project RGB feat
         self.f_layers = nn.ModuleList([conv(segm_input_dim[0], segm_inter_dim[0]),
@@ -454,8 +454,10 @@ class DepthSegmNetAttention(nn.Module):
             joint_attentions = torch.matmul(aug_att_mat[l], joint_attentions)   # [B, P_q, P_kv]
 
         n_patches = joint_attentions.shape[1] // 2                              # for each patch, 16 patches, 64 patches, 256 patches
-        featmap_sz = int(math.sqrt(n_patches))                                  # for RGB and D feat maps, 4x4, 8x8, 16x16
-        attention_map = torch.cat((joint_attentions[:, :n_patches, :], joint_attentions[:, n_patches:, :]), dim=-1) # B, P_q, 2P_kv
+        featmap_sz = int(math.sqrt(n_patches))
+        # attention_map = joint_attentions.view(joint_attentions.shape[0], n_patches, -1)
+        attention_map = torch.max(joint_attentions[:, :n_patches, :], joint_attentions[:, n_patches:, :])                                # for RGB and D feat maps, 4x4, 8x8, 16x16
+        # attention_map = torch.cat((joint_attentions[:, :n_patches, :], joint_attentions[:, n_patches:, :]), dim=-1) # B, P_q, 2P_kv
         attention_map = attention_map.view(attention_map.shape[0], featmap_sz, featmap_sz, -1).permute(0, 3, 1, 2)  # .contiguous() # [B, 2P_kv, H, W]
 
         attention_map = F.interpolate(attention_map, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))            # B x 2P_kv x 4 x 4 ->  B x 2P_kv x 48 x 48
