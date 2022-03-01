@@ -5,7 +5,7 @@ from pytracking import TensorDict
 import ltr.data.processing_utils as prutils
 import random
 import copy
-
+import cv2
 
 class BaseProcessing:
     """ Base class for Processing. Processing class is used to process the data returned by a dataset, before passing it
@@ -371,19 +371,17 @@ class DepthSegmProcessingRotation(BaseProcessing):
             crops_mask, _ = prutils.jittered_center_crop(data[s + '_masks'], jittered_anno, data[s + '_anno'],
                                                             self.search_area_factor, self.output_sz, pad_val=float(0))
 
-            # Song : Rotation
+            # # Song : Rotation
             if s == 'train' and random.random() < 0.2:
                 angle = random.randint(0, 180)
                 scale = 1
-                h, w, c = crops_img.shape
+                h, w = crops_depth[0].shape
                 center = (w/2, h/2)
                 M = cv2.getRotationMatrix2D(center, angle, scale)
 
                 crops_img = [cv2.warpAffine(x, M, (w, h)) for x in crops_img]
                 crops_depth = [cv2.warpAffine(x, M, (w, h)) for x in crops_depth]
                 crops_mask = [cv2.warpAffine(x, M, (w, h)) for x in crops_mask]
-
-                print(len(crops_img), crops_img[0].shape)
 
 
             if s == 'test' and self.use_distance:
