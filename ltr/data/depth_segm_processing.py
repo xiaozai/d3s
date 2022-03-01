@@ -372,7 +372,7 @@ class DepthSegmProcessingRotation(BaseProcessing):
                                                             self.search_area_factor, self.output_sz, pad_val=float(0))
 
             # # Song : Rotation
-            if s == 'train' and random.random() < 0.2:
+            if random.random() < 0.2:
                 angle = random.randint(0, 180)
                 scale = 1
                 h, w = crops_depth[0].shape
