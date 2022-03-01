@@ -249,7 +249,9 @@ class BaseTracker:
         self.pause_mode = False
 
         if self.params.debug == 5:
-            self.fig, ((self.ax, self.ax_d, self.ax_initmask, self.ax_rgb_patches), (self.ax_m, self.ax_mrgb, self.ax_score, self.ax_rgb_scoremap)) = plt.subplots(2, 4)
+            self.fig, ((self.ax, self.ax_d), (self.ax_initmask, self.ax_initmaskimg), \
+                       (self.ax_rgb_patches, self.ax_d_patches), (self.ax_m, self.ax_mrgb), \
+                       (self.ax_score, self.ax_rgb_scoremap)) = plt.subplots(5, 2)
 
         elif self.params.debug == 4:
             self.ax_m = None
@@ -287,27 +289,40 @@ class BaseTracker:
             self.ax_m.imshow(self.mask)
             self.ax_m.set_title('predicted mask')
 
+            masked_img = Image.fromarray(np.uint8(self.masked_img)).convert('RGBA')
+            if self.score_map is not None:
+                cm = plt.get_cmap('jet')
+                colored_image = cm(self.score_map)
+                scoremap = Image.fromarray((colored_image[:, :, :3]*255).astype(np.uint8)).convert('RGBA')
+                scoremap = scoremap.resize(masked_img.size)
+                masked_img = Image.blend(masked_img, scoremap, 0.3)
+
             self.ax_mrgb.cla()
-            self.ax_mrgb.imshow(self.masked_img)
+            self.ax_mrgb.imshow(masked_img)
             self.ax_mrgb.set_title('predicted mask over rgb')
 
             self.ax_initmask.cla()
             self.ax_initmask.imshow(self.init_mask)
             self.ax_initmask.set_title('init mask')
 
+            self.ax_initmaskimg.cla()
+            self.ax_initmaskimg.imshow(self.init_masked_img)
+            self.ax_initmaskimg.set_title('init masked over rgb')
+
             if self.rgb_patches is not None:
                 self.ax_rgb_patches.cla()
                 self.ax_rgb_patches.imshow(self.rgb_patches)
                 self.ax_rgb_patches.set_title('rgb patches')
 
-                rgb = Image.fromarray(np.uint8(self.rgb_patches)).convert('RGBA')
+                self.ax_d_patches.cla()
+                d_patches = np.uint8(self.d_patches *255)
+                self.ax_d_patches.imshow(d_patches)
+                self.ax_d_patches.set_title('d patches')
 
-                # cm = plt.get_cmap('gist_rainbow')
-                cm = plt.get_cmap('jet')
-                colored_image = cm(self.score_map)
-                scoremap = Image.fromarray((colored_image[:, :, :3] * 255).astype(np.uint8)).convert('RGBA')
-
-                rgb_score = Image.blend(rgb, scoremap, 0.3)
+                rgb_score = Image.fromarray(np.uint8(self.rgb_patches)).convert('RGBA')
+                if self.score_map is not None:
+                    scoremap = scoremap.resize(rgb_score.size)
+                    rgb_score = Image.blend(rgb_score, scoremap, 0.3)
                 self.ax_rgb_scoremap.cla()
                 self.ax_rgb_scoremap.imshow(rgb_score)
                 self.ax_rgb_scoremap.set_title('scoremap over rgb')
@@ -327,11 +342,6 @@ class BaseTracker:
                 search_hw = [search_bm[0] - search_tp[0], search_bm[1] - search_tp[1]]
                 search = patches.Rectangle((search_tp[1], search_tp[0]), search_hw[1], search_hw[0], linewidth=2, edgecolor='b', facecolor='none')
                 self.ax.add_patch(search)
-
-
-
-
-
 
         if len(state) == 4:
             pred = patches.Rectangle((state[0], state[1]), state[2], state[3], linewidth=2, edgecolor='r', facecolor='none')
@@ -373,7 +383,7 @@ class BaseTracker:
             # depth[depth > max_depth] = max_depth
             # depth = cv.normalize(depth, None, alpha=0, beta=1, norm_type=cv.NORM_MINMAX, dtype=cv.CV_32F)
             depth = (depth - min_depth) / (max_depth - min_depth) * 1.0
-            depth = np.clip(depth, -0.2, 1.2)
+            depth = np.clip(depth, 0, 1.0)
             depth = np.expand_dims(np.asarray(depth), axis=-1)
             images = {'color':color, 'depth':depth}
             return images

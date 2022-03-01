@@ -171,7 +171,6 @@ class DepthSegmST(BaseTracker):
         self.time += toc_
 
         self.rgb_patches = None
-        self.d_patches = None
         # vis the crop image patches or search region
         self.vis_search_center = None
         self.vis_search_scales = None
@@ -351,7 +350,7 @@ class DepthSegmST(BaseTracker):
 
         # [AL] Modification
         # if update_flag:
-        if update_flag and uncert_score < self.params.tracking_uncertainty_thr:
+        if uncert_score < self.params.tracking_uncertainty_thr:
             # Get train sample
             train_x_rgb = TensorList([x[scale_ind:scale_ind + 1, ...] for x in test_x_rgb])
 
@@ -515,7 +514,6 @@ class DepthSegmST(BaseTracker):
         x_rgb, d_crops, rgb_patches = self.extract_sample(color, depth, pos, scales, sz)
         self.rgb_patches = rgb_patches.clone().detach().cpu().numpy().squeeze()
         self.rgb_patches = np.swapaxes(np.swapaxes(self.rgb_patches, 0, 1), 1, 2).astype(int)
-        self.d_patches = d_crops.clone().detach().cpu().numpy().squeeze()
         return self.preprocess_sample(self.project_sample(x_rgb)), d_crops
 
     def preprocess_sample(self, x: TensorList) -> (TensorList, TensorList):
@@ -800,9 +798,7 @@ class DepthSegmST(BaseTracker):
         return 1 - np.exp(-((np.power(X, p) / (sz_weight * w ** p)) + (np.power(Y, p) / (sz_weight * h ** p))))
 
     def init_segmentation(self, color, depth, bb, init_mask=None):
-        '''
-        Song init mask sometimes is not correct
-        '''
+
         init_patch_crop_rgb, f_ = prutils.sample_target(color, np.array(bb), self.params.segm_search_area_factor,
                                                     output_sz=self.params.segm_output_sz)
 
@@ -898,7 +894,7 @@ class DepthSegmST(BaseTracker):
         # reshape image for the feature extractor
         init_patch_rgb = torch.unsqueeze(init_patch_rgb, dim=0).permute(0, 3, 1, 2)
         init_patch_d = torch.unsqueeze(init_patch_d, dim=0).permute(0, 3, 1, 2)
-        init_mask_patch = torch.unsqueeze(torch.unsqueeze(init_mask_patch, dim=0), dim=0) # [1, 1, 384,384]
+        init_mask_patch = torch.unsqueeze(torch.unsqueeze(init_mask_patch, dim=0), dim=0)
 
         # extract features (extracting twice on the same patch - not necessary)
         train_feat_rgb = segm_net.extract_backbone_features(init_patch_rgb)
@@ -911,15 +907,6 @@ class DepthSegmST(BaseTracker):
         # Song : extract depth features
         train_feat_segm_d = segm_net.segm_predictor.depth_feat_extractor(init_patch_d)
 
-        ''' init_mask is 384*384 after segm_predictor
-        Sometimes, init mask is not good
-        Can we use K-Cluster to replace init_segmentation???
-
-            rgb features   : [conv1, layer1, layer2, layer3], Bx64x192x192 -> Bx256x96x96 -> Bx512x48x48 -> Bx1024x24x24
-            depth features : [feat0, feat1, feat2, feat3],    Bx4x192x192  -> Bx16x96x96  -> Bx32x48x48  -> Bx64x24x24
-        '''
-        # if init_mask is None:
-        #     test_feat_segm_rgb
         if init_mask is None:
             iters = 0
             while iters < 1:
@@ -946,7 +933,7 @@ class DepthSegmST(BaseTracker):
 
                 target_pixels = np.sum((mask > 0.5).astype(np.float32))
 
-                # self.mask = mask # Song
+                self.mask = mask # Song
                 self.segm_init_target_pixels = target_pixels
 
                 if self.params.save_mask:
@@ -958,17 +945,9 @@ class DepthSegmST(BaseTracker):
                 train_masks = [mask_gpu]
 
                 iters += 1
-
-            # Song what happend if init mask is not correct?
-            # print('init mask : ', np.sum(mask), np.sum(init_mask_patch_np), np.sum(mask) / np.sum(init_mask_patch_np))
-            if np.sum(mask) > np.sum(init_mask_patch_np) or np.sum(mask) / (np.sum(init_mask_patch_np)+0.001) < 0.75:
-                mask = init_mask_patch_np
-                target_pixels = np.sum((init_mask_patch_np).astype(np.float32))
         else:
-            # Song , we use init box as init mask to prevent bad init mask
             init_mask_patch_np = (init_mask_patch_np > 0.1).astype(np.float32)
-            mask = init_mask_patch_np
-            # self.mask = init_mask_patch_np
+            self.mask = init_mask_patch_np
             target_pixels = np.sum((init_mask_patch_np).astype(np.float32))
             self.segm_init_target_pixels = target_pixels
 
@@ -983,10 +962,8 @@ class DepthSegmST(BaseTracker):
         if self.params.segm_use_dist:
             self.dist_map = dist_map
 
-        mask = np.array(mask, dtype=np.uint8)
         self.init_mask = mask
         self.mask_pixels = np.array([np.sum(mask)])
-        # self.segm_init_target_pixels = target_pixels
         self.mask = mask
         self.masked_img = init_patch_crop_rgb * np.expand_dims(mask, axis=-1)
         self.init_masked_img = init_patch_crop_rgb * np.expand_dims(mask, axis=-1)
@@ -1130,7 +1107,6 @@ class DepthSegmST(BaseTracker):
                     if pixels_ratio < self.params.segm_pixels_ratio \
                         and pixels_ratio > 0.05 \
                         and init_mask_pixels_ratio > 0.6 \
-                        and init_mask_pixels_ratio < 1.2 \
                         and mask_pixels_ratio > 0.8 \
                         and mask_pixels_ratio < 1.2:
 
@@ -1187,3 +1163,31 @@ class DepthSegmST(BaseTracker):
         w = s * (x2 - x1) + 1
         h = s * (y2 - y1) + 1
         return np.array([cx - w / 2, cy - h / 2, w, h])
+
+    # def avg_depth(self, depth_im, bbox):
+    #     #bbox [x0,y0,w,h]
+    #     # get center around depth
+    #     cx, cy = bbox[0]+bbox[2]/2, bbox[1] + bbox[2]/2
+    #
+    #     def shrink_box(bbox, mh, mw, r=0.4):
+    #         w, h = (1-r) * bbox[2], (1-r) * bbox[3]
+    #         if w<2 or h<2:
+    #             lx = max(cx-w/2, 0)
+    #             ly = max(cy-h/2, 0)
+    #             return [lx, ly, bbox[2], bbox[3]]
+    #         else:
+    #             lx = max(cx-w/2, 0)
+    #             ly = max(cy-h/2, 0)
+    #             w = min(w, mw - w)
+    #             h = min(h, mh - h)
+    #             return [lx, ly, w, h]
+    #
+    #     h, w = depth_im.shape
+    #     shrink_box = shrink_box(bbox, h, w, r=0.4)
+    #     shrink_box = np.asarray(shrink_box).astype(np.int16)
+    #     avg_depth = np.mean(depth_im[shrink_box[1]:(shrink_box[1]+shrink_box[3]), \
+    #             shrink_box[0]:(shrink_box[0]+shrink_box[2])])
+    #
+    #     if np.isnan(avg_depth):
+    #         return -1.
+    #     return avg_depth
