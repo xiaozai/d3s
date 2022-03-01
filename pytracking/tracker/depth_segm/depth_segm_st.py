@@ -16,6 +16,8 @@ from pytracking.features import augmentation
 import ltr.data.processing_utils as prutils
 from ltr import load_network
 
+from ltr.external.depthconv.functions import depth_conv
+
 from pytracking.bbox_fit import fit_bbox_to_mask
 from pytracking.mask_to_disk import save_mask
 
@@ -159,7 +161,7 @@ class DepthSegmST(BaseTracker):
         self.init_memory(train_x_rgb) # No need for depth
 
         # Init optimizer and do initial optimization for DCF
-        self.init_optimization(train_x_rgb, init_y)
+        self.init_optimization(train_x_rgb, init_y) # Song, but Depth is not used for filter optimize
 
         if self.params.use_segmentation:
             self.init_segmentation(color, depth, state, init_mask=init_mask)
@@ -286,8 +288,15 @@ class DepthSegmST(BaseTracker):
         sample_pos = copy.deepcopy(self.pos)
         sample_scales = self.target_scale * self.params.scale_factors
         test_x_rgb, test_x_d = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
+
+        ''' Song, use DAL instead of normal DCF'''
         # Compute scores
-        scores_raw = self.apply_filter(test_x_rgb)
+        if not self.params.use_dal:
+            scores_raw = self.apply_filter(test_x_rgb)
+        else:
+            scores_raw = self.classify_target(test_x_rgb, test_x_d)
+
+
         translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
         new_pos = sample_pos + translation_vec
 
@@ -397,8 +406,47 @@ class DepthSegmST(BaseTracker):
 
         return new_state.tolist(), self.score_map.max()
 
+
+    def classify_target(self, sample_x, sample_d):
+        if sample_d is not None:
+            alpha = 0.1
+            scores = self.apply_filter_depthaware(sample_x, self.filter, sample_d, alpha)
+        else:
+            scores = self.apply_filter(sample_x)
+        return scores
+
     def apply_filter(self, sample_x: TensorList):
         return operation.conv2d(sample_x, self.filter, mode='same')
+
+    def apply_filter_depthaware(self, feat, filter, depth, alpha):
+        '''DAL depth-aware DCF'''
+        for i in range(len(feat)):
+            if feat[i].shape[2]!=depth.shape[2] or feat[i].shape[2]!=depth.shape[2]:
+                depth=F.upsample(depth, size=(feat[i].shape[2],feat[i].shape[3]),mode='bilinear')
+
+        multiple_filters = (feat.dim() == 5)
+        padding = (filter.shape[-2] // 2, filter.shape[-1] // 2)
+        num_images = feat.shape[0]
+        num_sequences = feat.shape[1] if feat.dim() == 5 else 1
+        size_scoreoutput = int(feat.shape[-2] + 2 * padding[0] - filter.shape[-2] / 1 + 1)
+
+        if multiple_filters:
+            scores=torch.zeros(num_images, num_sequences,1,size_scoreoutput,size_scoreoutput).to(feat.device)
+            for seq in range(num_sequences):
+                feat_seq  =feat[:,seq,:,:,:]
+                filter_seq=filter[:,seq,:,:,:]
+                depth_seq =depth[:,seq,:,:,:]
+                depth_seq =alpha*depth_seq.to(feat.device)
+
+                scores_seq=depth_conv(feat_seq,depth_seq,filter_seq,None,stride=1,padding=padding,dilation=1)
+
+                scores[:,seq,:, :,:]=scores_seq
+            return scores.view(num_images, num_sequences, scores.shape[-2], scores.shape[-1])
+
+        depth =alpha*depth
+        depth =depth.to(feat.device)
+        scores=depth_conv(feat,depth,filter,None,stride=1,padding=padding,dilation=1)
+        return scores.view(num_images, num_sequences, scores.shape[-2], scores.shape[-1])
 
     def localize_target(self, scores_raw):
         # Weighted sum (if multiple features) with interpolation in fourier domain
@@ -611,6 +659,7 @@ class DepthSegmST(BaseTracker):
 
         init_samples = self.params.features_filter.extract_transformed(im, self.pos.round(), self.target_scale,
                                                                        aug_expansion_sz, self.transforms)
+
 
         # Remove augmented samples for those that shall not have
         for i, use_aug in enumerate(self.fparams.attribute('use_augmentation')):
@@ -961,9 +1010,9 @@ class DepthSegmST(BaseTracker):
 
             # Song what happend if init mask is not correct?
             # print('init mask : ', np.sum(mask), np.sum(init_mask_patch_np), np.sum(mask) / np.sum(init_mask_patch_np))
-            if np.sum(mask) > np.sum(init_mask_patch_np) or np.sum(mask) / (np.sum(init_mask_patch_np)+0.001) < 0.75:
-                mask = init_mask_patch_np
-                target_pixels = np.sum((init_mask_patch_np).astype(np.float32))
+            # if np.sum(mask) > np.sum(init_mask_patch_np) or np.sum(mask) / (np.sum(init_mask_patch_np)+0.001) < 0.75:
+            #     mask = init_mask_patch_np
+            #     target_pixels = np.sum((init_mask_patch_np).astype(np.float32))
         else:
             # Song , we use init box as init mask to prevent bad init mask
             init_mask_patch_np = (init_mask_patch_np > 0.1).astype(np.float32)
@@ -1128,11 +1177,10 @@ class DepthSegmST(BaseTracker):
                 if self.uncert_score < self.params.uncertainty_segm_scale_thr:
 
                     if pixels_ratio < self.params.segm_pixels_ratio \
-                        and pixels_ratio > 0.05 \
-                        and init_mask_pixels_ratio > 0.6 \
-                        and init_mask_pixels_ratio < 1.2 \
-                        and mask_pixels_ratio > 0.8 \
-                        and mask_pixels_ratio < 1.2:
+                        and init_mask_pixels_ratio > 0.75 \
+                        and init_mask_pixels_ratio < 1.25 \
+                        and mask_pixels_ratio > 0.75 \
+                        and mask_pixels_ratio < 1.25:
 
                         self.mask_pixels = np.append(self.mask_pixels, mask_pixels_)
                         if self.mask_pixels.size > self.params.mask_pixels_budget_sz:

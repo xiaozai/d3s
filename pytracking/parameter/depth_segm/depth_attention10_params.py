@@ -108,14 +108,16 @@ def parameters():
 
     params.use_segmentation = True
 
+    params.use_dal = False # Song
+
     params.model = 'depth_segm_st'
     params.constructor_module = 'ltr.models.depth_segm.depth_segm'
     params.constructor_fun_name = 'depth_segm_attention10_resnet50'
-    params.segm_net_path = '/home/yan/Data2/d3s/checkpoints/ltr/depth_segm/depth_segm_attention10/DepthSegmNet_ep0036.pth.tar'
+    params.segm_net_path = '/home/yan/Data2/d3s/checkpoints/ltr/depth_segm/depth_segm_attention10/DepthSegmNet_ep0040.pth.tar'
     params.segm_use_dist = True
     params.segm_normalize_mean = [0.485, 0.456, 0.406]
     params.segm_normalize_std = [0.229, 0.224, 0.225]
-    params.segm_search_area_factor = 4.0
+    params.segm_search_area_factor = 3.0 # 4.0
     params.segm_feature_sz = 24
     params.segm_output_sz = params.segm_feature_sz * 16 # 384
     params.segm_scale_estimation = False # True
