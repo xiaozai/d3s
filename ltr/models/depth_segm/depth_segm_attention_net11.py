@@ -342,6 +342,7 @@ class DepthNet(nn.Module):
 
     def forward(self, dp):
 
+        print(self.conv0.weight.data)
         feat0 = depth_conv(dp,dp,self.conv0.weight.data, None,stride=1,padding=0,dilation=1)
         feat0 = self.b0(feat0)
         feat0 = self.relu0(feat0)
