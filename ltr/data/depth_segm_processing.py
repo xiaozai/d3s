@@ -383,6 +383,8 @@ class DepthSegmProcessingRotation(BaseProcessing):
                 crops_depth = [cv2.warpAffine(x, M, (w, h)) for x in crops_depth]
                 crops_mask = [cv2.warpAffine(x, M, (w, h)) for x in crops_mask]
 
+                print(len(crops_img), crops_img[0].shape)
+
 
             if s == 'test' and self.use_distance:
                 # use target center only to create distance map
