@@ -365,7 +365,7 @@ class DepthSegmNetAttention(nn.Module):
         # project pre-out feat
         self.s_layers = nn.ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]),
                                        conv(segm_inter_dim[1], segm_inter_dim[1]),
-                                       conv(segm_inter_dim[2], segm_inter_dim[2]),
+                                       conv(1, segm_inter_dim[2]),
                                        conv(1, segm_inter_dim[3], kernel_size=1, padding=0)])
         # attention layers
         self.a_layers = nn.ModuleList([conv(crossAttnTransformer0.n_patches * 2, segm_inter_dim[0]),
