@@ -111,7 +111,8 @@ def run(settings):
     objective = nn.BCEWithLogitsLoss()
 
     # Create actor, which wraps network and objective
-    actor = actors.DepthSegmActor_no_targetsz(net=net, objective=objective)
+    # actor = actors.DepthSegmActor_no_targetsz(net=net, objective=objective)
+    actor = actors.DepthSegmActor(net=net, objective=objective)
 
     # Optimizer
     optimizer = optim.Adam(actor.net.segm_predictor.parameters(), lr=1e-3)

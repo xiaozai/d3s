@@ -7,16 +7,9 @@ import torch
 import time
 import torch.nn as nn
 import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DDP
 
-# def setup(rank, world_size):
-#     os.environ['MASTER_ADDR'] = 'localhost'
-#     os.environ['MASTER_PORT'] = '12355'
-#
-#     # initialize the process group
-#     dist.init_process_group("gloo", rank=rank, world_size=world_size)
-# 
-# def cleanup():
-#     dist.destroy_process_group()
 
 class LTRTrainer(BaseTrainer):
     def __init__(self, actor, loaders, optimizer, settings, lr_scheduler=None):
@@ -52,7 +45,6 @@ class LTRTrainer(BaseTrainer):
 
     def cycle_dataset(self, loader):
         """Do a cycle of training or validation."""
-
         self.actor.train(loader.training)
         torch.set_grad_enabled(loader.training)
 
@@ -73,7 +65,6 @@ class LTRTrainer(BaseTrainer):
             loss, stats = self.actor(data)
 
             # backward pass and update weights
-            # if not torch.isnan(loss):
             if loader.training:
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -95,6 +86,7 @@ class LTRTrainer(BaseTrainer):
 
         self._stats_new_epoch()
         self._write_tensorboard()
+
 
     def _init_timing(self):
         self.num_frames = 0

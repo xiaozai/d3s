@@ -3,6 +3,7 @@ import glob
 import torch
 from ltr.admin import loading
 import torch.distributed as dist
+import torch.multiprocessing as mp
 import os
 
 # def setup(rank, world_size=-1):
@@ -78,10 +79,6 @@ class BaseTrainer:
 
                 for epoch in range(self.epoch+1, max_epochs+1):
 
-                    # Song, use multiple gpus
-                    # setup(self.device)
-                    # self.actor.net = DDP(self.actor.net, device_ids=[self.device], output_device=self.device)
-
                     self.epoch = epoch
 
                     if self.lr_scheduler is not None:
@@ -100,8 +97,6 @@ class BaseTrainer:
                     print('Restarting training from last epoch ...')
                 else:
                     raise
-
-        # self.actor.cleanup() # Song  for DDP, DistributedDataParallel
 
         print('Finished training!')
 
@@ -201,7 +196,7 @@ class BaseTrainer:
                             new_checkpoint_dict['module.'+k] = v
                         else:
                             new_checkpoint_dict[k] = v
-                    
+
                     self.actor.net.load_state_dict(new_checkpoint_dict)
                 else:
                     self.actor.net.load_state_dict(checkpoint_dict[key])
