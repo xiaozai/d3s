@@ -1,6 +1,9 @@
 from pytracking import TensorDict
 import torch
 import torch.nn as nn
+from torch.nn.parallel import DistributedDataParallel as DDP
+import torch.distributed as dist
+import os
 
 class BaseActor:
     """ Base class for actor. The actor class handles the passing of the data through the network
@@ -37,7 +40,13 @@ class BaseActor:
         if torch.cuda.device_count()>1:
             print("Let's use ", torch.cuda.device_count(), "GPUs")
             self.net = nn.DataParallel(self.net)
-
+            # rank = 0
+            # world_size = torch.cuda.device_count()
+            # print(1, rank, world_size)
+            # self.setup(rank, world_size)
+            # print(2)
+            # self.net = DDP(self.net, device_ids=[0, 1], output_device=0)
+            # print(3)
         self.net.to(device)
 
     def train(self, mode=True):
@@ -50,3 +59,13 @@ class BaseActor:
     def eval(self):
         """ Set network to eval mode"""
         self.train(False)
+
+    def setup(self, rank, world_size):
+        # world_size,  Number of processes participating in the job
+        os.environ['MASTER_ADDR'] = 'localhost'
+        os.environ['MASTER_PORT'] = '12355'
+        # initialize the process group
+        dist.init_process_group("gloo", rank=rank, world_size=world_size)
+
+    def cleanup(self):
+        dist.destroy_process_group()

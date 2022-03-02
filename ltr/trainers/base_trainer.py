@@ -2,7 +2,18 @@ import os
 import glob
 import torch
 from ltr.admin import loading
+import torch.distributed as dist
+import os
 
+# def setup(rank, world_size=-1):
+#     os.environ['MASTER_ADDR'] = 'localhost'
+#     os.environ['MASTER_PORT'] = '12355'
+#
+#     # initialize the process group
+#     dist.init_process_group("gloo", rank=rank, world_size=world_size)
+
+# def cleanup():
+#     dist.destroy_process_group()
 
 class BaseTrainer:
     """Base trainer class. Contains functions for training and saving/loading chackpoints.
@@ -66,6 +77,11 @@ class BaseTrainer:
                     self.load_checkpoint()
 
                 for epoch in range(self.epoch+1, max_epochs+1):
+
+                    # Song, use multiple gpus
+                    # setup(self.device)
+                    # self.actor.net = DDP(self.actor.net, device_ids=[self.device], output_device=self.device)
+
                     self.epoch = epoch
 
                     if self.lr_scheduler is not None:
@@ -75,6 +91,8 @@ class BaseTrainer:
 
                     if self._checkpoint_dir:
                         self.save_checkpoint()
+
+
             except:
                 print('Training crashed at epoch {}'.format(epoch))
                 if fail_safe:
@@ -82,6 +100,8 @@ class BaseTrainer:
                     print('Restarting training from last epoch ...')
                 else:
                     raise
+
+        # self.actor.cleanup() # Song  for DDP, DistributedDataParallel
 
         print('Finished training!')
 
@@ -175,8 +195,13 @@ class BaseTrainer:
             if key == 'net':
                 # Song
                 if net_type == 'DataParallel':
-                    new_checkpoint_dict = checkpoint_dict[key]
-                    new_checkpoint_dict = {'module.'+k : v for k, v in new_checkpoint_dict.items() if not k.startswith('module.')}
+                    new_checkpoint_dict = {} # checkpoint_dict[key]
+                    for k, v in checkpoint_dict[key].items():
+                        if not k.startswith('module.'):
+                            new_checkpoint_dict['module.'+k] = v
+                        else:
+                            new_checkpoint_dict[k] = v
+                    
                     self.actor.net.load_state_dict(new_checkpoint_dict)
                 else:
                     self.actor.net.load_state_dict(checkpoint_dict[key])

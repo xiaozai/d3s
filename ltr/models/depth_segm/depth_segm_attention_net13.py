@@ -353,12 +353,15 @@ class DepthSegmNetAttention(nn.Module):
 
         self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
-        config3 = get_config(size=(4, 4)) # 4x4 ? 6*6?
-        config = get_config(size=(12, 12)) # 4*4, 8*8, 16*16 patches
 
-        crossAttnTransformer0 = CrossAttentionTransformer(config, (feat_sz[0]*2, feat_sz[0]), segm_inter_dim[0], vis=True)
-        crossAttnTransformer1 = CrossAttentionTransformer(config, (feat_sz[1]*2, feat_sz[1]), segm_inter_dim[1], vis=True)
-        crossAttnTransformer2 = CrossAttentionTransformer(config, (feat_sz[2]*2, feat_sz[2]), segm_inter_dim[2], vis=True)
+        config0 = get_config(size=(6, 6)) # 4*4, 8*8, 16*16 patches
+        config1 = get_config(size=(12, 12)) # 4*4, 8*8, 16*16 patches
+        config2 = get_config(size=(12, 12)) # 4*4, 8*8, 16*16 patches
+        config3 = get_config(size=(4, 4)) # 4x4 ? 6*6?
+
+        crossAttnTransformer0 = CrossAttentionTransformer(config0, (feat_sz[0]*2, feat_sz[0]), segm_inter_dim[0], vis=True)
+        crossAttnTransformer1 = CrossAttentionTransformer(config1, (feat_sz[1]*2, feat_sz[1]), segm_inter_dim[1], vis=True)
+        crossAttnTransformer2 = CrossAttentionTransformer(config2, (feat_sz[2]*2, feat_sz[2]), segm_inter_dim[2], vis=True)
         crossAttnTransformer3 = CrossAttentionTransformer(config3, (feat_sz[3]*2, feat_sz[3]), segm_inter_dim[3], vis=True)
         self.transformers = nn.ModuleList([crossAttnTransformer0, crossAttnTransformer1, crossAttnTransformer2, crossAttnTransformer3])
 
@@ -417,7 +420,7 @@ class DepthSegmNetAttention(nn.Module):
             what happens we use attn weights maps as input??
         '''
         # attn_weights3, feat_rgbd3 = self.attn_module(test_dist[0], feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=3)
-        attn_weights2, feat_rgbd2 = self.attn_module(test_dist[0], feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=2)
+        attn_weights2, feat_rgbd2 = self.attn_module(test_dist[0], feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train=mask_train, layer=2)
         attn_weights1, feat_rgbd1 = self.attn_module(attn_weights2, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train=None, layer=1)
         attn_weights0, feat_rgbd0 = self.attn_module(attn_weights1, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train=None, layer=0)
 

@@ -6,6 +6,17 @@ from ltr.admin.tensorboard import TensorboardWriter
 import torch
 import time
 import torch.nn as nn
+import torch.distributed as dist
+
+# def setup(rank, world_size):
+#     os.environ['MASTER_ADDR'] = 'localhost'
+#     os.environ['MASTER_PORT'] = '12355'
+#
+#     # initialize the process group
+#     dist.init_process_group("gloo", rank=rank, world_size=world_size)
+# 
+# def cleanup():
+#     dist.destroy_process_group()
 
 class LTRTrainer(BaseTrainer):
     def __init__(self, actor, loaders, optimizer, settings, lr_scheduler=None):
@@ -57,7 +68,7 @@ class LTRTrainer(BaseTrainer):
             data['settings'] = self.settings
 
             data['iter'] = i
-            
+
             # forward pass
             loss, stats = self.actor(data)
 
