@@ -410,7 +410,7 @@ class DepthSegmST(BaseTracker):
     def classify_target(self, sample_x, sample_d):
         if sample_d is not None:
             alpha = 0.1
-            scores = self.apply_filter_depthaware(sample_x, self.filter, sample_d, alpha)
+            scores = self.apply_filter_depthaware(sample_x[0], self.filter[0], sample_d, alpha)
         else:
             scores = self.apply_filter(sample_x)
         return scores
@@ -420,9 +420,9 @@ class DepthSegmST(BaseTracker):
 
     def apply_filter_depthaware(self, feat, filter, depth, alpha):
         '''DAL depth-aware DCF'''
-        for i in range(len(feat)):
-            if feat[i].shape[2]!=depth.shape[2] or feat[i].shape[2]!=depth.shape[2]:
-                depth=F.upsample(depth, size=(feat[i].shape[2],feat[i].shape[3]),mode='bilinear')
+        # for i in range(len(feat)):
+        if feat.shape[2]!=depth.shape[2] or feat.shape[2]!=depth.shape[2]:
+            depth=F.upsample(depth, size=(feat.shape[2],feat.shape[3]),mode='bilinear')
 
         multiple_filters = (feat.dim() == 5)
         padding = (filter.shape[-2] // 2, filter.shape[-1] // 2)
@@ -1105,7 +1105,7 @@ class DepthSegmST(BaseTracker):
             mask_real = copy.copy(mask)
         mask = (mask > self.params.segm_mask_thr).astype(np.uint8)
 
-        print('mean previous mask pixels : ', np.mean(self.mask_pixels), 'pred mask pixels:', np.sum(mask) )
+        # print('mean previous mask pixels : ', np.mean(self.mask_pixels), 'pred mask pixels:', np.sum(mask) )
 
         self.mask = mask
         self.masked_img = patch_rgb * np.expand_dims(mask, axis=-1)
@@ -1176,11 +1176,11 @@ class DepthSegmST(BaseTracker):
                 print('pixels_ration : ', pixels_ratio, 'mask pixels ratio : ', mask_pixels_ratio, 'init mask pixels ratio:', init_mask_pixels_ratio)
                 if self.uncert_score < self.params.uncertainty_segm_scale_thr:
 
-                    if pixels_ratio < self.params.segm_pixels_ratio \
-                        and init_mask_pixels_ratio > 0.75 \
-                        and init_mask_pixels_ratio < 1.25 \
-                        and mask_pixels_ratio > 0.75 \
-                        and mask_pixels_ratio < 1.25:
+                    if pixels_ratio < self.params.segm_pixels_ratio and pixels_ratio:
+                        # and init_mask_pixels_ratio > 0.75 \
+                        # and init_mask_pixels_ratio < 1.25 \
+                        # and mask_pixels_ratio > 0.75 \
+                        # and mask_pixels_ratio < 1.25:
 
                         self.mask_pixels = np.append(self.mask_pixels, mask_pixels_)
                         if self.mask_pixels.size > self.params.mask_pixels_budget_sz:

@@ -59,6 +59,8 @@ class DepthconvFunction(torch.autograd.Function):
         stride=_pair(1)
         padding=_pair(1)
         dilation=_pair(1)
+        # ffi_=cffi.FFI()
+        # self.null = ffi_.NULL
 
         def _output_size(input, weight):
 
@@ -90,7 +92,7 @@ class DepthconvFunction(torch.autograd.Function):
         # if (not self.bias) or (bias is None):
         if bias is None:
             # print bias, self.bias
-            bias = self.null
+            # bias = self.null
             bias = input.new(weight.size(0)).zero_()
         input=input.contiguous()
         depth=depth.contiguous()

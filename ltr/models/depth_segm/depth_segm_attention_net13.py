@@ -11,7 +11,7 @@ import ml_collections
 import copy
 import math
 
-from ltr.external.depthconv.functions import depth_conv
+# from ltr.external.depthconv.functions import depth_conv
 
 def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1):
     return nn.Sequential(
@@ -416,22 +416,23 @@ class DepthSegmNetAttention(nn.Module):
 
             what happens we use attn weights maps as input??
         '''
-        attn_weights3, feat_rgbd3 = self.attn_module(test_dist[0], feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=3)
-        attn_weights2, feat_rgbd2 = self.attn_module(attn_weights3, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=2)
-        attn_weights1, feat_rgbd1 = self.attn_module(attn_weights2, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=1)
-        attn_weights0, feat_rgbd0 = self.attn_module(attn_weights1, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0)
+        # attn_weights3, feat_rgbd3 = self.attn_module(test_dist[0], feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=3)
+        attn_weights2, feat_rgbd2 = self.attn_module(test_dist[0], feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=2)
+        attn_weights1, feat_rgbd1 = self.attn_module(attn_weights2, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train=None, layer=1)
+        attn_weights0, feat_rgbd0 = self.attn_module(attn_weights1, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train=None, layer=0)
 
         if debug:
-            return attn_weights0, (attn_weights3, attn_weights2, attn_weights1, attn_weights0) # B, C, H, W
+            return attn_weights0, (attn_weights2, attn_weights2, attn_weights1, attn_weights0) # B, C, H, W
         else:
             return attn_weights0
 
-    def attn_module(self, pre_attn, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0):
+    def attn_module(self, pre_attn, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train=None, layer=0):
 
         f_test_rgb, f_test_d = feat_test_rgb[layer], feat_test_d[layer]
         f_train_rgb, f_train_d = feat_train_rgb[layer], feat_train_d[layer]
-        mask = F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1])) # Bx1xHxW
-        mask = torch.cat((mask, mask), dim=2)
+        if mask_train is not None:
+            mask = F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1])) # Bx1xHxW
+            mask = torch.cat((mask, mask), dim=2)
         template = torch.cat((self.f_layers[layer](f_train_rgb), self.d_layers[layer](f_train_d)), dim=2)
         search_region = torch.cat((self.f_layers[layer](f_test_rgb), self.d_layers[layer](f_test_d)), dim=2)
 

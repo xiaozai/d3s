@@ -289,7 +289,9 @@ class BaseTracker:
             self.ax_m.imshow(self.mask)
             self.ax_m.set_title('predicted mask')
 
-            masked_img = Image.fromarray(np.uint8(self.masked_img)).convert('RGBA')
+            masked_img = np.uint8(self.masked_img)
+            masked_img[np.all(masked_img == (0, 0, 0), axis=-1)] = (255,255,255)
+            masked_img = Image.fromarray(np.uint8(masked_img)).convert('RGBA')
             if self.score_map is not None:
                 cm = plt.get_cmap('jet')
                 colored_image = cm(self.score_map)
@@ -297,16 +299,21 @@ class BaseTracker:
                 scoremap = scoremap.resize(masked_img.size)
                 masked_img = Image.blend(masked_img, scoremap, 0.3)
 
+
             self.ax_mrgb.cla()
             self.ax_mrgb.imshow(masked_img)
             self.ax_mrgb.set_title('predicted mask over rgb')
+
 
             self.ax_initmask.cla()
             self.ax_initmask.imshow(self.init_mask)
             self.ax_initmask.set_title('init mask')
 
+
+            init_masked_img = np.uint8(self.init_masked_img)
+            init_masked_img[np.all(init_masked_img == (0, 0, 0), axis=-1)] = (255,255,255)
             self.ax_initmaskimg.cla()
-            self.ax_initmaskimg.imshow(self.init_masked_img)
+            self.ax_initmaskimg.imshow(init_masked_img)
             self.ax_initmaskimg.set_title('init masked over rgb')
 
             if self.rgb_patches is not None:

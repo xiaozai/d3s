@@ -73,7 +73,10 @@ class Attention(nn.Module):
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
 
         if mask is not None:
-            mask = torch.tensor(mask, dtype=torch.bool).to(attention_scores.device) # .to('cuda')
+            if torch.__version__ == '1.1.0':
+                mask = torch.tensor(mask, dtype=torch.uint8).to(attention_scores.device) # .to('cuda')
+            else:
+                mask = torch.tensor(mask, dtype=torch.bool).to(attention_scores.device) # .to('cuda')
             attention_scores = attention_scores.masked_fill(~mask.unsqueeze(1), 0) # float('-inf'))
 
         attention_probs = self.softmax(attention_scores) # dim=-1 [B, head, P_q, P_k]
