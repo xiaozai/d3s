@@ -354,8 +354,8 @@ class DepthSegmNetAttention(nn.Module):
         self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
 
-        config0 = get_config(size=(12, 12)) # 192, 8*8, 16*16 patches
-        config1 = get_config(size=(8, 8)) # 96*96 -> 8*8 patches
+        config0 = get_config(size=(8, 8)) # 192, 8*8, 24*24 patches
+        config1 = get_config(size=(8, 8)) # 96*96 -> 12*12 patches
         config2 = get_config(size=(8, 8)) # 48*48 -> 6*6 patches
         config3 = get_config(size=(4, 4)) # 24x24 -> 6*6?
 
