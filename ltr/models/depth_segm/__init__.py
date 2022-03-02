@@ -14,3 +14,4 @@ from .depth_segm_attention_net9 import DepthSegmNetAttention as DepthSegmNetAtte
 from .depth_segm_attention_net10 import DepthSegmNetAttention as DepthSegmNetAttention10
 from .depth_segm_attention_net11 import DepthSegmNetAttention as DepthSegmNetAttention11
 from .depth_segm_attention_net12 import DepthSegmNetAttention as DepthSegmNetAttention12
+from .depth_segm_attention_net13 import DepthSegmNetAttention as DepthSegmNetAttention13

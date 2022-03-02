@@ -315,6 +315,64 @@ class DepthSegmProcessingRotation(BaseProcessing):
         mask[int(round(bbox[1].item())):int(round(bbox[1].item() + bbox[3].item())), int(round(bbox[0].item())):int(round(bbox[0].item() + bbox[2].item()))] = 1
         return mask
 
+    # def noisy(self, noise_typ,image):
+    #     if noise_typ == "gauss":
+    #         # row,col,ch= image.shape
+    #         mean = 0
+    #         var = 0.1
+    #         sigma = var**0.5
+    #         gauss = np.random.normal(mean,sigma,image.shape)
+    #         gauss = gauss.reshape(image.shape)
+    #         noisy = image + gauss
+    #
+    #     elif noise_typ == "s&p":
+    #         # row,col,ch = image.shape
+    #         s_vs_p = 0.5
+    #         amount = 0.004
+    #         noisy = np.copy(image)
+    #         # Salt mode
+    #         num_salt = np.ceil(amount * image.size * s_vs_p)
+    #         coords = [np.random.randint(0, i - 1, int(num_salt))
+    #               for i in image.shape]
+    #         noisy[coords] = 1
+    #
+    #         # Pepper mode
+    #         num_pepper = np.ceil(amount* image.size * (1. - s_vs_p))
+    #         coords = [np.random.randint(0, i - 1, int(num_pepper))
+    #                   for i in image.shape]
+    #         noisy[coords] = 0
+    #
+    #     elif noise_typ == "poisson":
+    #         vals = len(np.unique(image))
+    #         vals = 2 ** np.ceil(np.log2(vals))
+    #         noisy = np.random.poisson(image * vals) / float(vals)
+    #
+    #     elif noise_typ =="speckle":
+    #         # row,col,ch = image.shape
+    #         gauss = np.random.randn(image.shape)
+    #         gauss = gauss.reshape(image.shape)
+    #         noisy = image + image * gauss
+    #
+    #     return noisy
+
+    def sp_noise(self, image,prob):
+        '''
+        Add salt and pepper noise to image
+        prob: Probability of the noise
+        '''
+        output = np.zeros(image.shape,np.uint8)
+        thres = 1 - prob
+        for i in range(image.shape[0]):
+            for j in range(image.shape[1]):
+                rdn = random.random()
+                if rdn < prob:
+                    output[i][j] = 0
+                elif rdn > thres:
+                    output[i][j] = 1 # 255
+                else:
+                    output[i][j] = image[i][j]
+        return output
+
     def __call__(self, data: TensorDict):
         """
         args:
@@ -370,6 +428,10 @@ class DepthSegmProcessingRotation(BaseProcessing):
             '''384*384'''
             crops_mask, _ = prutils.jittered_center_crop(data[s + '_masks'], jittered_anno, data[s + '_anno'],
                                                             self.search_area_factor, self.output_sz, pad_val=float(0))
+
+            # Song , Salt and Pepper Noises on Depth
+            if random.random() < 0.4:
+                crops_depth = [self.sp_noise(x, 0.1) for x in crops_depth]
 
             # # Song : Rotation
             if random.random() < 0.2:
