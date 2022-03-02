@@ -360,7 +360,7 @@ class DepthSegmProcessingRotation(BaseProcessing):
         Add salt and pepper noise to image
         prob: Probability of the noise
         '''
-        output = np.zeros(image.shape,np.uint8)
+        output = np.zeros(image.shape,np.float32)
         thres = 1 - prob
         for i in range(image.shape[0]):
             for j in range(image.shape[1]):
@@ -368,7 +368,7 @@ class DepthSegmProcessingRotation(BaseProcessing):
                 if rdn < prob:
                     output[i][j] = 0
                 elif rdn > thres:
-                    output[i][j] = 1 # 255
+                    output[i][j] = 1.0 # 255
                 else:
                     output[i][j] = image[i][j]
         return output
@@ -431,7 +431,7 @@ class DepthSegmProcessingRotation(BaseProcessing):
 
             # Song , Salt and Pepper Noises on Depth
             if random.random() < 0.4:
-                crops_depth = [self.sp_noise(x, 0.1) for x in crops_depth]
+                crops_depth = [self.sp_noise(x, 0.05) for x in crops_depth]
 
             # # Song : Rotation
             if random.random() < 0.2:
