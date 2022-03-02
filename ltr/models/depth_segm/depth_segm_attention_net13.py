@@ -433,6 +433,8 @@ class DepthSegmNetAttention(nn.Module):
         if mask_train is not None:
             mask = F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1])) # Bx1xHxW
             mask = torch.cat((mask, mask), dim=2)
+        else:
+            mask = None
         template = torch.cat((self.f_layers[layer](f_train_rgb), self.d_layers[layer](f_train_d)), dim=2)
         search_region = torch.cat((self.f_layers[layer](f_test_rgb), self.d_layers[layer](f_test_d)), dim=2)
 
