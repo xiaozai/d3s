@@ -30,9 +30,9 @@ class BaseTrainer:
 
         self.device = getattr(settings, 'device', None)
         if self.device is None:
-            # self.device = torch.device("cuda:0" if torch.cuda.is_available() and settings.use_gpu else "cpu")
-            self.device = torch.device("cuda" if torch.cuda.is_available() and settings.use_gpu else "cpu")
-            print('using device ', self.device)
+            self.device = torch.device("cuda:0" if torch.cuda.is_available() and settings.use_gpu else "cpu")
+            # self.device = torch.device("cuda" if torch.cuda.is_available() and settings.use_gpu else "cpu")
+            # print('using device ', self.device)
 
         self.actor.to(self.device)
 
@@ -154,6 +154,10 @@ class BaseTrainer:
         # Load network
         checkpoint_dict = loading.torch_load_legacy(checkpoint_path)
 
+        # Song, for DataParallel loading
+        if net_type == 'DataParallel':
+            checkpoint_dict['net_type'] = net_type
+        #
         assert net_type == checkpoint_dict['net_type'], 'Network is not of correct type.'
 
         if fields is None:
@@ -169,7 +173,14 @@ class BaseTrainer:
             if key in ignore_fields:
                 continue
             if key == 'net':
-                self.actor.net.load_state_dict(checkpoint_dict[key])
+                # Song
+                if net_type == 'DataParallel':
+                    new_checkpoint_dict = checkpoint_dict[key]
+                    new_checkpoint_dict = {'module.'+k : v for k, v in new_checkpoint_dict.items() if not k.startswith('module.')}
+                    self.actor.net.load_state_dict(new_checkpoint_dict)
+                else:
+                    self.actor.net.load_state_dict(checkpoint_dict[key])
+
 
             elif key == 'optimizer':
                 self.optimizer.load_state_dict(checkpoint_dict[key])
