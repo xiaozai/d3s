@@ -420,9 +420,19 @@ class DepthSegmNetAttention(nn.Module):
             what happens we use attn weights maps as input??
         '''
         # attn_weights3, feat_rgbd3 = self.attn_module(test_dist[0], feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=3)
-        attn_weights2, feat_rgbd2 = self.attn_module(test_dist[0], feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train=mask_train, layer=2)
-        attn_weights1, feat_rgbd1 = self.attn_module(attn_weights2, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train=None, layer=1)
-        attn_weights0, feat_rgbd0 = self.attn_module(attn_weights1, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train=None, layer=0)
+
+        attn_weights2, feat_rgbd2 = self.attn_module(test_dist[0],
+                                                     feat_test_rgb, feat_test_d,
+                                                     feat_train_rgb, feat_train_d,
+                                                     mask_train=mask_train, layer=2)
+        attn_weights1, feat_rgbd1 = self.attn_module(attn_weights2,
+                                                     feat_test_rgb, feat_test_d,
+                                                     feat_train_rgb, feat_train_d,
+                                                     mask_train=None, layer=1)
+        attn_weights0, feat_rgbd0 = self.attn_module(attn_weights1,
+                                                     feat_test_rgb, feat_test_d,
+                                                     feat_train_rgb, feat_train_d,
+                                                     mask_train=None, layer=0)
 
         if debug:
             return attn_weights0, (attn_weights2, attn_weights2, attn_weights1, attn_weights0) # B, C, H, W
