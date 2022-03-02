@@ -2,6 +2,7 @@ from . import BaseActor
 import torch
 import torch.nn.functional as F
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import cv2
 import os
@@ -91,7 +92,7 @@ def save_debug(data, pred_mask, vis_data):
 
     elif len(vis_data) == 4:
         attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data
-        train_mask = train_mask = data['train_masks'][0, batch_element, :, :].cpu().numpy().astype(np.float32)
+        train_mask = train_mask = data['train_masks'][0, batch_element, :, :]
         attn_weights3 = process_attn_maps(attn_weights3, batch_element, train_mask)
         attn_weights2 = process_attn_maps(attn_weights2, batch_element, train_mask)
         attn_weights1 = process_attn_maps(attn_weights1, batch_element, train_mask)
@@ -108,7 +109,7 @@ def save_debug(data, pred_mask, vis_data):
     test_mask = data['test_masks'][0, batch_element, :, :]
 
     test_dist = data['test_dist'][0, batch_element, :, :] # song
-    # print(test_dist.shape)
+
 
     # softmax on the mask prediction (since this is done internaly when calculating loss)
     mask = F.softmax(pred_mask, dim=1)[batch_element, 0, :, :].cpu().detach().numpy().astype(np.float32)
@@ -159,57 +160,47 @@ def save_debug(data, pred_mask, vis_data):
     plt.savefig(save_path)
     plt.close(f)
 
-def save_debug_attnweights(data, pred_mask, vis_data):
 
-    batch_element = 0
 
-    attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data # B,C,H,W
-    train_mask = train_mask = data['train_masks'][0, batch_element, :, :].cpu().numpy().astype(np.float32)
-    attn_weights3 = attn_weights3[batch_element, :, :, :].cpu().detach().numpy().squeeze().astype(np.float32) # C, H, W
-    attn_weights2 = attn_weights2[batch_element, :, :, :].cpu().detach().numpy().squeeze().astype(np.float32) # C, H, W
-    attn_weights1 = attn_weights1[batch_element, :, :, :].cpu().detach().numpy().squeeze().astype(np.float32) # C, H, W
-    attn_weights0 = attn_weights0[batch_element, :, :, :].cpu().detach().numpy().squeeze().astype(np.float32) # C, H, W
+def save_debug_attnweights(data, pred_mask, vis_data, batch_element=0):
 
-    attn_maps3 = cat_attn_feat(attn_weights3) # NewH * newW
-    attn_maps2 = cat_attn_feat(attn_weights2)
-    attn_maps1 = cat_attn_feat(attn_weights1)
-    attn_maps0 = cat_attn_feat(attn_weights0)
-
+    # detach from computation path
+    data = data.detach().clone().cpu()
+    pred_mask = pred_mask.detach().clone().cpu()
+    vis_data = [x.detach().clone().cpu().numpy().astype(np.float32) for x in vis_data]
 
     dir_path = data['settings'].env.images_dir
 
+    vis_data = [x[batch_element, :, :, :].squeeze() for x in vis_data]
+    attn_maps = [cat_attn_feat(x) for x in vis_data]
+    attn_maps3, attn_maps2, attn_maps1, attn_maps0 = attn_maps # B,C,H,W
+
+
     train_img = data['train_images'][:, batch_element, :, :].permute(1, 2, 0)
-    train_depth = data['train_depths'][:, batch_element, :, :].permute(1, 2, 0)
-    train_mask = data['train_masks'][0, batch_element, :, :]
     test_img = data['test_images'][:, batch_element, :, :].permute(1, 2, 0)
-    test_depth = data['test_depths'][:, batch_element, :, :].permute(1, 2, 0)
-    test_mask = data['test_masks'][0, batch_element, :, :]
+    train_depth = data['train_depths'][:, batch_element, :, :].permute(1, 2, 0).numpy().squeeze().astype(np.float32)
+    test_depth = data['test_depths'][:, batch_element, :, :].permute(1, 2, 0).numpy().squeeze().astype(np.float32)
+    train_mask = data['train_masks'][0, batch_element, :, :].numpy().squeeze().astype(np.float32)
+    test_mask = data['test_masks'][0, batch_element, :, :].numpy().squeeze().astype(np.float32)
+    test_dist = data['test_dist'][0, batch_element, :, :].numpy().squeeze().astype(np.float32)
 
-    test_dist = data['test_dist'][0, batch_element, :, :] # song
-    # print(test_dist.shape)
 
-    # softmax on the mask prediction (since this is done internaly when calculating loss)
-    mask = F.softmax(pred_mask, dim=1)[batch_element, 0, :, :].cpu().detach().numpy().astype(np.float32)
-    predicted_mask = (mask > 0.5).astype(np.float32) * mask
-
-    mu = torch.Tensor(data['settings'].normalize_mean).to(torch.device('cuda')).view(1, 1, 3)
-    std = torch.Tensor(data['settings'].normalize_std).to(torch.device('cuda')).view(1, 1, 3)
-
+    mu = torch.Tensor(data['settings'].normalize_mean).view(1, 1, 3)
+    std = torch.Tensor(data['settings'].normalize_std).view(1, 1, 3)
     train_img = 255 * (train_img * std + mu)
     test_img = 255 * (test_img * std + mu)
+    train_img = train_img.numpy().astype(np.uint8)
+    test_img = test_img.numpy().astype(np.uint8)
 
-    train_img = (train_img.cpu().numpy()).astype(np.uint8)
-    train_depth = (train_depth.cpu().numpy().squeeze()).astype(np.float32)
-    test_img = (test_img.cpu().numpy()).astype(np.uint8)
-    test_depth = (test_depth.cpu().numpy().squeeze()).astype(np.float32)
-    train_mask = (train_mask.cpu().numpy()).astype(np.float32)
-    test_mask = (test_mask.cpu().numpy()).astype(np.float32)
-    test_dist = (test_dist.detach().cpu().numpy().squeeze()).astype(np.float32)
-    test_conf = 1 - test_dist / np.max(test_dist)
 
-    # Song
+    # # # softmax on the mask prediction (since this is done internaly when calculating loss)
+    mask = F.softmax(pred_mask, dim=1)[batch_element, 0, :, :].numpy().squeeze().astype(np.float32)
+    predicted_mask = (mask > 0.5).astype(np.float32) * mask
+    #
+    # #
+    plt.switch_backend('agg')
     f, ((ax1, ax2, ax3, ax4), (ax5, ax6, ax7, ax8), (ax9, ax10, ax11, ax12)) = plt.subplots(3, 4, figsize=(20, 20))
-
+    # #
     draw_axis(ax1, train_img, 'Train image')
     draw_axis(ax3, test_img, 'Test image')
     draw_axis(ax2, train_depth, 'Train depth')
@@ -222,9 +213,9 @@ def save_debug_attnweights(data, pred_mask, vis_data):
     draw_axis(ax10, attn_maps2, 'attn_weights2', show_minmax=True)
     draw_axis(ax11, attn_maps1, 'attn_weights1', show_minmax=True)
     draw_axis(ax12, attn_maps0, 'attn_weights0', show_minmax=True)
-
-
+    #
     save_path = os.path.join(data['settings'].env.images_dir, '%03d-%04d.png' % (data['epoch'], data['iter']))
+    #
     plt.savefig(save_path)
     plt.close(f)
 
@@ -325,9 +316,9 @@ class DepthSegmActor_no_targetsz(BaseActor):
                                         test_dist=test_dist,
                                         debug=True) # Song :  vis pos and neg maps
 
-
         masks_gt = data['test_masks'].permute(1, 0, 2, 3) # C, B, H, W -> # B * 1 * H * W
         masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)   # B * 2 * H * W
+        # masks_gt_pair = masks_gt_pair.to(masks_pred.device)
 
         loss = self.objective(masks_pred, masks_gt_pair)
 

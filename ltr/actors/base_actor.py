@@ -1,5 +1,6 @@
 from pytracking import TensorDict
-
+import torch
+import torch.nn as nn
 
 class BaseActor:
     """ Base class for actor. The actor class handles the passing of the data through the network
@@ -32,6 +33,11 @@ class BaseActor:
         args:
             device - device to use. 'cpu' or 'cuda'
         """
+
+        if torch.cuda.device_count()>1:
+            print("Let's use ", torch.cuda.device_count(), "GPUs")
+            self.net = nn.DataParallel(self.net)
+
         self.net.to(device)
 
     def train(self, mode=True):

@@ -30,7 +30,9 @@ class BaseTrainer:
 
         self.device = getattr(settings, 'device', None)
         if self.device is None:
-            self.device = torch.device("cuda:0" if torch.cuda.is_available() and settings.use_gpu else "cpu")
+            # self.device = torch.device("cuda:0" if torch.cuda.is_available() and settings.use_gpu else "cpu")
+            self.device = torch.device("cuda" if torch.cuda.is_available() and settings.use_gpu else "cpu")
+            print('using device ', self.device)
 
         self.actor.to(self.device)
 
@@ -151,7 +153,7 @@ class BaseTrainer:
 
         # Load network
         checkpoint_dict = loading.torch_load_legacy(checkpoint_path)
-        # print(net_type, checkpoint_dict['net_type']) # Song
+
         assert net_type == checkpoint_dict['net_type'], 'Network is not of correct type.'
 
         if fields is None:
@@ -168,15 +170,6 @@ class BaseTrainer:
                 continue
             if key == 'net':
                 self.actor.net.load_state_dict(checkpoint_dict[key])
-
-                # # Song load part of pretrained d3s weights
-                # pretrained_dict = checkpoint_dict[key]
-                # model_dict = self.actor.net.state_dict()
-                # pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict and not k.startswith('segm_predictor.mixer')}
-                # # for k, v in pretrained_dict.items():
-                # #     print(k)
-                # model_dict.update(pretrained_dict)
-                # self.actor.net.load_state_dict(model_dict, strict=False)
 
             elif key == 'optimizer':
                 self.optimizer.load_state_dict(checkpoint_dict[key])

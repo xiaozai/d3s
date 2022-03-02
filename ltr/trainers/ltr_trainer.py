@@ -5,7 +5,7 @@ from ltr.admin.stats import AverageMeter, StatValue
 from ltr.admin.tensorboard import TensorboardWriter
 import torch
 import time
-
+import torch.nn as nn
 
 class LTRTrainer(BaseTrainer):
     def __init__(self, actor, loaders, optimizer, settings, lr_scheduler=None):
@@ -57,16 +57,16 @@ class LTRTrainer(BaseTrainer):
             data['settings'] = self.settings
 
             data['iter'] = i
-
+            
             # forward pass
             loss, stats = self.actor(data)
 
             # backward pass and update weights
-            if not torch.isnan(loss):
-                if loader.training:
-                    self.optimizer.zero_grad()
-                    loss.backward()
-                    self.optimizer.step()
+            # if not torch.isnan(loss):
+            if loader.training:
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
 
             # update statistics
             batch_size = data['train_images'].shape[loader.stack_dim]
@@ -74,6 +74,7 @@ class LTRTrainer(BaseTrainer):
 
             # print statistics
             self._print_stats(i, loader, batch_size)
+
 
     def train_epoch(self):
         """Do one epoch for each loader."""
