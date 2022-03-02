@@ -50,7 +50,7 @@ def cat_attn_feat(attn_weights):
 
 def process_attn_maps(att_mat, batch_element, train_mask):
     # use batch 0
-    # att_mat = torch.stack(att_mat)
+    att_mat = torch.stack(att_mat)
     att_mat = att_mat[:, batch_element, ...].squeeze(1) # [layers=3, B, heads=3, 144, 144]
     att_mat = att_mat.cpu().detach()
     # Average the attention weights across all heads.
