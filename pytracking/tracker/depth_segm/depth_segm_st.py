@@ -1176,8 +1176,8 @@ class DepthSegmST(BaseTracker):
             displacement = np.mean(prbox, axis=0) - np.array([mask.shape[0] / 2, mask.shape[1] / 2])
             prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
 
-            print('prbox before segm_scale_estimation : ', prbox)
-            
+            print('prbox before segm_scale_estimation : ', prbox, displacement)
+
             if self.params.segm_scale_estimation:
 
                 # use pixels_ratio to determine if new scale should be estimated or not
