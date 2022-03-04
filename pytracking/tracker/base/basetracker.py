@@ -338,7 +338,7 @@ class BaseTracker:
             if self.polygon is not None:
                 polygon = patches.Polygon(self.polygon, closed=True)
                 prbox = patches.Polygon(self.prbox, closed=True)
-                aabb = patches.Rectangle((self.aabb[0], self.aabb[1]), self.aabb[2], self.aabb[3], linewidth=2. edgecolor='r', facecolor='none')
+                aabb = patches.Rectangle((self.aabb[0], self.aabb[1]), self.aabb[2], self.aabb[3], linewidth=2, edgecolor='r', facecolor='none')
                 # prbox = patches.Polygon(self.prbox, closed=True)
                 # print('prbox: ', self.prbox)
                 # prbox = patches.Rectangle((self.prbox[0], self.prbox[1]), self.prbox[2], self.prbox[3], linewidth=2, edgecolor='b', facecolor='none')
