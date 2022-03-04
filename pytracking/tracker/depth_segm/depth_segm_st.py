@@ -1226,7 +1226,7 @@ class DepthSegmST(BaseTracker):
                                    np.max(prbox[:, 1]) - np.min(prbox[:, 1]) + 1]
 
                 print('is rotated_bbox : ', self.rotated_bbox)
-                self.prbox = prbox
+                self.prbox = pred_region
                 return pred_region
 
         return None
