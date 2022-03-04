@@ -1250,7 +1250,9 @@ class DepthSegmST(BaseTracker):
         return np.array([cx - w / 2, cy - h / 2, w, h])
 
     def poly_to_aabbox_noscale(self, x_, y_):
-        ''' song : remove scale'''
+        ''' song : remove scale
+        Because the init target sz is axis bbox width * height
+        '''
         # keep the center and area of the polygon
         # change aspect ratio of the original bbox
         cx = np.mean(x_)
