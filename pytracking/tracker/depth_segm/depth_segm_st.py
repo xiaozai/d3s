@@ -1173,6 +1173,10 @@ class DepthSegmST(BaseTracker):
                     else:
                         print('Bbox optimization has made too large difference.')
 
+            # Song , for vis only, before displacement
+            new_aabb = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:, 1]) # Song
+            self.aabb = new_aabb
+
             displacement = np.mean(prbox, axis=0) - np.array([mask.shape[0] / 2, mask.shape[1] / 2])
             prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
 
@@ -1228,7 +1232,7 @@ class DepthSegmST(BaseTracker):
                                    np.max(prbox[:, 0]) - np.min(prbox[:, 0]) + 1,
                                    np.max(prbox[:, 1]) - np.min(prbox[:, 1]) + 1]
 
-                self.aabb = pred_region
+
                 return pred_region
 
         return None
