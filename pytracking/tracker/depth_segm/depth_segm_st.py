@@ -992,10 +992,10 @@ class DepthSegmST(BaseTracker):
                 # self.mask = mask # Song
                 self.segm_init_target_pixels = target_pixels
 
-                if self.params.save_mask:
-                    segm_crop_sz = math.ceil(math.sqrt(bb[2] * bb[3]) * self.params.segm_search_area_factor)
-                    save_mask(None, mask, segm_crop_sz, bb, color.shape[1], color.shape[0],
-                              self.params.masks_save_path, self.sequence_name, self.frame_name)
+                # if self.params.save_mask:
+                #     segm_crop_sz = math.ceil(math.sqrt(bb[2] * bb[3]) * self.params.segm_search_area_factor)
+                #     save_mask(None, mask, segm_crop_sz, bb, color.shape[1], color.shape[0],
+                #               self.params.masks_save_path, self.sequence_name, self.frame_name)
 
                 mask_gpu = torch.unsqueeze(torch.unsqueeze(torch.tensor(mask), dim=0), dim=0).to(self.params.device)
                 train_masks = [mask_gpu]
@@ -1176,9 +1176,15 @@ class DepthSegmST(BaseTracker):
 
 
             displacement = np.mean(prbox, axis=0) - np.array([mask.shape[0] / 2, mask.shape[1] / 2])
-            # prbox in image coordinates
+            # prbox in image coordinates, f_ is the scale
             prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
 
+            fig, ax = plt.subpots(1)
+            ax.imshow(color)
+            probox_vis = patches.Polygon(prbox, closed=True, facecolor='none', edgecolor='r')
+            ax.add(probox_vis)
+            plt.show()
+            
             # self.prbox = prbox
             ''' Song, target_scale is usef for localization target , and update self.pos '''
             if self.params.segm_scale_estimation:
