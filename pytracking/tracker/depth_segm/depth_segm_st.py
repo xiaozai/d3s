@@ -1127,12 +1127,18 @@ class DepthSegmST(BaseTracker):
                 save_mask(None, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
                           self.params.masks_save_path, self.sequence_name, self.frame_name)
 
+        cv2.imshow('contour and mask', mask)
+        cv2.waitKey(0.0001)
+        
+        print('max contour area : ', np.max(cnt_area))
+
         if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 1000:
             contour = contours[np.argmax(cnt_area)]  # use max area polygon
             polygon = contour.reshape(-1, 2)
 
             prbox = np.reshape(cv2.boxPoints(cv2.minAreaRect(polygon)), (4, 2))  # Rotated Rectangle
             prbox_init = copy.deepcopy(prbox)
+            print(prbox)
 
             prbox_opt = np.array([])
             if self.params.segm_optimize_polygon:
@@ -1173,17 +1179,12 @@ class DepthSegmST(BaseTracker):
                 mask_pixels_ = np.max(cnt_area)
                 # Song target mask size changes should be in a range
                 pixels_ratio = abs(np.mean(self.mask_pixels) - mask_pixels_) / np.mean(self.mask_pixels)
-                mask_pixels_ratio =  mask_pixels_ / (np.mean(self.mask_pixels)+0.001) # Song, prevent segmentation goes smaller
-                init_mask_pixels_ratio = mask_pixels_ / (np.sum(self.init_mask)+0.001)
-                # print('pred_mask, mean previous mask, init mask, ', mask_pixels_, np.mean(self.mask_pixels), np.sum(self.init_mask))
-                # print('pixels_ration : ', pixels_ratio, 'mask pixels ratio : ', mask_pixels_ratio, 'init mask pixels ratio:', init_mask_pixels_ratio)
+                # mask_pixels_ratio =  mask_pixels_ / (np.mean(self.mask_pixels)+0.001) # Song, prevent segmentation goes smaller
+                # init_mask_pixels_ratio = mask_pixels_ / (np.sum(self.init_mask)+0.001)
+
                 if self.uncert_score < self.params.uncertainty_segm_scale_thr:
 
                     if pixels_ratio < self.params.segm_pixels_ratio and pixels_ratio:
-                        # and init_mask_pixels_ratio > 0.75 \
-                        # and init_mask_pixels_ratio < 1.25 \
-                        # and mask_pixels_ratio > 0.75 \
-                        # and mask_pixels_ratio < 1.25:
 
                         self.mask_pixels = np.append(self.mask_pixels, mask_pixels_)
                         if self.mask_pixels.size > self.params.mask_pixels_budget_sz:
