@@ -1040,6 +1040,9 @@ class DepthSegmST(BaseTracker):
         self.masked_img = init_patch_crop_rgb * np.expand_dims(mask, axis=-1)
         self.init_masked_img = init_patch_crop_rgb * np.expand_dims(mask, axis=-1)
 
+        self.polygon = None
+        self.prbox = None
+        
     def segment_target(self, color, depth, pos, sz):
         # pos and sz are in the image coordinates
         # construct new bounding box first
@@ -1127,18 +1130,38 @@ class DepthSegmST(BaseTracker):
                 save_mask(None, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
                           self.params.masks_save_path, self.sequence_name, self.frame_name)
 
-        cv2.imshow('contour and mask', mask)
-        cv2.waitKey(0.0001)
-        
+
+
         print('max contour area : ', np.max(cnt_area))
 
         if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 1000:
             contour = contours[np.argmax(cnt_area)]  # use max area polygon
-            polygon = contour.reshape(-1, 2)
+            polygon = contour.reshape(-1, 2) # Song, checked already, here is correct
 
             prbox = np.reshape(cv2.boxPoints(cv2.minAreaRect(polygon)), (4, 2))  # Rotated Rectangle
-            prbox_init = copy.deepcopy(prbox)
-            print(prbox)
+            prbox_init = copy.deepcopy(prbox) # Song, checked already, here is correct
+
+            self.prbox = prbox
+            self.polygon = polygon
+            # import matplotlib.pyplot as plt
+            # import matplotlib.patches as patches
+            # fig2, (ax111, ax222, ax333) = plt.subplots(1,3)
+            # ax111.cla()
+            # ax111.imshow(mask)
+            # mask0000 = np.zeros(mask.shape, dtype=np.uint8)
+            # mask0000 = cv2.drawContours(mask0000, [contours[np.argmax(cnt_area)]], -1, 1, thickness=-1)
+            # ax222.cla()
+            # ax222.imshow(mask0000)
+            # ax333.cla()
+            # mask333 = np.zeros(mask.shape, dtype=np.uint8)
+            # box333 = np.int0(cv2.boxPoints(cv2.minAreaRect(polygon)))
+            # print(box333)
+            # ax333.imshow(mask333)
+            # rect = patches.Polygon(prbox, closed=True)
+            # ax333.add_patch(rect)
+            # plt.show()
+            # # plt.draw()
+            # # plt.pause(0.001)
 
             prbox_opt = np.array([])
             if self.params.segm_optimize_polygon:

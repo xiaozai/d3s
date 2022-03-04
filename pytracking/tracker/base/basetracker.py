@@ -251,7 +251,7 @@ class BaseTracker:
         if self.params.debug == 5:
             self.fig, ((self.ax, self.ax_d), (self.ax_initmask, self.ax_initmaskimg), \
                        (self.ax_rgb_patches, self.ax_d_patches), (self.ax_m, self.ax_mrgb), \
-                       (self.ax_score, self.ax_rgb_scoremap)) = plt.subplots(5, 2)
+                       (self.ax_score, self.ax_rgb_scoremap), (self.ax_polygon, self.ax_prbox)) = plt.subplots(6, 2)
 
         elif self.params.debug == 4:
             self.ax_m = None
@@ -333,6 +333,20 @@ class BaseTracker:
                 self.ax_rgb_scoremap.cla()
                 self.ax_rgb_scoremap.imshow(rgb_score)
                 self.ax_rgb_scoremap.set_title('scoremap over rgb')
+
+            if self.polygon is not None:
+                polygon = patches.Polygon(self.polygon, closed=True)
+                prbox = patches.Polygon(self.prbox, closed=True)
+                empty_mask = np.zeros(self.mask.shape, dtype=np.uint8)
+                self.ax_polygon.cla()
+                self.ax_polygon.imshow(empty_mask)
+                self.ax_polygon.add_patch(polygon)
+
+                self.ax_prbox.cla()
+                self.ax_prbox.imshow(empty_mask)
+                self.ax_prbox.add_patch(prbox)
+
+
 
             if self.score_map is not None:
                 self.ax_score.cla()
