@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 import importlib
-
+from .model_constructor import NetConstructor
 
 def load_network(network_dir=None, checkpoint=None, constructor_fun_name=None, constructor_module=None, **kwargs):
         """Loads a network checkpoint file.
@@ -51,7 +51,6 @@ def load_network(network_dir=None, checkpoint=None, constructor_fun_name=None, c
 
         # Load network
         checkpoint_dict = torch_load_legacy(checkpoint_path)
-
         # Construct network model
         if 'constructor' in checkpoint_dict and checkpoint_dict['constructor'] is not None:
             net_constr = checkpoint_dict['constructor']
@@ -69,9 +68,23 @@ def load_network(network_dir=None, checkpoint=None, constructor_fun_name=None, c
                 net_constr.fun_module = net_constr.fun_module[len('dlframework.'):]
             net = net_constr.get()
         else:
-            raise RuntimeError('No constructor for the given network.')
+            # raise RuntimeError('No constructor for the given network.')
+            print('Song, DataParallel does not provide construtor .... manually add it')
+            net_constr = NetConstructor(constructor_fun_name, constructor_module, {}, {})
+            net = net_constr.get()
 
-        net.load_state_dict(checkpoint_dict['net'])
+
+        pretrained_dict = checkpoint_dict['net']
+        model_dict = net.state_dict()
+        for k, v in pretrained_dict.items():
+            if k not in model_dict and k.startswith('module.'):
+                model_dict[k[7:]] = v
+            elif k not in model_dict:
+                print('wrong pretrained state_dict, ', k)
+            else:
+                model_dict[k] = v
+        # net.load_state_dict(checkpoint_dict['net'])
+        net.load_state_dict(model_dict)
 
         net.constructor = checkpoint_dict['constructor']
         if 'net_info' in checkpoint_dict and checkpoint_dict['net_info'] is not None:
