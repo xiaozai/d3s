@@ -110,6 +110,7 @@ def run(settings):
     # Set objective
     objective = nn.BCEWithLogitsLoss()
 
+    # test mac atom git again
     # Create actor, which wraps network and objective
     actor = actors.DepthSegmActor_no_targetsz(net=net, objective=objective)
 
