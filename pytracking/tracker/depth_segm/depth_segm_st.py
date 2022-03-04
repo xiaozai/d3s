@@ -1131,8 +1131,6 @@ class DepthSegmST(BaseTracker):
                 save_mask(None, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
                           self.params.masks_save_path, self.sequence_name, self.frame_name)
 
-
-
         print('max contour area : ', np.max(cnt_area))
 
         if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 1000:
@@ -1140,9 +1138,10 @@ class DepthSegmST(BaseTracker):
             polygon = contour.reshape(-1, 2) # Song, checked already, here is correct
             self.polygon = polygon
 
-            prbox = np.reshape(cv2.boxPoints(cv2.minAreaRect(polygon)), (4, 2))  # Rotated Rectangle
-            prbox_init = copy.deepcopy(prbox) # Song, checked already, here is correct
+            prbox = np.reshape(cv2.boxPoints(cv2.minAreaRect(polygon)), (4, 2))  # Rotated Rectangle, cv2.minAreaRect considered the rotation
+            prbox_init = copy.deepcopy(prbox)                                    # (center(x, y), (width, height), angle of rotation) -> cv2.boxPoints
 
+            self.prbox = prbox_init # p0, p1, p2, p3
             self.aabb = self.poly_to_aabbox_noscale(prbox_init[:, 0], prbox_init[:, 1]) # Song, why here is not correct
 
             prbox_opt = np.array([])
@@ -1197,7 +1196,6 @@ class DepthSegmST(BaseTracker):
 
                         # new_aabb = self.poly_to_aabbox(prbox[:, 0], prbox[:, 1])
                         new_aabb = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:, 1]) # Song
-                        self.aabb = new_aabb # Song some problem with aabb
 
                         new_target_scale = (math.sqrt(new_aabb[2] * new_aabb[3]) * self.params.search_area_scale) / \
                                            self.img_sample_sz[0]
@@ -1268,4 +1266,5 @@ class DepthSegmST(BaseTracker):
         w = x2 - x1
         h = y2 - y1
 
-        return np.array([cx - w / 2, cy - h / 2, w, h])
+        # return np.array([cx - w / 2, cy - h / 2, w, h])
+        return np.array([x1, y1, w, h])
