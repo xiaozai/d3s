@@ -318,6 +318,7 @@ class DepthSegmST(BaseTracker):
 
         # Update position and scale
         # [AL] Modification
+        ''' Song, it should not always update , because target scale is not correct '''
         # if flag != 'not_found':
         if uncert_score < self.params.tracking_uncertainty_thr:
             if getattr(self.params, 'use_classifier', True):
@@ -343,6 +344,8 @@ class DepthSegmST(BaseTracker):
         pred_segm_region = None
         if self.segmentation_task or (
             self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
+
+            ''' Song, self.target_sz increases always, because of target_scale '''
             pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
             # Song , do we need to consider about the mask sz? pixels in the pred_segm_region ?
             if pred_segm_region is None:
@@ -887,8 +890,6 @@ class DepthSegmST(BaseTracker):
         segm_net, _ = load_network(self.params.segm_net_path, backbone_pretrained=False,
                                    constructor_module=self.params.constructor_module,
                                    constructor_fun_name=self.params.constructor_fun_name) #
-                                   # constructor_module='ltr.models.depth_segm.depth_segm',
-                                   # constructor_fun_name='depth_segm_attention1_resnet50') #
 
         if self.params.use_gpu:
             segm_net.cuda()
@@ -1041,6 +1042,7 @@ class DepthSegmST(BaseTracker):
     def segment_target(self, color, depth, pos, sz):
         # pos and sz are in the image coordinates
         # construct new bounding box first
+        ''' Song, bb increase according to target sz and target scales !!!!!'''
         tlx_ = pos[1] - sz[1] / 2
         tly_ = pos[0] - sz[0] / 2
         w_ = sz[1]
@@ -1142,7 +1144,7 @@ class DepthSegmST(BaseTracker):
             ''' Song, only for vis, until here, polygon, prbox, aabb is correct'''
             self.polygon = polygon
             self.prbox = prbox_init # p0, p1, p2, p3
-            self.aabb = self.poly_to_aabbox_noscale(prbox_init[:, 0], prbox_init[:, 1]) # Song, why here is not correct
+            self.aabb, _ = self.poly_to_aabbox_noscale(prbox_init[:, 0], prbox_init[:, 1]) # Song, why here is not correct
 
             # prbox_opt = np.array([])
             # if self.params.segm_optimize_polygon:
@@ -1178,21 +1180,21 @@ class DepthSegmST(BaseTracker):
             # displacement = np.mean(prbox, axis=0) - np.array([mask.shape[0] / 2, mask.shape[1] / 2])
             # prbox in image coordinates, f_ is the scale
             ''' Song : something wrong here, it seems f_ has problem because of target-scale
-            f_ change according to targe_scale
+            f_ change according to targe_scale !!!!!!
             '''
             # prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
             prbox = (prbox - np.array([mask.shape[0]/2, mask.shape[1]/2])) / f_ + np.array([pos[1].item(), pos[0].item()])
 
-            import matplotlib.pyplot as plt
-            import matplotlib.patches as patches
-            fig, ax = plt.subplots(1)
-            ax.imshow(color)
-            probox_vis = patches.Polygon(prbox, closed=True, facecolor='none', edgecolor='r')
-            vis_aabb = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:,1])
-            vis_aabb = patches.Rectangle((vis_aabb[0], vis_aabb[1]), vis_aabb[2], vis_aabb[3], edgecolor='b', facecolor='none')
-            ax.add_patch(vis_aabb)
-            ax.add_patch(probox_vis)
-            plt.show()
+            # import matplotlib.pyplot as plt
+            # import matplotlib.patches as patches
+            # fig, ax = plt.subplots(1)
+            # ax.imshow(color)
+            # probox_vis = patches.Polygon(prbox, closed=True, facecolor='none', edgecolor='r')
+            # vis_aabb, _ = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:,1])
+            # vis_aabb = patches.Rectangle((vis_aabb[0], vis_aabb[1]), vis_aabb[2], vis_aabb[3], edgecolor='b', facecolor='none')
+            # ax.add_patch(vis_aabb)
+            # ax.add_patch(probox_vis)
+            # plt.show()
 
             # self.prbox = prbox
             ''' Song, target_scale is usef for localization target , and update self.pos '''
@@ -1211,18 +1213,22 @@ class DepthSegmST(BaseTracker):
                             self.mask_pixels = np.delete(self.mask_pixels, 0)
 
                         # new_aabb = self.poly_to_aabbox(prbox[:, 0], prbox[:, 1])
-                        new_aabb = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:, 1]) # Song
+                        new_aabb, new_target_sz = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:, 1]) # Song
 
-                        new_target_scale = (math.sqrt(new_aabb[2] * new_aabb[3]) * self.params.search_area_scale) / \
-                                           self.img_sample_sz[0]
-                        # print('self.img_sample_sz : ', self.img_sample_sz) # [256, 256]
                         ''' Song feel confused
                             target scale increases very quickly
                             self.target_scale = self.target_scale * 1.05
+
+                            new target scale estimation method???
                         '''
 
+                        # new_target_scale = (math.sqrt(new_aabb[2] * new_aabb[3]) * self.params.search_area_scale) / \
+                        #                    self.img_sample_sz[0]
+                        new_target_scale = (math.sqrt(new_target_sz) * self.params.search_area_scale) / \
+                                           self.img_sample_sz[0]
+
                         rel_scale_ch = (abs(new_target_scale - self.target_scale) / self.target_scale).item()
-                        print('rel_scale_ch', rel_scale_ch)
+                        print('target scale and rel_scale_ch', new_target_scale, rel_scale_ch)
                         # song: , new_target_scale > 0.2, rel_scale_ch < 0.75,  target scale change < 0.75
                         if new_target_scale > self.params.segm_min_scale and rel_scale_ch < self.params.max_rel_scale_ch_thr:
                             self.target_scale = max(self.target_scale * self.params.min_scale_change_factor,
@@ -1279,8 +1285,12 @@ class DepthSegmST(BaseTracker):
         '''
         # keep the center and area of the polygon
         # change aspect ratio of the original bbox
-        cx = np.mean(x_)
-        cy = np.mean(y_)
+
+        A1 = np.linalg.norm(np.array([x_[0], y_[0]]) - np.array([x_[1], y_[1]])) * \
+             np.linalg.norm(np.array([x_[1], y_[1]]) - np.array([x_[2], y_[2]]))
+
+        # cx = np.mean(x_)
+        # cy = np.mean(y_)
         x1 = np.min(x_)
         x2 = np.max(x_)
         y1 = np.min(y_)
@@ -1289,4 +1299,4 @@ class DepthSegmST(BaseTracker):
         h = y2 - y1
 
         # return np.array([cx - w / 2, cy - h / 2, w, h])
-        return np.array([x1, y1, w, h])
+        return np.array([x1, y1, w, h]), A1
