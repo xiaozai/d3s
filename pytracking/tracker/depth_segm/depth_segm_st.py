@@ -1275,4 +1275,4 @@ class DepthSegmST(BaseTracker):
         # w = s * (x2 - x1) + 1
         # h = s * (y2 - y1) + 1
         # return np.array([cx - w / 2, cy - h / 2, w, h])
-        return np.array([(x1+x2)/2, (y1+y2)/2, x2-x1, y2-y2])
+        return np.array([(x1+x2)/2, (y1+y2)/2, x2-x1, y2-y1])
