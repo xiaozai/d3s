@@ -107,6 +107,7 @@ def run(settings):
     net = segm_models.depth_segm_attention13_resnet50(backbone_pretrained=True, topk_pos=settings.segm_topk_pos,
                                                     topk_neg=settings.segm_topk_neg, mixer_channels=mixer_channels)
 
+    # song test atom fetch
     # Set objective
     objective = nn.BCEWithLogitsLoss()
 
