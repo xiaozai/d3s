@@ -112,7 +112,6 @@ def run(settings):
 
     # Create actor, which wraps network and objective
     actor = actors.DepthSegmActor_no_targetsz(net=net, objective=objective)
-    # actor = actors.DepthSegmActor(net=net, objective=objective)
 
     # Optimizer
     optimizer = optim.Adam(actor.net.segm_predictor.parameters(), lr=1e-3)
@@ -124,4 +123,4 @@ def run(settings):
     trainer = LTRTrainer(actor, [loader_train, loader_val], optimizer, settings, lr_scheduler)
 
     # Run training (set fail_safe=False if you are debugging)
-    trainer.train(40, load_latest=True, fail_safe=False)
+    trainer.train(50, load_latest=True, fail_safe=False)
