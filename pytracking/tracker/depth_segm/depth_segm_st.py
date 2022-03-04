@@ -1108,7 +1108,7 @@ class DepthSegmST(BaseTracker):
         # print('mean previous mask pixels : ', np.mean(self.mask_pixels), 'pred mask pixels:', np.sum(mask) )
         ''' Song , from the mask visualization, it seems that pred_mask is correct, but probx is wrong '''
 
-        self.mask = mask
+        # self.mask = mask # predicted segmentation
         self.masked_img = patch_rgb * np.expand_dims(mask, axis=-1)
 
 
@@ -1127,13 +1127,6 @@ class DepthSegmST(BaseTracker):
                 save_mask(None, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
                           self.params.masks_save_path, self.sequence_name, self.frame_name)
 
-        import matplotlib.pyplot as plt
-        fig, (ax1, ax2) = plt.subplots(1,2)
-        ax1.imshow(mask)
-        mask0000 = np.zeros(mask.shape, dtype=np.uint8)
-        cv2.drawContours(mask0000, contours, -1, 1, thickness=-1)
-        plt.show()
-
         if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 1000:
             contour = contours[np.argmax(cnt_area)]  # use max area polygon
             polygon = contour.reshape(-1, 2)
@@ -1146,12 +1139,13 @@ class DepthSegmST(BaseTracker):
                 if not self.segmentation_task:
                     mask = np.zeros(mask.shape, dtype=np.uint8)
                     cv2.drawContours(mask, [contour], -1, 1, thickness=-1)
+                    self.mask = mask # song
 
                     # save mask to disk
                     # Note: move this below if evaluating on VOT
-                    if self.params.save_mask:
-                        save_mask(mask, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
-                                  self.params.masks_save_path, self.sequence_name, self.frame_name)
+                    # if self.params.save_mask:
+                    #     save_mask(mask, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
+                    #               self.params.masks_save_path, self.sequence_name, self.frame_name)
 
                 t_opt_start_ = time.time()
                 prbox_opt_ = fit_bbox_to_mask(mask.astype(np.int32), rotated=self.rotated_bbox)
