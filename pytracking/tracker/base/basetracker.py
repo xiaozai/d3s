@@ -337,19 +337,8 @@ class BaseTracker:
             # Song
             if self.polygon is not None:
                 polygon = patches.Polygon(self.polygon, closed=True, facecolor='none', edgecolor='r')
-                # prbox = patches.Polygon(self.prbox, closed=True)
                 aabb = patches.Rectangle((self.aabb[0], self.aabb[1]), self.aabb[2], self.aabb[3], linewidth=2, edgecolor='g', facecolor='none')
-                # prbox = patches.Polygon(self.prbox, closed=True)
-                # print('prbox: ', self.prbox)
-                # prbox = patches.Rectangle((self.prbox[0], self.prbox[1]), self.prbox[2], self.prbox[3], linewidth=2, edgecolor='b', facecolor='none')
-                # empty_mask = np.zeros(self.mask.shape, dtype=np.uint8)
-                # self.ax_polygon.cla()
-                # self.ax_polygon.imshow(empty_mask)
                 self.ax_m.add_patch(polygon)
-
-                # self.ax_prbox.cla()
-                # self.ax_prbox.imshow(empty_mask)
-                # self.ax_m.add_patch(prbox)
                 self.ax_m.add_patch(aabb)
 
 

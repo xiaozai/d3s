@@ -1143,6 +1143,9 @@ class DepthSegmST(BaseTracker):
             prbox = np.reshape(cv2.boxPoints(cv2.minAreaRect(polygon)), (4, 2))  # Rotated Rectangle
             prbox_init = copy.deepcopy(prbox) # Song, checked already, here is correct
 
+            new_aabb = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:, 1]) # Song
+            self.aabb = new_aabb
+
             prbox_opt = np.array([])
             if self.params.segm_optimize_polygon:
                 if not self.segmentation_task:
@@ -1173,11 +1176,6 @@ class DepthSegmST(BaseTracker):
                     else:
                         print('Bbox optimization has made too large difference.')
 
-            # Song , for vis only, before displacement
-            # print(prbox)
-            # new_aabb = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:, 1]) # Song
-            # self.aabb = new_aabb
-            # print(self.aabb)
 
             displacement = np.mean(prbox, axis=0) - np.array([mask.shape[0] / 2, mask.shape[1] / 2])
             prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
@@ -1200,7 +1198,7 @@ class DepthSegmST(BaseTracker):
 
                         # new_aabb = self.poly_to_aabbox(prbox[:, 0], prbox[:, 1])
                         new_aabb = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:, 1]) # Song
-                        self.aabb = new_aabb
+                        self.aabb = new_aabb # Song some problem with aabb
 
                         new_target_scale = (math.sqrt(new_aabb[2] * new_aabb[3]) * self.params.search_area_scale) / \
                                            self.img_sample_sz[0]
