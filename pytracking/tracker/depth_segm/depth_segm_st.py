@@ -1127,10 +1127,13 @@ class DepthSegmST(BaseTracker):
                 save_mask(None, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
                           self.params.masks_save_path, self.sequence_name, self.frame_name)
 
-        fig, ax = plt.subplots(1,1)
-        ax.imshow(mask)
+        import matplotlib.pyplot as plt
+        fig, (ax1, ax2) = plt.subplots(1,2)
+        ax1.imshow(mask)
+        mask0000 = np.zeros(mask.shape, dtype=np.uint8)
+        cv2.drawContours(mask0000, contours, -1, 1, thickness=-1)
         plt.show()
-        
+
         if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 1000:
             contour = contours[np.argmax(cnt_area)]  # use max area polygon
             polygon = contour.reshape(-1, 2)
