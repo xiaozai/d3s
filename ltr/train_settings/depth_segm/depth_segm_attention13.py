@@ -112,10 +112,6 @@ def run(settings):
 
     # Create actor, which wraps network and objective
     actor = actors.DepthSegmActor_no_targetsz(net=net, objective=objective)
-<<<<<<< HEAD
-=======
-    # actor = actors.DepthSegmActor(net=net, objective=objective)
->>>>>>> ca3e392a05a64efa0e83e0fb0c36c88801adeeec
 
     # Optimizer
     optimizer = optim.Adam(actor.net.segm_predictor.parameters(), lr=1e-3)
