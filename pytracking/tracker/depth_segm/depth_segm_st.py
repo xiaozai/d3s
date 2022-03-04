@@ -1175,16 +1175,25 @@ class DepthSegmST(BaseTracker):
             #             print('Bbox optimization has made too large difference.')
 
 
-            displacement = np.mean(prbox, axis=0) - np.array([mask.shape[0] / 2, mask.shape[1] / 2])
+            # displacement = np.mean(prbox, axis=0) - np.array([mask.shape[0] / 2, mask.shape[1] / 2])
             # prbox in image coordinates, f_ is the scale
-            prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
+            ''' Song : something wrong here, it seems f_ has problem because of target-scale
+            f_ change according to targe_scale
+            '''
+            # prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
+            prbox = (prbox - np.array([mask.shape[0]/2, mask.shape[1]/2])) / f_ + np.array([pos[1].item(), pos[0].item()])
 
-            fig, ax = plt.subpots(1)
+            import matplotlib.pyplot as plt
+            import matplotlib.patches as patches
+            fig, ax = plt.subplots(1)
             ax.imshow(color)
             probox_vis = patches.Polygon(prbox, closed=True, facecolor='none', edgecolor='r')
-            ax.add(probox_vis)
+            vis_aabb = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:,1])
+            vis_aabb = patches.Rectangle((vis_aabb[0], vis_aabb[1]), vis_aabb[2], vis_aabb[3], edgecolor='b', facecolor='none')
+            ax.add_patch(vis_aabb)
+            ax.add_patch(probox_vis)
             plt.show()
-            
+
             # self.prbox = prbox
             ''' Song, target_scale is usef for localization target , and update self.pos '''
             if self.params.segm_scale_estimation:
@@ -1206,8 +1215,14 @@ class DepthSegmST(BaseTracker):
 
                         new_target_scale = (math.sqrt(new_aabb[2] * new_aabb[3]) * self.params.search_area_scale) / \
                                            self.img_sample_sz[0]
-                        rel_scale_ch = (abs(new_target_scale - self.target_scale) / self.target_scale).item()
+                        # print('self.img_sample_sz : ', self.img_sample_sz) # [256, 256]
+                        ''' Song feel confused
+                            target scale increases very quickly
+                            self.target_scale = self.target_scale * 1.05
+                        '''
 
+                        rel_scale_ch = (abs(new_target_scale - self.target_scale) / self.target_scale).item()
+                        print('rel_scale_ch', rel_scale_ch)
                         # song: , new_target_scale > 0.2, rel_scale_ch < 0.75,  target scale change < 0.75
                         if new_target_scale > self.params.segm_min_scale and rel_scale_ch < self.params.max_rel_scale_ch_thr:
                             self.target_scale = max(self.target_scale * self.params.min_scale_change_factor,

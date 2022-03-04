@@ -130,7 +130,7 @@ def parameters():
     params.segm_pixels_ratio = 2
     params.mask_pixels_budget_sz = 25
     params.segm_min_scale = 0.2
-    params.max_rel_scale_ch_thr = 0.5 # 0.75
+    params.max_rel_scale_ch_thr = 0.2 # 0.5 # 0.75
     params.consider_segm_pixels_ratio = 1
     params.opt_poly_overlap_thr = 0.3
     params.poly_cost_a = 1.2
