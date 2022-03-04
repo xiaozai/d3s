@@ -1182,23 +1182,23 @@ class DepthSegmST(BaseTracker):
 
                 # use pixels_ratio to determine if new scale should be estimated or not
                 mask_pixels_ = np.max(cnt_area)
-                # Song target mask size changes should be in a range
                 pixels_ratio = abs(np.mean(self.mask_pixels) - mask_pixels_) / np.mean(self.mask_pixels)
-                # mask_pixels_ratio =  mask_pixels_ / (np.mean(self.mask_pixels)+0.001) # Song, prevent segmentation goes smaller
-                # init_mask_pixels_ratio = mask_pixels_ / (np.sum(self.init_mask)+0.001)
 
                 if self.uncert_score < self.params.uncertainty_segm_scale_thr:
 
-                    if pixels_ratio < self.params.segm_pixels_ratio and pixels_ratio:
+                    if pixels_ratio < self.params.segm_pixels_ratio:
 
                         self.mask_pixels = np.append(self.mask_pixels, mask_pixels_)
                         if self.mask_pixels.size > self.params.mask_pixels_budget_sz:
                             self.mask_pixels = np.delete(self.mask_pixels, 0)
 
-                        new_aabb = self.poly_to_aabbox(prbox[:, 0], prbox[:, 1])
+                        # new_aabb = self.poly_to_aabbox(prbox[:, 0], prbox[:, 1])
+                        new_aabb = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:, 1]) # Song
                         new_target_scale = (math.sqrt(new_aabb[2] * new_aabb[3]) * self.params.search_area_scale) / \
                                            self.img_sample_sz[0]
                         rel_scale_ch = (abs(new_target_scale - self.target_scale) / self.target_scale).item()
+
+                        # song: , new_target_scale > 0.2, rel_scale_ch < 0.75,  target scale change < 0.75
                         if new_target_scale > self.params.segm_min_scale and rel_scale_ch < self.params.max_rel_scale_ch_thr:
                             self.target_scale = max(self.target_scale * self.params.min_scale_change_factor,
                                                     min(self.target_scale * self.params.max_scale_change_factor,
@@ -1248,3 +1248,22 @@ class DepthSegmST(BaseTracker):
         w = s * (x2 - x1) + 1
         h = s * (y2 - y1) + 1
         return np.array([cx - w / 2, cy - h / 2, w, h])
+
+    def poly_to_aabbox_noscale(self, x_, y_):
+        ''' song : remove scale'''
+        # keep the center and area of the polygon
+        # change aspect ratio of the original bbox
+        cx = np.mean(x_)
+        cy = np.mean(y_)
+        x1 = np.min(x_)
+        x2 = np.max(x_)
+        y1 = np.min(y_)
+        y2 = np.max(y_)
+        # A1 = np.linalg.norm(np.array([x_[0], y_[0]]) - np.array([x_[1], y_[1]])) * \
+        #      np.linalg.norm(np.array([x_[1], y_[1]]) - np.array([x_[2], y_[2]]))
+        # A2 = (x2 - x1) * (y2 - y1)
+        # s = np.sqrt(A1 / A2)
+        # w = s * (x2 - x1) + 1
+        # h = s * (y2 - y1) + 1
+        # return np.array([cx - w / 2, cy - h / 2, w, h])
+        return np.array([(x1+x2)/2, (y1+y2)/2, x2-x1, y2-y2])
