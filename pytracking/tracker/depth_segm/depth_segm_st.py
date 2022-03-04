@@ -1143,8 +1143,7 @@ class DepthSegmST(BaseTracker):
             prbox = np.reshape(cv2.boxPoints(cv2.minAreaRect(polygon)), (4, 2))  # Rotated Rectangle
             prbox_init = copy.deepcopy(prbox) # Song, checked already, here is correct
 
-            new_aabb = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:, 1]) # Song
-            self.aabb = new_aabb
+            self.aabb = self.poly_to_aabbox_noscale(prbox_init[:, 0], prbox_init[:, 1]) # Song, why here is not correct
 
             prbox_opt = np.array([])
             if self.params.segm_optimize_polygon:
@@ -1266,11 +1265,7 @@ class DepthSegmST(BaseTracker):
         x2 = np.max(x_)
         y1 = np.min(y_)
         y2 = np.max(y_)
-        # A1 = np.linalg.norm(np.array([x_[0], y_[0]]) - np.array([x_[1], y_[1]])) * \
-        #      np.linalg.norm(np.array([x_[1], y_[1]]) - np.array([x_[2], y_[2]]))
-        # A2 = (x2 - x1) * (y2 - y1)
-        # s = np.sqrt(A1 / A2)
-        # w = s * (x2 - x1) + 1
-        # h = s * (y2 - y1) + 1
-        # return np.array([cx - w / 2, cy - h / 2, w, h])
-        return np.array([(x1+x2)/2, (y1+y2)/2, x2-x1, y2-y1])
+        w = x2 - x1
+        h = y2 - y1
+
+        return np.array([cx - w / 2, cy - h / 2, w, h])

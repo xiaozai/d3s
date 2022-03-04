@@ -337,7 +337,8 @@ class BaseTracker:
             # Song
             if self.polygon is not None:
                 polygon = patches.Polygon(self.polygon, closed=True, facecolor='none', edgecolor='r')
-                aabb = patches.Rectangle((self.aabb[0], self.aabb[1]), self.aabb[2], self.aabb[3], linewidth=2, edgecolor='g', facecolor='none')
+                cx, cy, w, h = self.aabb
+                aabb = patches.Rectangle((cx-w/2, cy-h/2), w, h, linewidth=2, edgecolor='g', facecolor='none')
                 self.ax_m.add_patch(polygon)
                 self.ax_m.add_patch(aabb)
 
