@@ -388,7 +388,7 @@ class DepthSegmST(BaseTracker):
                     pred_segm_region[2] = color.shape[1] - pred_segm_region[0]
                 if pred_segm_region[1] + pred_segm_region[3] >= color.shape[0]:
                     pred_segm_region[3] = color.shape[0] - pred_segm_region[1]
-
+                print('use segment region as results ....')
                 return pred_segm_region, self.score_map.max()
 
         # Return new state
@@ -1176,8 +1176,8 @@ class DepthSegmST(BaseTracker):
             displacement = np.mean(prbox, axis=0) - np.array([mask.shape[0] / 2, mask.shape[1] / 2])
             prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
 
-            self.prbox = prbox
-
+            # self.prbox = prbox
+            ''' Song, target_scale is usef for localization target , self.pos '''
             if self.params.segm_scale_estimation:
 
                 # use pixels_ratio to determine if new scale should be estimated or not
@@ -1194,7 +1194,7 @@ class DepthSegmST(BaseTracker):
 
                         # new_aabb = self.poly_to_aabbox(prbox[:, 0], prbox[:, 1])
                         new_aabb = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:, 1]) # Song
-                        self.aabb = new_aabb
+                        # self.aabb = new_aabb
 
                         new_target_scale = (math.sqrt(new_aabb[2] * new_aabb[3]) * self.params.search_area_scale) / \
                                            self.img_sample_sz[0]
@@ -1228,7 +1228,7 @@ class DepthSegmST(BaseTracker):
                                    np.max(prbox[:, 0]) - np.min(prbox[:, 0]) + 1,
                                    np.max(prbox[:, 1]) - np.min(prbox[:, 1]) + 1]
 
-
+                self.aabb = pred_region
                 return pred_region
 
         return None

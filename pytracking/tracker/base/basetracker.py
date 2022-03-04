@@ -336,9 +336,9 @@ class BaseTracker:
 
             # Song
             if self.polygon is not None:
-                polygon = patches.Polygon(self.polygon, closed=True)
-                prbox = patches.Polygon(self.prbox, closed=True)
-                aabb = patches.Rectangle((self.aabb[0], self.aabb[1]), self.aabb[2], self.aabb[3], linewidth=2, edgecolor='r', facecolor='none')
+                polygon = patches.Polygon(self.polygon, closed=True, facecolor='none', edgecolor='r')
+                # prbox = patches.Polygon(self.prbox, closed=True)
+                aabb = patches.Rectangle((self.aabb[0], self.aabb[1]), self.aabb[2], self.aabb[3], linewidth=2, edgecolor='g', facecolor='none')
                 # prbox = patches.Polygon(self.prbox, closed=True)
                 # print('prbox: ', self.prbox)
                 # prbox = patches.Rectangle((self.prbox[0], self.prbox[1]), self.prbox[2], self.prbox[3], linewidth=2, edgecolor='b', facecolor='none')
@@ -349,7 +349,7 @@ class BaseTracker:
 
                 # self.ax_prbox.cla()
                 # self.ax_prbox.imshow(empty_mask)
-                self.ax_m.add_patch(prbox)
+                # self.ax_m.add_patch(prbox)
                 self.ax_m.add_patch(aabb)
 
 
