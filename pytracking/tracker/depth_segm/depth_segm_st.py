@@ -1042,7 +1042,7 @@ class DepthSegmST(BaseTracker):
 
         self.polygon = None
         self.prbox = None
-        
+
     def segment_target(self, color, depth, pos, sz):
         # pos and sz are in the image coordinates
         # construct new bounding box first
@@ -1141,27 +1141,7 @@ class DepthSegmST(BaseTracker):
             prbox = np.reshape(cv2.boxPoints(cv2.minAreaRect(polygon)), (4, 2))  # Rotated Rectangle
             prbox_init = copy.deepcopy(prbox) # Song, checked already, here is correct
 
-            self.prbox = prbox
             self.polygon = polygon
-            # import matplotlib.pyplot as plt
-            # import matplotlib.patches as patches
-            # fig2, (ax111, ax222, ax333) = plt.subplots(1,3)
-            # ax111.cla()
-            # ax111.imshow(mask)
-            # mask0000 = np.zeros(mask.shape, dtype=np.uint8)
-            # mask0000 = cv2.drawContours(mask0000, [contours[np.argmax(cnt_area)]], -1, 1, thickness=-1)
-            # ax222.cla()
-            # ax222.imshow(mask0000)
-            # ax333.cla()
-            # mask333 = np.zeros(mask.shape, dtype=np.uint8)
-            # box333 = np.int0(cv2.boxPoints(cv2.minAreaRect(polygon)))
-            # print(box333)
-            # ax333.imshow(mask333)
-            # rect = patches.Polygon(prbox, closed=True)
-            # ax333.add_patch(rect)
-            # plt.show()
-            # # plt.draw()
-            # # plt.pause(0.001)
 
             prbox_opt = np.array([])
             if self.params.segm_optimize_polygon:
@@ -1195,6 +1175,7 @@ class DepthSegmST(BaseTracker):
 
             displacement = np.mean(prbox, axis=0) - np.array([mask.shape[0] / 2, mask.shape[1] / 2])
             prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
+
 
             if self.params.segm_scale_estimation:
 
@@ -1242,6 +1223,8 @@ class DepthSegmST(BaseTracker):
                                    np.max(prbox[:, 0]) - np.min(prbox[:, 0]) + 1,
                                    np.max(prbox[:, 1]) - np.min(prbox[:, 1]) + 1]
 
+                print('is rotated_bbox : ', self.rotated_bbox)
+                self.prbox = prbox
                 return pred_region
 
         return None

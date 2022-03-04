@@ -334,9 +334,11 @@ class BaseTracker:
                 self.ax_rgb_scoremap.imshow(rgb_score)
                 self.ax_rgb_scoremap.set_title('scoremap over rgb')
 
+            # Song
             if self.polygon is not None:
                 polygon = patches.Polygon(self.polygon, closed=True)
-                prbox = patches.Polygon(self.prbox, closed=True)
+                # prbox = patches.Polygon(self.prbox, closed=True)
+                prbox = patches.Rectangle((self.prbox[0], self.prbox[1]), self.prbox[2], self.prbox[3], linewidth=2, edgecolor='b', facecolor='none')
                 empty_mask = np.zeros(self.mask.shape, dtype=np.uint8)
                 self.ax_polygon.cla()
                 self.ax_polygon.imshow(empty_mask)
