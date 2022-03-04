@@ -331,14 +331,14 @@ class DepthSegmST(BaseTracker):
         self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy() # if self.params.debug == 5 else None
 
         # just a sanity check so that it does not get out of image
-        if new_pos[0] < 0:
-            new_pos[0] = 0
-        if new_pos[1] < 0:
-            new_pos[1] = 0
-        if new_pos[0] >= color.shape[0]:
-            new_pos[0] = color.shape[0] - 1
-        if new_pos[1] >= color.shape[1]:
-            new_pos[1] = color.shape[1] - 1
+        # if new_pos[0] < 0:
+        #     new_pos[0] = 0
+        # if new_pos[1] < 0:
+        #     new_pos[1] = 0
+        # if new_pos[0] >= color.shape[0]:
+        #     new_pos[0] = color.shape[0] - 1
+        # if new_pos[1] >= color.shape[1]:
+        #     new_pos[1] = color.shape[1] - 1
 
         pred_segm_region = None
         if self.segmentation_task or (
@@ -380,31 +380,25 @@ class DepthSegmST(BaseTracker):
             if pred_segm_region is not None:
                 # [x, y, w, h]
                 # just a sanity check so that it does not get out of image
-                if pred_segm_region[0] < 0:
-                    pred_segm_region[0] = 0
-                if pred_segm_region[1] < 0:
-                    pred_segm_region[1] = 0
-                if pred_segm_region[0] + pred_segm_region[2] >= color.shape[1]:
-                    pred_segm_region[2] = color.shape[1] - pred_segm_region[0]
-                if pred_segm_region[1] + pred_segm_region[3] >= color.shape[0]:
-                    pred_segm_region[3] = color.shape[0] - pred_segm_region[1]
+                px, py, pw, ph = pred_segm_region
+                px = max(px, 0)
+                py = max(py, 0)
+                pw = min(color.shape[1]-px, pw)
+                ph = min(color.shape[0]-py, ph)
                 print('use segment region as results ....')
-                return pred_segm_region, self.score_map.max()
+                # return pred_segm_region, self.score_map.max()
+                return [px, py, pw, ph], self.score_map.max()
 
         # Return new state
         new_state = torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]]))
-        # [x, y, w, h]
-        # just a sanity check so that it does not get out of image
-        if new_state[0] < 0:
-            new_state[0] = 0
-        if new_state[1] < 0:
-            new_state[1] = 0
-        if new_state[0] + new_state[2] >= color.shape[1]:
-            new_state[2] = color.shape[1] - new_state[0]
-        if new_state[1] + new_state[3] >= color.shape[0]:
-            new_state[3] = color.shape[0] - new_state[1]
+        px, py, pw, ph = new_state.tolist()
+        px = max(px, 0)
+        py = max(py, 0)
+        pw = min(color.shape[1]-px, pw)
+        ph = min(color.shape[0]-py, ph)
 
-        return new_state.tolist(), self.score_map.max()
+        # return new_state.tolist(), self.score_map.max()
+        return [px, py, pw, ph], self.score_map.max()
 
 
     def classify_target(self, sample_x, sample_d):
@@ -1186,7 +1180,7 @@ class DepthSegmST(BaseTracker):
             prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
 
             # self.prbox = prbox
-            ''' Song, target_scale is usef for localization target , self.pos '''
+            ''' Song, target_scale is usef for localization target , and update self.pos '''
             if self.params.segm_scale_estimation:
 
                 # use pixels_ratio to determine if new scale should be estimated or not
