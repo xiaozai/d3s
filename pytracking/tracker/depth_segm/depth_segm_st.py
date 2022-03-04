@@ -1106,9 +1106,11 @@ class DepthSegmST(BaseTracker):
         mask = (mask > self.params.segm_mask_thr).astype(np.uint8)
 
         # print('mean previous mask pixels : ', np.mean(self.mask_pixels), 'pred mask pixels:', np.sum(mask) )
+        ''' Song , from the mask visualization, it seems that pred_mask is correct, but probx is wrong '''
 
         self.mask = mask
         self.masked_img = patch_rgb * np.expand_dims(mask, axis=-1)
+
 
         if cv2.__version__[-5] == '4':
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
@@ -1125,7 +1127,11 @@ class DepthSegmST(BaseTracker):
                 save_mask(None, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
                           self.params.masks_save_path, self.sequence_name, self.frame_name)
 
-        if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 50:  # 1000:
+        fig, ax = plt.subplots(1,1)
+        ax.imshow(mask)
+        plt.show()
+        
+        if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 1000:
             contour = contours[np.argmax(cnt_area)]  # use max area polygon
             polygon = contour.reshape(-1, 2)
 
@@ -1172,8 +1178,8 @@ class DepthSegmST(BaseTracker):
                 pixels_ratio = abs(np.mean(self.mask_pixels) - mask_pixels_) / np.mean(self.mask_pixels)
                 mask_pixels_ratio =  mask_pixels_ / (np.mean(self.mask_pixels)+0.001) # Song, prevent segmentation goes smaller
                 init_mask_pixels_ratio = mask_pixels_ / (np.sum(self.init_mask)+0.001)
-                print('pred_mask, mean previous mask, init mask, ', mask_pixels_, np.mean(self.mask_pixels), np.sum(self.init_mask))
-                print('pixels_ration : ', pixels_ratio, 'mask pixels ratio : ', mask_pixels_ratio, 'init mask pixels ratio:', init_mask_pixels_ratio)
+                # print('pred_mask, mean previous mask, init mask, ', mask_pixels_, np.mean(self.mask_pixels), np.sum(self.init_mask))
+                # print('pixels_ration : ', pixels_ratio, 'mask pixels ratio : ', mask_pixels_ratio, 'init mask pixels ratio:', init_mask_pixels_ratio)
                 if self.uncert_score < self.params.uncertainty_segm_scale_thr:
 
                     if pixels_ratio < self.params.segm_pixels_ratio and pixels_ratio:
