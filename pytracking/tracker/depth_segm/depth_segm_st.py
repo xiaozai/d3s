@@ -1042,6 +1042,7 @@ class DepthSegmST(BaseTracker):
 
         self.polygon = None
         self.prbox = None
+        self.aabb = None
 
     def segment_target(self, color, depth, pos, sz):
         # pos and sz are in the image coordinates
@@ -1137,11 +1138,10 @@ class DepthSegmST(BaseTracker):
         if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 1000:
             contour = contours[np.argmax(cnt_area)]  # use max area polygon
             polygon = contour.reshape(-1, 2) # Song, checked already, here is correct
+            self.polygon = polygon
 
             prbox = np.reshape(cv2.boxPoints(cv2.minAreaRect(polygon)), (4, 2))  # Rotated Rectangle
             prbox_init = copy.deepcopy(prbox) # Song, checked already, here is correct
-
-            self.polygon = polygon
 
             prbox_opt = np.array([])
             if self.params.segm_optimize_polygon:
@@ -1176,7 +1176,7 @@ class DepthSegmST(BaseTracker):
             displacement = np.mean(prbox, axis=0) - np.array([mask.shape[0] / 2, mask.shape[1] / 2])
             prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
 
-            print('prbox before segm_scale_estimation : ', prbox, displacement)
+            self.prbox = prbox
 
             if self.params.segm_scale_estimation:
 
@@ -1194,6 +1194,8 @@ class DepthSegmST(BaseTracker):
 
                         # new_aabb = self.poly_to_aabbox(prbox[:, 0], prbox[:, 1])
                         new_aabb = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:, 1]) # Song
+                        self.aabb = new_aabb
+
                         new_target_scale = (math.sqrt(new_aabb[2] * new_aabb[3]) * self.params.search_area_scale) / \
                                            self.img_sample_sz[0]
                         rel_scale_ch = (abs(new_target_scale - self.target_scale) / self.target_scale).item()
@@ -1226,8 +1228,7 @@ class DepthSegmST(BaseTracker):
                                    np.max(prbox[:, 0]) - np.min(prbox[:, 0]) + 1,
                                    np.max(prbox[:, 1]) - np.min(prbox[:, 1]) + 1]
 
-                print('is rotated_bbox : ', self.rotated_bbox)
-                self.prbox = pred_region
+
                 return pred_region
 
         return None
