@@ -1202,6 +1202,8 @@ class DepthSegmST(BaseTracker):
                             self.target_scale = max(self.target_scale * self.params.min_scale_change_factor,
                                                     min(self.target_scale * self.params.max_scale_change_factor,
                                                         new_target_scale))
+
+                        print('target scale : ', self.target_scale)
                     else:
                         print('pred_mask too large or too small, ', mask_pixels_, np.mean(self.mask_pixels), np.sum(self.init_mask))
 
