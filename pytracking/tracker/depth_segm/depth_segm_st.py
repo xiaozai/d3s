@@ -76,13 +76,14 @@ class DepthSegmST(BaseTracker):
             state[1] -= 1
             # Get position and size
             self.pos = torch.Tensor([state[1] + state[3] / 2, state[0] + state[2] / 2])
-            self.pos_prev = [state[1] + state[3] / 2, state[0] + state[2] / 2]
+            # self.pos_prev = [state[1] + state[3] / 2, state[0] + state[2] / 2]
             self.target_sz = torch.Tensor([state[3], state[2]])
             self.gt_poly = np.array([state[0], state[1],
                                      state[0] + state[2] - 1, state[1],
                                      state[0] + state[2] - 1, state[1] + state[3] - 1,
                                      state[0], state[1] + state[3] - 1])
 
+            self.prev_box = state # song
             self.rotated_bbox = False
 
         # Set search area
@@ -276,7 +277,7 @@ class DepthSegmST(BaseTracker):
         self.frame_num += 1
         self.frame_name = '%08d' % self.frame_num
 
-        self.pos_prev = [copy.copy(self.pos[0].item()), copy.copy(self.pos[1].item())]
+        # self.pos_prev = [copy.copy(self.pos[0].item()), copy.copy(self.pos[1].item())]
 
         # Convert image
         color, depth = image['color'], image['depth']
@@ -316,13 +317,13 @@ class DepthSegmST(BaseTracker):
         if flag == 'not_found':
             uncert_score = 100
 
-        # Update position and scale
-        # [AL] Modification
-        ''' Song, it should not always update , because target scale is not correct '''
-        # if flag != 'not_found':
-        if uncert_score < self.params.tracking_uncertainty_thr:
-            if getattr(self.params, 'use_classifier', True):
-                self.update_state(new_pos, sample_scales[scale_ind])
+        ''' # Update position and scale
+            # [AL] Modification
+        '''
+        # # if flag != 'not_found':
+        # if uncert_score < self.params.tracking_uncertainty_thr:
+        #     if getattr(self.params, 'use_classifier', True):
+        #         self.update_state(new_pos, sample_scales[scale_ind])
 
         # if self.params.debug >= 2:
         if self.params.debug == 2:
@@ -332,14 +333,6 @@ class DepthSegmST(BaseTracker):
         self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy() # if self.params.debug == 5 else None
 
         # just a sanity check so that it does not get out of image
-        # if new_pos[0] < 0:
-        #     new_pos[0] = 0
-        # if new_pos[1] < 0:
-        #     new_pos[1] = 0
-        # if new_pos[0] >= color.shape[0]:
-        #     new_pos[0] = color.shape[0] - 1
-        # if new_pos[1] >= color.shape[1]:
-        #     new_pos[1] = color.shape[1] - 1
 
         pred_segm_region = None
         if self.segmentation_task or (
@@ -347,7 +340,7 @@ class DepthSegmST(BaseTracker):
 
             ''' Song, self.target_sz increases always, because of target_scale '''
             pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
-            # Song , do we need to consider about the mask sz? pixels in the pred_segm_region ?
+
             if pred_segm_region is None:
                 print('segment_target is None, use DCF results...')
                 self.pos = new_pos.clone()
@@ -363,7 +356,7 @@ class DepthSegmST(BaseTracker):
 
         # [AL] Modification
         # if update_flag:
-        if update_flag and uncert_score < self.params.tracking_uncertainty_thr:
+        if uncert_score < self.params.tracking_uncertainty_thr:
             # Get train sample
             train_x_rgb = TensorList([x[scale_ind:scale_ind + 1, ...] for x in test_x_rgb])
 
@@ -379,30 +372,60 @@ class DepthSegmST(BaseTracker):
         elif (self.frame_num - 1) % self.params.train_skipping == 0:
             self.filter_optimizer.run(self.params.CG_iter)
 
-        if self.params.use_segmentation:
-            if pred_segm_region is not None:
-                # [x, y, w, h]
-                # just a sanity check so that it does not get out of image
-                px, py, pw, ph = pred_segm_region
-                px = max(px, 0)
-                py = max(py, 0)
-                pw = min(color.shape[1]-px, pw)
-                ph = min(color.shape[0]-py, ph)
-                print('use segment region as results ....')
-                # return pred_segm_region, self.score_map.max()
-                return [px, py, pw, ph], self.score_map.max()
+        new_state = pred_segm_region if (self.params.use_segmentation and pred_segm_region is not None) else \
+                    torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]])).tolist()
+        conf_ = self.score_map.max()
 
-        # Return new state
-        new_state = torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]]))
-        px, py, pw, ph = new_state.tolist()
+        # if self.params.use_segmentation:
+        #     if pred_segm_region is not None:
+        #         new_state = pred_segm_region
+                # just a sanity check so that it does not get out of image
+                # px, py, pw, ph = pred_segm_region
+                # px = max(px, 0)
+                # py = max(py, 0)
+                # pw = min(color.shape[1]-px, pw)
+                # ph = min(color.shape[0]-py, ph)
+                # print('use segment region as results ....')
+                # if flag not in ['not_found', 'uncertain'] and self.score_map.max() > 0.8:
+                #     self.prev_box = [px, py, pw, ph]
+                # return [px, py, pw, ph], self.score_map.max()
+        # else:
+        #     # Return new state
+        #     new_state = torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]])).tolist()
+
+        # px, py, pw, ph = new_state.tolist()
+
+        # just a sanity check so that it does not get out of image
+        # px, py, pw, ph = new_state
+        # px = max(px, 0)
+        # py = max(py, 0)
+        # pw = min(color.shape[1]-px, pw)
+        # ph = min(color.shape[0]-py, ph)
+        new_state = self.sanity_check(new_state, color.shape)
+
+        if flag not in ['not_found', 'uncertain'] and conf_ > 0.8:
+            self.prev_box = new_state
+
+        ''' # Update position and scale
+            # [AL] Modification
+            # [SY] Modification, we moved here and modified it
+        '''
+        if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.8:
+            if getattr(self.params, 'use_classifier', True):
+                self.update_state(new_pos, sample_scales[scale_ind], new_state)
+
+
+        return new_state, conf_
+
+
+    def sanity_check(self, new_state, img_shape):
+        px, py, pw, ph = new_state
         px = max(px, 0)
         py = max(py, 0)
-        pw = min(color.shape[1]-px, pw)
-        ph = min(color.shape[0]-py, ph)
+        pw = min(img_shape[1]-px, pw)
+        ph = min(img_shape[0]-py, ph)
 
-        # return new_state.tolist(), self.score_map.max()
-        return [px, py, pw, ph], self.score_map.max()
-
+        return [px, py, pw, ph]
 
     def classify_target(self, sample_x, sample_d):
         if sample_d is not None:
@@ -805,11 +828,30 @@ class DepthSegmST(BaseTracker):
             train_y.append(dcf.label_function_spatial(sz, sig, center))
         return train_y
 
-    def update_state(self, new_pos, new_scale=None):
+    def update_state(self, new_pos, new_scale=None, new_state=None):
+        ''' Song, target_scale increases, exceed the self.max_scale_factor,
+        self.target_scale = 1.05 * self.target_scale'''
         # Update scale
-        if new_scale is not None:
-            self.target_scale = new_scale.clamp(self.min_scale_factor, self.max_scale_factor)
-            self.target_sz = self.base_target_sz * self.target_scale
+        if new_state is not None:
+            new_target_scale = (math.sqrt(new_state[2] * new_state[3]) * self.params.search_area_scale) / \
+                               self.img_sample_sz[0]
+
+            rel_scale_ch = (abs(new_target_scale - self.target_scale) / self.target_scale).item()
+
+            ''' if target scale change too small, then dont change, keep it as 1.05 '''
+            if new_target_scale > self.params.segm_min_scale and rel_scale_ch > 0.3:
+
+                self.target_scale = max(self.target_scale * self.params.min_scale_change_factor,
+                                            min(self.target_scale * self.params.max_scale_change_factor,
+                                                new_target_scale))
+                self.target_sz = self.base_target_sz * self.target_scale
+                print('update_state target scale 11 : ', self.target_scale, self.target_sz, new_state[2]*new_state[3])
+
+        else:
+            if new_scale is not None:
+                self.target_scale = new_scale.clamp(self.min_scale_factor, self.max_scale_factor)
+                self.target_sz = self.base_target_sz * self.target_scale
+                print('update_state target scale 22 : ', self.target_scale, self.target_sz)
 
         # Update pos
         inside_ratio = 0.2
@@ -1049,6 +1091,9 @@ class DepthSegmST(BaseTracker):
         h_ = sz[0]
         bb = [tlx_.item(), tly_.item(), w_.item(), h_.item()]
 
+        ''' Song bb = new_pos + prev target_sz'''
+        # bb = self.prev_box ?????
+
         # extract patch
         patch_rgb, f_ = prutils.sample_target(color, np.array(bb), self.params.segm_search_area_factor,
                                           output_sz=self.params.segm_output_sz)
@@ -1181,6 +1226,9 @@ class DepthSegmST(BaseTracker):
             # prbox in image coordinates, f_ is the scale
             ''' Song : something wrong here, it seems f_ has problem because of target-scale
             f_ change according to targe_scale !!!!!!
+            !
+            !
+            !
             '''
             # prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
             prbox = (prbox - np.array([mask.shape[0]/2, mask.shape[1]/2])) / f_ + np.array([pos[1].item(), pos[0].item()])
@@ -1222,10 +1270,13 @@ class DepthSegmST(BaseTracker):
                             new target scale estimation method???
                         '''
 
-                        # new_target_scale = (math.sqrt(new_aabb[2] * new_aabb[3]) * self.params.search_area_scale) / \
-                        #                    self.img_sample_sz[0]
-                        new_target_scale = (math.sqrt(new_target_sz) * self.params.search_area_scale) / \
+                        # Song,
+                        new_target_scale = (math.sqrt(new_aabb[2] * new_aabb[3]) * self.params.search_area_scale) / \
                                            self.img_sample_sz[0]
+
+                        # Song, does not work ....
+                        # new_target_scale = (math.sqrt(new_target_sz) * self.params.search_area_scale) / \
+                        #                    self.img_sample_sz[0]
 
                         rel_scale_ch = (abs(new_target_scale - self.target_scale) / self.target_scale).item()
                         print('target scale and rel_scale_ch', new_target_scale, rel_scale_ch)

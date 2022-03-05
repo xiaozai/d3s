@@ -120,7 +120,7 @@ def parameters():
     params.segm_search_area_factor = 4.0
     params.segm_feature_sz = 24
     params.segm_output_sz = params.segm_feature_sz * 16 # 384
-    params.segm_scale_estimation = True
+    params.segm_scale_estimation = False # True
     params.segm_optimize_polygon = True
 
     params.tracking_uncertainty_thr = 3
