@@ -1257,23 +1257,23 @@ class DepthSegmST(BaseTracker):
             # prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
             prbox = (prbox - np.array([mask.shape[0]/2, mask.shape[1]/2])) / f_ + np.array([pos[1].item(), pos[0].item()])
 
-            import matplotlib.pyplot as plt
-            import matplotlib.patches as patches
-            fig, (ax1, ax2) = plt.subplots(1, 2)
-            ax1.cla()
-            ax1.imshow(color)
-            probox_vis = patches.Polygon(prbox, closed=True, facecolor='none', edgecolor='r')
-            vis_aabb, _ = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:,1])
-            vis_aabb = patches.Rectangle((vis_aabb[0], vis_aabb[1]), vis_aabb[2], vis_aabb[3], edgecolor='b', facecolor='none')
-            ax1.add_patch(vis_aabb)
-            ax1.add_patch(probox_vis)
-
-            print(prbox_init)
-            ax2.cla()
-            ax2.imshow(mask)
-            prbox_in_search = patches.Polygon(prbox_init, closed=True, edgecolor='r', facecolor='none')
-            ax2.add_patch(prbox_in_search)
-            plt.show()
+            # import matplotlib.pyplot as plt
+            # import matplotlib.patches as patches
+            # fig, (ax1, ax2) = plt.subplots(1, 2)
+            # ax1.cla()
+            # ax1.imshow(color)
+            # probox_vis = patches.Polygon(prbox, closed=True, facecolor='none', edgecolor='r')
+            # vis_aabb, _ = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:,1])
+            # vis_aabb = patches.Rectangle((vis_aabb[0], vis_aabb[1]), vis_aabb[2], vis_aabb[3], edgecolor='b', facecolor='none')
+            # ax1.add_patch(vis_aabb)
+            # ax1.add_patch(probox_vis)
+            #
+            # print(prbox_init)
+            # ax2.cla()
+            # ax2.imshow(mask)
+            # prbox_in_search = patches.Polygon(prbox_init, closed=True, edgecolor='r', facecolor='none')
+            # ax2.add_patch(prbox_in_search)
+            # plt.show()
 
             # self.prbox = prbox
             ''' Song, target_scale is usef for localization target , and update self.pos '''
