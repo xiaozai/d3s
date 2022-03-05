@@ -1253,7 +1253,8 @@ class DepthSegmST(BaseTracker):
 
             import matplotlib.pyplot as plt
             import matplotlib.patches as patches
-            fig, （(ax1, ax2)) = plt.subplots(1, 2)
+            fig, (ax1, ax2) = plt.subplots(1, 2)
+            ax1.cla()
             ax1.imshow(color)
             probox_vis = patches.Polygon(prbox, closed=True, facecolor='none', edgecolor='r')
             vis_aabb, _ = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:,1])
@@ -1261,8 +1262,10 @@ class DepthSegmST(BaseTracker):
             ax1.add_patch(vis_aabb)
             ax1.add_patch(probox_vis)
 
+            print(prbox_init)
+            ax2.cla()
             ax2.imshow(mask)
-            prbox_in_search = patches.Rectangle((prbox_init[0], prbox_init[1]), prbox_init[2], prbox_init[3], edgecolor='r', facecolor='none')
+            prbox_in_search = patches.Polygon(prbox_init, closed=True, edgecolor='r', facecolor='none')
             ax2.add_patch(prbox_in_search)
             plt.show()
 
