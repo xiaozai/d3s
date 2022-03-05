@@ -356,7 +356,7 @@ class DepthSegmST(BaseTracker):
 
         # [AL] Modification
         # if update_flag:
-        if uncert_score < self.params.tracking_uncertainty_thr:
+        if uncert_score < self.params.tracking_uncertainty_thr and self.score_map.max() > 0.95:
             # Get train sample
             train_x_rgb = TensorList([x[scale_ind:scale_ind + 1, ...] for x in test_x_rgb])
 
@@ -1214,38 +1214,38 @@ class DepthSegmST(BaseTracker):
             # self.aabb, _ = self.poly_to_aabbox_noscale(prbox_init[:, 0], prbox_init[:, 1]) # Song, why here is not correct
             # self.aabb = prbox
 
-            # prbox_opt = np.array([])
-            # if self.params.segm_optimize_polygon:
-            #     if not self.segmentation_task:
-            #         mask = np.zeros(mask.shape, dtype=np.uint8)
-            #         cv2.drawContours(mask, [contour], -1, 1, thickness=-1)
-            #         self.mask = mask # song
-            #
-            #         # save mask to disk
-            #         # Note: move this below if evaluating on VOT
-            #         if self.params.save_mask:
-            #             save_mask(mask, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
-            #                       self.params.masks_save_path, self.sequence_name, self.frame_name)
-            #
-            #     t_opt_start_ = time.time()
-            #     prbox_opt_ = fit_bbox_to_mask(mask.astype(np.int32), rotated=self.rotated_bbox)
-            #     bbox_opt_time = time.time() - t_opt_start_
-            #     if prbox_opt_ is not None:
-            #         A1 = np.linalg.norm(np.array([prbox[0, 0], prbox[0, 1]]) - np.array([prbox[1, 0], prbox[1, 1]])) * \
-            #              np.linalg.norm(np.array([prbox[1, 0], prbox[1, 1]]) - np.array([prbox[2, 0], prbox[2, 1]]))
-            #         A_new = np.linalg.norm(np.array([prbox_opt_[0, 0], prbox_opt_[0, 1]]) - np.array(
-            #             [prbox_opt_[1, 0], prbox_opt_[1, 1]])) * \
-            #                 np.linalg.norm(np.array([prbox_opt_[1, 0], prbox_opt_[1, 1]]) - np.array(
-            #                     [prbox_opt_[2, 0], prbox_opt_[2, 1]]))
-            #         area_ratio = A_new / A1
-            #
-            #         if area_ratio > 0.1 and area_ratio < 2.5:  # 1.7
-            #             prbox_opt = prbox_opt_
-            #         else:
-            #             print('Bbox optimization has made too large difference.')
+            prbox_opt = np.array([])
+            if self.params.segm_optimize_polygon:
+                if not self.segmentation_task:
+                    mask = np.zeros(mask.shape, dtype=np.uint8)
+                    cv2.drawContours(mask, [contour], -1, 1, thickness=-1)
+                    self.mask = mask # song
+
+                    # save mask to disk
+                    # Note: move this below if evaluating on VOT
+                    if self.params.save_mask:
+                        save_mask(mask, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
+                                  self.params.masks_save_path, self.sequence_name, self.frame_name)
+
+                t_opt_start_ = time.time()
+                prbox_opt_ = fit_bbox_to_mask(mask.astype(np.int32), rotated=self.rotated_bbox)
+                bbox_opt_time = time.time() - t_opt_start_
+                if prbox_opt_ is not None:
+                    A1 = np.linalg.norm(np.array([prbox[0, 0], prbox[0, 1]]) - np.array([prbox[1, 0], prbox[1, 1]])) * \
+                         np.linalg.norm(np.array([prbox[1, 0], prbox[1, 1]]) - np.array([prbox[2, 0], prbox[2, 1]]))
+                    A_new = np.linalg.norm(np.array([prbox_opt_[0, 0], prbox_opt_[0, 1]]) - np.array(
+                        [prbox_opt_[1, 0], prbox_opt_[1, 1]])) * \
+                            np.linalg.norm(np.array([prbox_opt_[1, 0], prbox_opt_[1, 1]]) - np.array(
+                                [prbox_opt_[2, 0], prbox_opt_[2, 1]]))
+                    area_ratio = A_new / A1
+
+                    if area_ratio > 0.1 and area_ratio < 2.5:  # 1.7
+                        prbox_opt = prbox_opt_
+                    else:
+                        print('Bbox optimization has made too large difference.')
 
 
-            # displacement = np.mean(prbox, axis=0) - np.array([mask.shape[0] / 2, mask.shape[1] / 2])
+
             # prbox in image coordinates, f_ is the scale
             ''' Song : something wrong here, it seems f_ has problem because of target-scale
             f_ change according to targe_scale !!!!!!
@@ -1253,9 +1253,9 @@ class DepthSegmST(BaseTracker):
             !
             !
             '''
-
-            # prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
-            prbox = (prbox - np.array([mask.shape[0]/2, mask.shape[1]/2])) / f_ + np.array([pos[1].item(), pos[0].item()])
+            displacement = np.mean(prbox, axis=0) - np.array([mask.shape[0] / 2, mask.shape[1] / 2])
+            prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
+            # prbox = (prbox - np.array([mask.shape[0]/2, mask.shape[1]/2])) / f_ + np.array([pos[1].item(), pos[0].item()])
 
             # import matplotlib.pyplot as plt
             # import matplotlib.patches as patches
@@ -1326,10 +1326,10 @@ class DepthSegmST(BaseTracker):
                 self.pos[1] = np.mean(prbox[:, 0])
 
             if not self.params.segm_scale_estimation or pixels_ratio < self.params.segm_pixels_ratio:
-                # if prbox_opt.size > 0:
-                #     displacement_opt = np.mean(prbox_opt, axis=0) - np.array([mask.shape[0] / 2, mask.shape[1] / 2])
-                #     prbox = (prbox_opt - np.mean(prbox_opt, axis=0) + displacement_opt) / f_ + np.array(
-                #         [pos[1].item(), pos[0].item()])
+                if prbox_opt.size > 0:
+                    displacement_opt = np.mean(prbox_opt, axis=0) - np.array([mask.shape[0] / 2, mask.shape[1] / 2])
+                    prbox = (prbox_opt - np.mean(prbox_opt, axis=0) + displacement_opt) / f_ + np.array(
+                        [pos[1].item(), pos[0].item()])
 
                 if self.rotated_bbox:
                     pred_region = [prbox[0, 0], prbox[0, 1], prbox[1, 0], prbox[1, 1], prbox[2, 0], prbox[2, 1],
