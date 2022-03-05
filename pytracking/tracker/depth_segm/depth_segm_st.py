@@ -1212,7 +1212,7 @@ class DepthSegmST(BaseTracker):
             self.polygon = polygon
             self.prbox = prbox_init # p0, p1, p2, p3
             # self.aabb, _ = self.poly_to_aabbox_noscale(prbox_init[:, 0], prbox_init[:, 1]) # Song, why here is not correct
-            self.aabb = prbox
+            # self.aabb = prbox
 
             # prbox_opt = np.array([])
             # if self.params.segm_optimize_polygon:
