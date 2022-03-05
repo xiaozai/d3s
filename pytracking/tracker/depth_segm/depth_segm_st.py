@@ -66,7 +66,7 @@ class DepthSegmST(BaseTracker):
             else:
                 state = np.array([np.min(x_), np.min(y_), np.max(x_) - np.min(x_), np.max(y_) - np.min(y_)])
 
-            self.target_sz = torch.Tensor([state[3], state[2]])
+            self.target_sz = torch.Tensor([state[3], state[2]]) # H, W
 
             if init_mask is not None:
                 self.rotated_bbox = False
@@ -77,7 +77,7 @@ class DepthSegmST(BaseTracker):
             # Get position and size
             self.pos = torch.Tensor([state[1] + state[3] / 2, state[0] + state[2] / 2])
             # self.pos_prev = [state[1] + state[3] / 2, state[0] + state[2] / 2]
-            self.target_sz = torch.Tensor([state[3], state[2]])
+            self.target_sz = torch.Tensor([state[3], state[2]]) # H, W
             self.gt_poly = np.array([state[0], state[1],
                                      state[0] + state[2] - 1, state[1],
                                      state[0] + state[2] - 1, state[1] + state[3] - 1,
@@ -830,7 +830,11 @@ class DepthSegmST(BaseTracker):
 
     def update_state(self, new_pos, new_scale=None, new_state=None):
         ''' Song, target_scale increases, exceed the self.max_scale_factor,
-        self.target_scale = 1.05 * self.target_scale'''
+        self.target_scale = 1.05 * self.target_scale
+
+        self.target_sz = [H, W], but new_state is much larger than previous target_sz
+
+        '''
         # Update scale
         if new_state is not None:
             new_target_scale = (math.sqrt(new_state[2] * new_state[3]) * self.params.search_area_scale) / \
@@ -845,18 +849,31 @@ class DepthSegmST(BaseTracker):
                                             min(self.target_scale * self.params.max_scale_change_factor,
                                                 new_target_scale))
                 self.target_sz = self.base_target_sz * self.target_scale
-                print('update_state target scale 11 : ', self.target_scale, self.target_sz, new_state[2]*new_state[3])
 
-        else:
-            if new_scale is not None:
-                self.target_scale = new_scale.clamp(self.min_scale_factor, self.max_scale_factor)
-                self.target_sz = self.base_target_sz * self.target_scale
-                print('update_state target scale 22 : ', self.target_scale, self.target_sz)
+
+
+                print('update_state target scale 11 : ', self.target_scale, torch.prod(self.target_sz), new_state[2]*new_state[3])
+
 
         # Update pos
         inside_ratio = 0.2
         inside_offset = (inside_ratio - 0.5) * self.target_sz
         self.pos = torch.max(torch.min(new_pos, self.image_sz - inside_offset), inside_offset)
+
+
+    # def update_state(self, new_pos, new_scale=None, new_state=None):
+    #
+    #     # Update scale
+    #     if new_scale is not None:
+    #         self.target_scale = new_scale.clamp(self.min_scale_factor, self.max_scale_factor)
+    #         self.target_sz = self.base_target_sz * self.target_scale
+    #         print('update_state target scale 22 : ', self.target_scale, self.target_sz)
+    #
+    #     # Update pos
+    #     inside_ratio = 0.2
+    #     inside_offset = (inside_ratio - 0.5) * self.target_sz
+    #     self.pos = torch.max(torch.min(new_pos, self.image_sz - inside_offset), inside_offset)
+
 
     def create_dist(self, width, height, cx=None, cy=None):
 
@@ -1230,19 +1247,24 @@ class DepthSegmST(BaseTracker):
             !
             !
             '''
+
             # prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
             prbox = (prbox - np.array([mask.shape[0]/2, mask.shape[1]/2])) / f_ + np.array([pos[1].item(), pos[0].item()])
 
-            # import matplotlib.pyplot as plt
-            # import matplotlib.patches as patches
-            # fig, ax = plt.subplots(1)
-            # ax.imshow(color)
-            # probox_vis = patches.Polygon(prbox, closed=True, facecolor='none', edgecolor='r')
-            # vis_aabb, _ = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:,1])
-            # vis_aabb = patches.Rectangle((vis_aabb[0], vis_aabb[1]), vis_aabb[2], vis_aabb[3], edgecolor='b', facecolor='none')
-            # ax.add_patch(vis_aabb)
-            # ax.add_patch(probox_vis)
-            # plt.show()
+            import matplotlib.pyplot as plt
+            import matplotlib.patches as patches
+            fig, （ax1, ax2) = plt.subplots(1, 2)
+            ax1.imshow(color)
+            probox_vis = patches.Polygon(prbox, closed=True, facecolor='none', edgecolor='r')
+            vis_aabb, _ = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:,1])
+            vis_aabb = patches.Rectangle((vis_aabb[0], vis_aabb[1]), vis_aabb[2], vis_aabb[3], edgecolor='b', facecolor='none')
+            ax1.add_patch(vis_aabb)
+            ax1.add_patch(probox_vis)
+
+            ax2.imshow(mask)
+            prbox_in_search = patches.Rectangle((prbox_init[0], prbox_init[1]), prbox_init[2], prbox_init[3], edgecolor='r', facecolor='none')
+            ax2.add_patch(prbox_in_search)
+            plt.show()
 
             # self.prbox = prbox
             ''' Song, target_scale is usef for localization target , and update self.pos '''
