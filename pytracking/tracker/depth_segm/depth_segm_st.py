@@ -1196,7 +1196,12 @@ class DepthSegmST(BaseTracker):
             polygon = contour.reshape(-1, 2) # Song, checked already, here is correct
 
 
-            prbox = np.reshape(cv2.boxPoints(cv2.minAreaRect(polygon)), (4, 2))  # Rotated Rectangle, cv2.minAreaRect considered the rotation
+            ''' Song,
+            polygon -> rotated_bbpo -> aabbox ,may cause some problem , brings larger aabbox
+            '''
+            prbox = self.poly_to_prbox(polygon) # return 4 points
+
+            # prbox = np.reshape(cv2.boxPoints(cv2.minAreaRect(polygon)), (4, 2))  # Rotated Rectangle, cv2.minAreaRect considered the rotation
             prbox_init = copy.deepcopy(prbox)                                    # (center(x, y), (width, height), angle of rotation) -> cv2.boxPoints
 
             mask = np.zeros(mask.shape, dtype=np.uint8)
@@ -1206,7 +1211,8 @@ class DepthSegmST(BaseTracker):
             ''' Song, only for vis, until here, polygon, prbox, aabb is correct'''
             self.polygon = polygon
             self.prbox = prbox_init # p0, p1, p2, p3
-            self.aabb, _ = self.poly_to_aabbox_noscale(prbox_init[:, 0], prbox_init[:, 1]) # Song, why here is not correct
+            # self.aabb, _ = self.poly_to_aabbox_noscale(prbox_init[:, 0], prbox_init[:, 1]) # Song, why here is not correct
+            self.aabb = prbox
 
             # prbox_opt = np.array([])
             # if self.params.segm_optimize_polygon:
@@ -1337,6 +1343,15 @@ class DepthSegmST(BaseTracker):
                 return pred_region
 
         return None
+
+    def poly_to_prbox(self, polygon):
+        ''' Song, get axis aligned bbox from polygon , return 4 points'''
+        x_, y_ = polygon[:, 0], polygon[:, 1]
+        x1 = np.min(x_)
+        x2 = np.max(x_)
+        y1 = np.min(y_)
+        y2 = np.max(y_)
+        return np.array([[x1, y1], [x1, y2], [x2, y2], [x2, y1]])
 
     def poly_to_aabbox(self, x_, y_):
         # keep the center and area of the polygon
