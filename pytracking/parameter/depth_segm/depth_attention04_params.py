@@ -13,7 +13,7 @@ def parameters():
     # params.longterm = False                # Song : dal longterm or shortterm
     # Use GPU or not (IoUNet requires this to be True)
     params.use_gpu = True
-
+    params.use_dal = False
     # Feature specific parameters
     deep_params = TrackerParams()
 

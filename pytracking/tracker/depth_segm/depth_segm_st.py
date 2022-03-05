@@ -342,7 +342,7 @@ class DepthSegmST(BaseTracker):
             pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
 
             if pred_segm_region is None:
-                print('segment_target is None, use DCF results...')
+                # print('segment_target is None, use DCF results...')
                 self.pos = new_pos.clone()
         else:
             self.pos = new_pos.clone()
@@ -852,7 +852,7 @@ class DepthSegmST(BaseTracker):
 
 
 
-                print('update_state target scale 11 : ', self.target_scale, torch.prod(self.target_sz), new_state[2]*new_state[3])
+                # print('update_state target scale 11 : ', self.target_scale, torch.prod(self.target_sz), new_state[2]*new_state[3])
 
 
         # Update pos
@@ -1189,7 +1189,7 @@ class DepthSegmST(BaseTracker):
         #         save_mask(None, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
         #                   self.params.masks_save_path, self.sequence_name, self.frame_name)
 
-        print('max contour area : ', np.max(cnt_area))
+        # print('max contour area : ', np.max(cnt_area))
 
         if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 1000:
             contour = contours[np.argmax(cnt_area)]  # use max area polygon
@@ -1310,14 +1310,14 @@ class DepthSegmST(BaseTracker):
                         #                    self.img_sample_sz[0]
 
                         rel_scale_ch = (abs(new_target_scale - self.target_scale) / self.target_scale).item()
-                        print('target scale and rel_scale_ch', new_target_scale, rel_scale_ch)
+                        # print('target scale and rel_scale_ch', new_target_scale, rel_scale_ch)
                         # song: , new_target_scale > 0.2, rel_scale_ch < 0.75,  target scale change < 0.75
                         if new_target_scale > self.params.segm_min_scale and rel_scale_ch < self.params.max_rel_scale_ch_thr:
                             self.target_scale = max(self.target_scale * self.params.min_scale_change_factor,
                                                     min(self.target_scale * self.params.max_scale_change_factor,
                                                         new_target_scale))
 
-                        print('target scale : ', self.target_scale)
+                        # print('target scale : ', self.target_scale)
                     else:
                         print('pred_mask too large or too small, ', mask_pixels_, np.mean(self.mask_pixels), np.sum(self.init_mask))
 
