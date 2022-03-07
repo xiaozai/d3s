@@ -381,7 +381,7 @@ class DepthSegmNetAttention02(nn.Module):
 
 
         if debug:
-            return out, (pred_sm_rgb, pred_sm_d, attn_weights2, attn_weights1, attn_weights0)
+            return out, (attn_weights2, attn_weights2, attn_weights1, attn_weights0)
         else:
             return out
 
