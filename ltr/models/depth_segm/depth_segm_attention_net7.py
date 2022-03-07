@@ -460,10 +460,14 @@ class DepthSegmNetAttention07(nn.Module):
 
         out = F.softmax(out, dim=1)
 
+        # if debug:
+        #     return out, target_sz, (attn_weights3, attn_weights2, attn_weights1, attn_weights0)
+        # else:
+        #     return out, target_sz
         if debug:
-            return out, target_sz, (attn_weights3, attn_weights2, attn_weights1, attn_weights0)
+            return out, (attn_weights3, attn_weights2, attn_weights1, attn_weights0)
         else:
-            return out, target_sz
+            return out
 
     def init_mask(self, test_dist, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=3):
         f_test_rgb = self.segment1_rgb(self.segment0_rgb(feat_test_rgb[layer]))
