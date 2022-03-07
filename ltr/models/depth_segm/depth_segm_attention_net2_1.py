@@ -277,10 +277,12 @@ class DepthSegmNetAttention02(nn.Module):
         self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
         # config = get_b16_config(size=(12, 12))
-        config = get_b16_config(size=(8, 8))
-        self.rgbd_transformers = nn.ModuleList([Transformer(config, (384, 384), 4, True),  # self.rgbd_attention0 32 * 32 patches, 1024
-                                                Transformer(config, (192, 192), 16, True), # self.rgbd_attention1 16 * 16 patches, 256
-                                                Transformer(config, (96, 96), 32, True)])  # self.rgbd_attention2 vis = True img_size = 384, patches=(12, 12), in_channels=32
+        config0 = get_b16_config(size=(12, 12))
+        config1 = get_b16_config(size=(6, 6))
+        config2 = get_b16_config(size=(3, 3))
+        self.rgbd_transformers = nn.ModuleList([Transformer(config0, (384, 384), 4, True),  # self.rgbd_attention0 32 * 32 patches, 1024
+                                                Transformer(config1, (192, 192), 16, True), # self.rgbd_attention1 16 * 16 patches, 256
+                                                Transformer(config2, (96, 96), 32, True)])  # self.rgbd_attention2 vis = True img_size = 384, patches=(12, 12), in_channels=32
 
 
 
@@ -299,9 +301,9 @@ class DepthSegmNetAttention02(nn.Module):
                                        conv(segm_inter_dim[2], segm_inter_dim[2]), # self.s2 16 -> 16
                                        conv(segm_inter_dim[3], segm_inter_dim[2])])# self.s3  4 ->  4
 
-        self.a_layers = nn.ModuleList([conv(config.hidden_size*2, segm_inter_dim[0]),   # self.a0
-                                       conv(config.hidden_size*2, segm_inter_dim[1]),   # self.a1
-                                       conv(config.hidden_size*2, segm_inter_dim[2])])  # self.a2
+        self.a_layers = nn.ModuleList([conv(config0.hidden_size*2, segm_inter_dim[0]),   # self.a0
+                                       conv(config1.hidden_size*2, segm_inter_dim[1]),   # self.a1
+                                       conv(config2.hidden_size*2, segm_inter_dim[2])])  # self.a2
 
         self.f_layers = nn.ModuleList([conv(segm_input_dim[0], segm_inter_dim[0]), # self.f0
                                        conv(segm_input_dim[1], segm_inter_dim[1]), # self.f1
@@ -381,7 +383,7 @@ class DepthSegmNetAttention02(nn.Module):
 
 
         if debug:
-            return out, (attn_weights2, attn_weights2, attn_weights1, attn_weights0)
+            return out, (pred_sm_rgb, pred_sm_d, attn_weights2, attn_weights1, attn_weights0)
         else:
             return out
 
