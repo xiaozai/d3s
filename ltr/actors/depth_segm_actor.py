@@ -244,23 +244,23 @@ class DepthSegmActor(BaseActor):
         if 'test_dist' in data:
             test_dist = data['test_dist'].permute(1, 0, 2, 3)
 
-        if self.target_size:
-            # Run network to obtain IoU prediction for each proposal in 'test_proposals'
-            masks_pred, scale_pred, vis_data = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
-                                                       data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
-                                                       data['test_images'].permute(1, 0, 2, 3),
-                                                       data['test_depths'].permute(1, 0, 2, 3),
-                                                       data['train_masks'].permute(1, 0, 2, 3),
-                                                       test_dist=test_dist,
-                                                       debug=True) # Song :  vis pos and neg
-        else:
-            masks_pred, vis_data = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
-                                            data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
-                                            data['test_images'].permute(1, 0, 2, 3),
-                                            data['test_depths'].permute(1, 0, 2, 3),
-                                            data['train_masks'].permute(1, 0, 2, 3),
-                                            test_dist=test_dist,
-                                            debug=True) # Song :  vis pos and neg maps
+        # if self.target_size:
+        #     # Run network to obtain IoU prediction for each proposal in 'test_proposals'
+        #     masks_pred, scale_pred, vis_data = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
+        #                                                data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
+        #                                                data['test_images'].permute(1, 0, 2, 3),
+        #                                                data['test_depths'].permute(1, 0, 2, 3),
+        #                                                data['train_masks'].permute(1, 0, 2, 3),
+        #                                                test_dist=test_dist,
+        #                                                debug=True) # Song :  vis pos and neg
+        # else:
+        masks_pred, vis_data = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
+                                        data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
+                                        data['test_images'].permute(1, 0, 2, 3),
+                                        data['test_depths'].permute(1, 0, 2, 3),
+                                        data['train_masks'].permute(1, 0, 2, 3),
+                                        test_dist=test_dist,
+                                        debug=True) # Song :  vis pos and neg maps
 
 
         masks_gt = data['test_masks'].permute(1, 0, 2, 3) # C, B, H, W -> # B * 1 * H * W
@@ -273,22 +273,22 @@ class DepthSegmActor(BaseActor):
             # loss = torch.tensor(0.5)
 
         stats = {'Loss/total': loss.item(),
-                 'Loss/segm': loss.item(),
-                 'Loss/size': 0}
+                 'Loss/segm': loss.item()}
+                 # 'Loss/size': 0}
 
-        if self.target_size:
-            train_masks = data['train_masks'].permute(1, 0, 2, 3)
-
-            # img_sz = masks_gt.shape[-1] * masks_gt.shape[-2] * 1.0 # H * W
-            train_sz = torch.sum(train_masks.view(train_masks.shape[0], -1), 1).unsqueeze(-1) # [B, 1]
-            test_sz = torch.sum(masks_gt.view(masks_gt.shape[0], -1), 1).unsqueeze(-1) # [B, 1]
-            scale_gt = test_sz / (train_sz + 1e-20)
-
-            loss_sz = self.target_sz_objective(scale_gt, scale_pred)
-
-            # loss = loss + loss_sz
-            # stats['Loss/total'] = loss.item()
-            stats['Loss/size'] = loss_sz.item()
+        # if self.target_size:
+        #     train_masks = data['train_masks'].permute(1, 0, 2, 3)
+        #
+        #     # img_sz = masks_gt.shape[-1] * masks_gt.shape[-2] * 1.0 # H * W
+        #     train_sz = torch.sum(train_masks.view(train_masks.shape[0], -1), 1).unsqueeze(-1) # [B, 1]
+        #     test_sz = torch.sum(masks_gt.view(masks_gt.shape[0], -1), 1).unsqueeze(-1) # [B, 1]
+        #     scale_gt = test_sz / (train_sz + 1e-20)
+        #
+        #     loss_sz = self.target_sz_objective(scale_gt, scale_pred)
+        #
+        #     # loss = loss + loss_sz
+        #     # stats['Loss/total'] = loss.item()
+        #     stats['Loss/size'] = loss_sz.item()
 
 
         if 'iter' in data and (data['iter'] - 1) % 50 == 0:
