@@ -336,78 +336,78 @@ class DepthSegmActor_no_targetsz(BaseActor):
         return loss, stats
 
 
-class DepthSegmActor_parallel(BaseActor):
+# class DepthSegmActor_parallel(BaseActor):
+#
+#     """ Actor for training the Segmentation in ATOM"""
+#     def __call__(self, data):
+#         """
+#         args:
+#             data - The input data, should contain the fields 'train_images', 'test_images', 'train_anno',
+#                     'test_proposals' and 'proposal_iou'.
+#
+#         returns:
+#             loss    - the training loss
+#             states  -  dict containing detailed losses
+#         """
+#         world_size = 2
+#         mp.spawn(model_parallel,
+#                 args=(data),
+#                 nprocs=world_size,
+#                 join=True)
 
-    """ Actor for training the Segmentation in ATOM"""
-    def __call__(self, data):
-        """
-        args:
-            data - The input data, should contain the fields 'train_images', 'test_images', 'train_anno',
-                    'test_proposals' and 'proposal_iou'.
-
-        returns:
-            loss    - the training loss
-            states  -  dict containing detailed losses
-        """
-        world_size = 2
-        mp.spawn(model_parallel,
-                args=(data),
-                nprocs=world_size,
-                join=True)
-
-def model_parallel(data):
-    """
-    args:
-        data - The input data, should contain the fields 'train_images', 'test_images', 'train_anno',
-                'test_proposals' and 'proposal_iou'.
-
-    returns:
-        loss    - the training loss
-        states  -  dict containing detailed losses
-    """
-    rank = 0
-    world_size = 2
-    setup(rank, world_size)
-    net = segm_models.depth_segm_attention13_resnet50(backbone_pretrained=True)
-
-    ddp_model = DDP(net, device_ids=[rank])
-
-    objective = nn.BCEWithLogitsLoss()
-
-    test_dist = None
-    if 'test_dist' in data:
-        test_dist = data['test_dist'].permute(1, 0, 2, 3)
-
-
-    masks_pred, vis_data = ddp_model(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
-                                    data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
-                                    data['test_images'].permute(1, 0, 2, 3),
-                                    data['test_depths'].permute(1, 0, 2, 3),
-                                    data['train_masks'].permute(1, 0, 2, 3),
-                                    test_dist=test_dist,
-                                    debug=True) # Song :  vis pos and neg maps
-
-
-    masks_gt = data['test_masks'].permute(1, 0, 2, 3) # C, B, H, W -> # B * 1 * H * W
-    masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)   # B * 2 * H * W
-    # masks_gt_pair = masks_gt_pair.to(masks_pred.device)
-
-    loss = objective(masks_pred, masks_gt_pair)
-
-    stats = {'Loss/total': loss.item(),
-             'Loss/segm': loss.item()}
-
-    if 'iter' in data and (data['iter'] - 1) % 50 == 0:
-        save_debug_attnweights(data, masks_pred, vis_data) # vis_data = (p_rgb, p_d) or  (pred_sm_d, attn_weights2, attn_weights1, attn_weights0)
-
-    return loss, stats
-
-def setup(self, rank, world_size):
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
-
-    # initialize the process group
-    dist.init_process_group("gloo", rank=rank, world_size=world_size)
-
-def cleanup(self):
-    dist.destroy_process_group()
+# def model_parallel(data):
+#     """
+#     args:
+#         data - The input data, should contain the fields 'train_images', 'test_images', 'train_anno',
+#                 'test_proposals' and 'proposal_iou'.
+#
+#     returns:
+#         loss    - the training loss
+#         states  -  dict containing detailed losses
+#     """
+#     rank = 0
+#     world_size = 2
+#     setup(rank, world_size)
+#     net = segm_models.depth_segm_attention13_resnet50(backbone_pretrained=True)
+#
+#     ddp_model = DDP(net, device_ids=[rank])
+#
+#     objective = nn.BCEWithLogitsLoss()
+#
+#     test_dist = None
+#     if 'test_dist' in data:
+#         test_dist = data['test_dist'].permute(1, 0, 2, 3)
+#
+#
+#     masks_pred, vis_data = ddp_model(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
+#                                     data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
+#                                     data['test_images'].permute(1, 0, 2, 3),
+#                                     data['test_depths'].permute(1, 0, 2, 3),
+#                                     data['train_masks'].permute(1, 0, 2, 3),
+#                                     test_dist=test_dist,
+#                                     debug=True) # Song :  vis pos and neg maps
+#
+#
+#     masks_gt = data['test_masks'].permute(1, 0, 2, 3) # C, B, H, W -> # B * 1 * H * W
+#     masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)   # B * 2 * H * W
+#     # masks_gt_pair = masks_gt_pair.to(masks_pred.device)
+#
+#     loss = objective(masks_pred, masks_gt_pair)
+#
+#     stats = {'Loss/total': loss.item(),
+#              'Loss/segm': loss.item()}
+#
+#     if 'iter' in data and (data['iter'] - 1) % 50 == 0:
+#         save_debug_attnweights(data, masks_pred, vis_data) # vis_data = (p_rgb, p_d) or  (pred_sm_d, attn_weights2, attn_weights1, attn_weights0)
+#
+#     return loss, stats
+#
+# def setup(self, rank, world_size):
+#     os.environ['MASTER_ADDR'] = 'localhost'
+#     os.environ['MASTER_PORT'] = '12355'
+#
+#     # initialize the process group
+#     dist.init_process_group("gloo", rank=rank, world_size=world_size)
+#
+# def cleanup(self):
+#     dist.destroy_process_group()
