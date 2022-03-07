@@ -6,16 +6,6 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import os
 
-# def setup(rank, world_size=-1):
-#     os.environ['MASTER_ADDR'] = 'localhost'
-#     os.environ['MASTER_PORT'] = '12355'
-#
-#     # initialize the process group
-#     dist.init_process_group("gloo", rank=rank, world_size=world_size)
-
-# def cleanup():
-#     dist.destroy_process_group()
-
 class BaseTrainer:
     """Base trainer class. Contains functions for training and saving/loading chackpoints.
     Trainer classes should inherit from this one and overload the train_epoch function."""
@@ -43,8 +33,6 @@ class BaseTrainer:
         self.device = getattr(settings, 'device', None)
         if self.device is None:
             self.device = torch.device("cuda:0" if torch.cuda.is_available() and settings.use_gpu else "cpu")
-            # self.device = torch.device("cuda" if torch.cuda.is_available() and settings.use_gpu else "cpu")
-            # print('using device ', self.device)
 
         self.actor.to(self.device)
 
