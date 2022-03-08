@@ -85,7 +85,7 @@ def process_attn_maps(att_mat, batch_element, train_mask):
     for idx in range(v.shape[0]):
         # pixel = v[idx, :].detach().numpy() * mask
         pixel = v[idx, :].detach().numpy()
-        pixel = softmax(pixel)
+        # pixel = softmax(pixel)
         p_kv = len(pixel)
         prob_idx = np.argmax(pixel)
         if prob_idx < p_kv // 2:
