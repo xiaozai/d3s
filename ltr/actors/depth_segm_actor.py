@@ -156,12 +156,12 @@ def save_debug(data, pred_mask, vis_data):
     train_img = 255 * (train_img * std + mu)
     test_img = 255 * (test_img * std + mu)
 
-    train_img = (train_img.cpu().numpy()).astype(np.uint8)
-    train_depth = (train_depth.cpu().numpy().squeeze()).astype(np.float32)
-    test_img = (test_img.cpu().numpy()).astype(np.uint8)
-    test_depth = (test_depth.cpu().numpy().squeeze()).astype(np.float32)
-    train_mask = (train_mask.cpu().numpy()).astype(np.float32)
-    test_mask = (test_mask.cpu().numpy()).astype(np.float32)
+    train_img = (train_img.detach().cpu().numpy()).astype(np.uint8)
+    train_depth = (train_depth.detach().cpu().numpy().squeeze()).astype(np.float32)
+    test_img = (test_img.detach().cpu().numpy()).astype(np.uint8)
+    test_depth = (test_depth.detach().cpu().numpy().squeeze()).astype(np.float32)
+    train_mask = (train_mask.detach().cpu().numpy()).astype(np.float32)
+    test_mask = (test_mask.detach().cpu().numpy()).astype(np.float32)
     test_dist = (test_dist.detach().cpu().numpy().squeeze()).astype(np.float32)
     test_conf = 1 - test_dist / np.max(test_dist)
 
