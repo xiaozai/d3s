@@ -145,8 +145,8 @@ def save_debug(data, pred_mask, vis_data, batch_element = 0):
     train_img = data['train_images'][:, batch_element, :, :].permute(1, 2, 0)
     test_img = data['test_images'][:, batch_element, :, :].permute(1, 2, 0)
 
-    mu = torch.Tensor(data['settings'].normalize_mean)).view(1, 1, 3)
-    std = torch.Tensor(data['settings'].normalize_std)).view(1, 1, 3)
+    mu = torch.Tensor(data['settings'].normalize_mean).view(1, 1, 3)
+    std = torch.Tensor(data['settings'].normalize_std).view(1, 1, 3)
 
     train_img = 255 * (train_img * std + mu)
     test_img = 255 * (test_img * std + mu)
