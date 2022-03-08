@@ -71,7 +71,10 @@ def process_attn_maps(att_mat, batch_element, train_mask):
 
     v = joint_attentions[-1] # last layer of multihead attention, [P_q, P_kv]
 
-    grid_size = int(np.sqrt(aug_att_mat.size(-2)//2)) # for each img, sqrt(p_q // 2)
+    if aug_att_mat.size(-1) == aug_att_mat.size(-2):
+        grid_size = int(np.sqrt(aug_att_mat.size(-2)//4)) # for each img, sqrt(p_q // 2)
+    else:
+        grid_size = int(np.sqrt(aug_att_mat.size(-2)//2)) # for each img, sqrt(p_q // 2)
 
     # block_size = train_mask.shape[0]//grid_size
     # mask = skimage.measure.block_reduce(train_mask, (block_size, block_size), np.max)
@@ -90,7 +93,8 @@ def process_attn_maps(att_mat, batch_element, train_mask):
         else:
             out_img[idx] = 0
 
-    return out_img.reshape((grid_size*2, grid_size))
+    # return out_img.reshape((grid_size*2, grid_size))
+    return out_img.reshape((grid_size*2, -1))
 
 def save_debug(data, pred_mask, vis_data):
 
