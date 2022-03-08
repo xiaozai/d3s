@@ -9,6 +9,7 @@ import os
 import skimage.measure
 import math
 
+from scipy.special import softmax
 
 import torch.distributed as dist
 import torch.nn as nn
@@ -81,9 +82,10 @@ def process_attn_maps(att_mat, batch_element, train_mask):
     for idx in range(v.shape[0]):
         # pixel = v[idx, :].detach().numpy() * mask
         pixel = v[idx, :].detach().numpy()
+        pixel = softmax(pixel)
         p_kv = len(pixel)
         prob_idx = np.argmax(pixel)
-        if prob_idx > p_kv // 2:
+        if prob_idx < p_kv // 2:
             out_img[idx] = pixel.max() # probability for FG
         else:
             out_img[idx] = 0
