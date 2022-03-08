@@ -64,7 +64,7 @@ def run(settings):
                                                                                      std=settings.normalize_std)])
 
     # Data processing to do on the training pairs
-    data_processing_train = depth_segm_processing.DepthSegmProcessing(search_area_factor=settings.search_area_factor,
+    data_processing_train = depth_segm_processing.DepthSegmProcessingRotation(search_area_factor=settings.search_area_factor,
                                                                       output_sz=settings.output_sz,
                                                                       center_jitter_factor=settings.center_jitter_factor,
                                                                       scale_jitter_factor=settings.scale_jitter_factor,
@@ -73,7 +73,7 @@ def run(settings):
                                                                       use_distance=settings.segm_use_distance)
 
     # Data processing to do on the validation pairs
-    data_processing_val = depth_segm_processing.DepthSegmProcessing(search_area_factor=settings.search_area_factor,
+    data_processing_val = depth_segm_processing.DepthSegmProcessingRotation(search_area_factor=settings.search_area_factor,
                                                                     output_sz=settings.output_sz,
                                                                     center_jitter_factor=settings.center_jitter_factor,
                                                                     scale_jitter_factor=settings.scale_jitter_factor,
