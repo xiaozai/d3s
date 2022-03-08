@@ -106,7 +106,7 @@ def save_debug(data, pred_mask, vis_data, batch_element = 0):
 
     data = data.detach().clone().cpu()
     pred_mask = pred_mask.detach().clone().cpu()
-    if isinstance(vis_data, list) or isinstance(vid_data, tuple):
+    if isinstance(vis_data, list) or isinstance(vis_data, tuple):
         vis_data = [torch.stack(vid).detach().clone().cpu() if isinstance(vid, list) or isinstance(vid, tuple) \
                                                             else vid.detach().clone().cpu() \
                                                             for vid in vis_data]
