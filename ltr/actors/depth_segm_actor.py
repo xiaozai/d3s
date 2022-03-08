@@ -296,7 +296,11 @@ class DepthSegmActor(BaseActor):
                  'Loss/segm': loss.item()}
 
         if 'iter' in data and (data['iter'] - 1) % 50 == 0:
-            save_debug(data, masks_pred, vis_data)
+
+            try:
+                save_debug(data, masks_pred, vis_data)
+            except:
+                print('save_debug error ....')
 
         return loss, stats
 
