@@ -213,9 +213,7 @@ class Transformer(nn.Module):
             self.mask_pool = nn.MaxPool2d(config.patches['size'], stride=config.patches['size'])
 
     def forward(self, q_ids, kv=None, mask=None):
-        # if kv is not None:
-        #     embeddings_kv = self.embeddings(kv)
-        # else:
+
         embeddings_kv = self.embeddings(kv) if kv is not None else None
         mask = self.mask_pool(mask).view(mask.shape[0], -1) if mask is not None else None
 
