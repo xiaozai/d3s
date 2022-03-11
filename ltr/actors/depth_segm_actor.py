@@ -24,32 +24,7 @@ def draw_axis(ax, img, title, show_minmax=False):
         title = '%s \n min=%.2f max=%.2f' % (title, minval_, maxval_)
     ax.set_title(title, fontsize=9)
 
-# def cat_attn_feat(attn_weights):
-#     ''' attn_weights channels : 32, 16, 4, 2 => 4*8, 4*4, 2*2, 1*2'''
-#     C, H, W = attn_weights.shape
-#     if C == 32:
-#         edge = 4
-#         attn_maps = np.zeros((edge*H*2, edge*W), dtype=np.float32)
-#     elif C == 16:
-#         edge = 4
-#         attn_maps = np.zeros((edge*H, edge*W), dtype=np.float32)
-#     elif C == 4:
-#         edge = 2
-#         attn_maps = np.zeros((edge*H, edge*W), dtype=np.float32)
-#     elif C == 2:
-#         edge = 2
-#         attn_maps = np.zeros((H, edge*W), dtype=np.float32)
-#
-#     # edge = int(math.sqrt(C))+1
-#     # attn_maps = np.zeros((edge*H, edge*W), dtype=np.float32)
-#     for idx in range(C):
-#         attn = attn_weights[idx] # H, W
-#         hid = idx // edge
-#         wid = idx % edge
-#         attn_maps[hid*H:(hid+1)*H, wid*W:(wid+1)*W] = attn
-#     return attn_maps
-
-def process_attn_maps(att_mat, batch_element): #, train_mask):
+def process_attn_maps(att_mat, batch_element, layer=0): #, train_mask):
     # use batch 0
     if isinstance(att_mat, list) or isinstance(att_mat, tuple):
         att_mat = torch.stack(att_mat) # [layers=3, B, heads=3, Pq, P_kv]
@@ -72,14 +47,21 @@ def process_attn_maps(att_mat, batch_element): #, train_mask):
 
     v = joint_attentions[-1] # last layer of multihead attention, [P_q, P_kv]
 
-    if int(np.sqrt(aug_att_mat.size(-2)//4)) ** 2 * 4 == aug_att_mat.size(-2):
-        grid_size = int(np.sqrt(aug_att_mat.size(-2)//4))
-        rows = 2
-        cols = 2
-    elif int(np.sqrt(aug_att_mat.size(-2)//2)) ** 2 * 2 == aug_att_mat.size(-2):
-        grid_size = int(np.sqrt(aug_att_mat.size(-2)//2))
-        rows = 2
+
+    if layer == 3:
+        # only one images
+        grid_size = int(np.sqrt(aug_att_mat.size(-2)))
+        rows = 1
         cols = 1
+    else:
+        if int(np.sqrt(aug_att_mat.size(-2)//4)) ** 2 * 4 == aug_att_mat.size(-2):
+            grid_size = int(np.sqrt(aug_att_mat.size(-2)//4))
+            rows = 2
+            cols = 2
+        elif int(np.sqrt(aug_att_mat.size(-2)//2)) ** 2 * 2 == aug_att_mat.size(-2):
+            grid_size = int(np.sqrt(aug_att_mat.size(-2)//2))
+            rows = 2
+            cols = 1
     # block_size = train_mask.shape[0]//grid_size
     # mask = skimage.measure.block_reduce(train_mask, (block_size, block_size), np.max)
     # mask = np.concatenate((mask, mask), axis=0)
@@ -89,13 +71,14 @@ def process_attn_maps(att_mat, batch_element): #, train_mask):
     for idx in range(v.shape[0]):
         # pixel = v[idx, :].detach().numpy() * mask
         pixel = v[idx, :].detach().numpy()
-        # pixel = softmax(pixel)
-        p_kv = len(pixel)
-        prob_idx = np.argmax(pixel)
-        if prob_idx < p_kv // 2:
-            out_img[idx] = pixel.max() # probability for FG
-        else:
-            out_img[idx] = 0
+
+        # p_kv = len(pixel)
+        # prob_idx = np.argmax(pixel)
+        # if prob_idx < p_kv // 2:
+        #     out_img[idx] = pixel.max() # probability for FG
+        # else:
+        #     out_img[idx] = 0
+        out_img[idx] = pixel.max() # probability for FG
 
     return out_img.reshape((grid_size*rows, grid_size*cols))
 
@@ -134,7 +117,7 @@ def save_debug(data, pred_mask, vis_data, batch_element = 0):
     elif len(vis_data) == 4:
         attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data
 
-        attn_weights3 = process_attn_maps(attn_weights3, batch_element)#, train_mask)
+        attn_weights3 = process_attn_maps(attn_weights3, batch_element, layer=3)#, train_mask)
         attn_weights2 = process_attn_maps(attn_weights2, batch_element)#, train_mask)
         attn_weights1 = process_attn_maps(attn_weights1, batch_element)#, train_mask)
         attn_weights0 = process_attn_maps(attn_weights0, batch_element)#, train_mask)
