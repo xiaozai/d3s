@@ -80,7 +80,11 @@ def process_attn_maps(att_mat, batch_element, layer=0): #, train_mask):
         #     out_img[idx] = 0
         out_img[idx] = pixel.max() # probability for FG
 
-    return out_img.reshape((grid_size*rows, grid_size*cols))
+    out_img = out_img.reshape((grid_size*rows, grid_size*cols))
+    if layer == 3:
+        return out_img
+    else:
+        return out_img[:grid_size*rows//2, :]
 
     # return out_img.reshape((grid_size*2, grid_size))
     # return out_img.reshape((grid_size*2, -1))
