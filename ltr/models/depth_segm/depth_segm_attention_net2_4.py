@@ -323,7 +323,7 @@ class DepthSegmNetAttention(nn.Module):
         self.s_layers = nn.ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]), # self.s0 64 -> 32
                                        conv(segm_inter_dim[1], segm_inter_dim[1]), # self.s1 32 -> 32
                                        conv(segm_inter_dim[2], segm_inter_dim[2]), # self.s2 16 -> 16
-                                       conv(1, segm_inter_dim[2])])# self.s3  4 ->  4
+                                       conv(1, segm_inter_dim[3])])# self.s3  4 ->  4
 
         self.a_layers = nn.ModuleList([conv(config0.hidden_size*2, segm_inter_dim[0]),   # self.a0
                                        conv(config1.hidden_size*2, segm_inter_dim[1]),   # self.a1
@@ -385,7 +385,7 @@ class DepthSegmNetAttention(nn.Module):
             n_patches = attn_rgbd.shape[1]
 
         else:
-            ''' self-attention, with masked bg pixels ''''
+            ''' self-attention, with masked bg pixels '''
             bg_mask = 1 - F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1])) # Bx1xHxW
 
             feat_rgb = torch.cat((self.f_layers[layer](f_test_rgb), self.f_layers[layer](f_train_rgb*bg_mask)), dim=2) # [B,C,2H, W]
