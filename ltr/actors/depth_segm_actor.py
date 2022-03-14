@@ -48,20 +48,20 @@ def process_attn_maps(att_mat, batch_element, layer=0): #, train_mask):
     v = joint_attentions[-1] # last layer of multihead attention, [P_q, P_kv]
 
 
-    if layer in [3, 2]:
-        # only one images
+    # if layer in [3, 2]:
+    #     # only one images
+    #     grid_size = int(np.sqrt(aug_att_mat.size(-2)//2))
+    #     rows = 2
+    #     cols = 1
+    # else:
+    if int(np.sqrt(aug_att_mat.size(-2)//4)) ** 2 * 4 == aug_att_mat.size(-2):
+        grid_size = int(np.sqrt(aug_att_mat.size(-2)//4))
+        rows = 2
+        cols = 2
+    elif int(np.sqrt(aug_att_mat.size(-2)//2)) ** 2 * 2 == aug_att_mat.size(-2):
         grid_size = int(np.sqrt(aug_att_mat.size(-2)//2))
         rows = 2
         cols = 1
-    else:
-        if int(np.sqrt(aug_att_mat.size(-2)//4)) ** 2 * 4 == aug_att_mat.size(-2):
-            grid_size = int(np.sqrt(aug_att_mat.size(-2)//4))
-            rows = 2
-            cols = 2
-        elif int(np.sqrt(aug_att_mat.size(-2)//2)) ** 2 * 2 == aug_att_mat.size(-2):
-            grid_size = int(np.sqrt(aug_att_mat.size(-2)//2))
-            rows = 2
-            cols = 1
     # block_size = train_mask.shape[0]//grid_size
     # mask = skimage.measure.block_reduce(train_mask, (block_size, block_size), np.max)
     # mask = np.concatenate((mask, mask), axis=0)
