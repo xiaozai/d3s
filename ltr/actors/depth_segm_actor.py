@@ -60,8 +60,8 @@ def process_attn_maps(att_mat, batch_element, layer=0): #, train_mask):
         cols = 2
     elif int(np.sqrt(aug_att_mat.size(-2)//2)) ** 2 * 2 == aug_att_mat.size(-2):
         grid_size = int(np.sqrt(aug_att_mat.size(-2)//2))
-        rows = 2
-        cols = 1
+        rows = 1
+        cols = 2
     # block_size = train_mask.shape[0]//grid_size
     # mask = skimage.measure.block_reduce(train_mask, (block_size, block_size), np.max)
     # mask = np.concatenate((mask, mask), axis=0)

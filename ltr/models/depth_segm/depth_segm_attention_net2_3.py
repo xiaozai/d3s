@@ -382,7 +382,7 @@ class DepthSegmNetAttention(nn.Module):
         f_test_rgb, f_test_d, f_train_rgb, f_train_d = feat_test_rgb[layer], feat_test_d[layer], feat_train_rgb[layer], feat_train_d[layer]
         # F_rgb, F_d, BG_rgb, BG_d, -> BxCx2Hx2W
         if layer == 3:
-            feat_rgbd = torch.cat((self.f_layers[layer](f_test_rgb), f_test_d), dim=3)
+            feat_rgbd = torch.cat((self.f_layers[layer](f_test_rgb), f_test_d), dim=3) # BxCxHx2W
             feat_kv = torch.cat((self.f_layers[layer](f_train_rgb), f_train_d), dim=3)
             # feat_rgbd2, featuremaps for each pacth
             mask = F.interpolate(mask_train[0], size=(f_train_rgb.shape[-2], f_train_rgb.shape[-1]))  # Bx1x24x48
@@ -411,5 +411,5 @@ class DepthSegmNetAttention(nn.Module):
         feat_rgbd = F.interpolate(feat_rgbd, size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))                     # B x 2C x 4 x 4 ->  B x 2C x 48 x 48
         out = self.post_layers[layer](F.upsample(self.a_layers[layer](feat_rgbd) + self.s_layers[layer](pre_out), scale_factor=2))
 
-        # output attn_weights is wrong 
+        # output attn_weights is wrong
         return out, attn_weights
