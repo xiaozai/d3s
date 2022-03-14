@@ -48,7 +48,7 @@ def process_attn_maps(att_mat, batch_element, layer=0): #, train_mask):
     v = joint_attentions[-1] # last layer of multihead attention, [P_q, P_kv]
 
 
-    if layer == 3:
+    if layer in [3, 2]:
         # only one images
         grid_size = int(np.sqrt(aug_att_mat.size(-2)))
         rows = 1
