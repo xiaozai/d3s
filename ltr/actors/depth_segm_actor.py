@@ -122,9 +122,9 @@ def save_debug(data, pred_mask, vis_data, batch_element = 0):
         attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data
 
         attn_weights3 = process_attn_maps(attn_weights3, batch_element, layer=3)#, train_mask)
-        attn_weights2 = process_attn_maps(attn_weights2, batch_element)#, train_mask)
-        attn_weights1 = process_attn_maps(attn_weights1, batch_element)#, train_mask)
-        attn_weights0 = process_attn_maps(attn_weights0, batch_element)#, train_mask)
+        attn_weights2 = process_attn_maps(attn_weights2, batch_element, layer=2)#, train_mask)
+        attn_weights1 = process_attn_maps(attn_weights1, batch_element, layer=1)#, train_mask)
+        attn_weights0 = process_attn_maps(attn_weights0, batch_element, layer=0)#, train_mask)
 
 
     dir_path = data['settings'].env.images_dir
