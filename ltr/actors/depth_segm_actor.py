@@ -50,8 +50,8 @@ def process_attn_maps(att_mat, batch_element, layer=0): #, train_mask):
 
     if layer in [3, 2]:
         # only one images
-        grid_size = int(np.sqrt(aug_att_mat.size(-2)))
-        rows = 1
+        grid_size = int(np.sqrt(aug_att_mat.size(-2)//2))
+        rows = 2
         cols = 1
     else:
         if int(np.sqrt(aug_att_mat.size(-2)//4)) ** 2 * 4 == aug_att_mat.size(-2):
