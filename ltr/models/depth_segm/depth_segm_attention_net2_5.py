@@ -315,7 +315,7 @@ class DepthSegmNetAttention(nn.Module):
         config3 = get_b16_config(size=(2, 2))
         self.rgbd_transformers = nn.ModuleList([Transformer(config, (384, 384), 4, True),
                                                 Transformer(config, (192, 192), 16, True),
-                                                Transformer(config, (96, 48), 32, True),
+                                                Transformer(config, (96, 48), 32, True, mask_pool=True),
                                                 Transformer(config3, (48, 24), 64, True, mask_pool=True)]) # instead of consine
 
         self.s_layers = nn.ModuleList([conv(segm_inter_dim[0], segm_inter_dim[0]),

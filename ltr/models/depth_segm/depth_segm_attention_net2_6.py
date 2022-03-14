@@ -325,9 +325,9 @@ class DepthSegmNetAttention(nn.Module):
                                        conv(segm_inter_dim[2], segm_inter_dim[2]),
                                        conv(1, segm_inter_dim[3])])
 
-        self.a_layers = nn.ModuleList([conv(config.hidden_size*2, segm_inter_dim[0]),   # self.a0
-                                       conv(config.hidden_size*2, segm_inter_dim[1]),   # self.a1
-                                       conv(config.hidden_size*2, segm_inter_dim[2]),
+        self.a_layers = nn.ModuleList([conv(config0.hidden_size*2, segm_inter_dim[0]),   # self.a0
+                                       conv(config1.hidden_size*2, segm_inter_dim[1]),   # self.a1
+                                       conv(config2.hidden_size*2, segm_inter_dim[2]),
                                        conv(config3.hidden_size*2, segm_inter_dim[3])])  # self.a2
 
         self.f_layers = nn.ModuleList([conv(segm_input_dim[0], segm_inter_dim[0]), # self.f0
