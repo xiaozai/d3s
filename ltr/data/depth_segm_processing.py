@@ -201,6 +201,10 @@ class DepthSegmProcessing(BaseProcessing):
             '''
             data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth] # 1, 1*384*384
 
+            ''' Song :
+            Should we increase this prob ? to make Box2Mask ?instead of Mask2Mask
+            because Mask2Mask require too much from template mask 
+            '''
             if s == 'train' and random.random() < 0.005:
                 # on random use binary mask generated from axis-aligned bbox
                 data['test_images'] = copy.deepcopy(data['train_images'])
