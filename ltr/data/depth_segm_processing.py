@@ -193,17 +193,11 @@ class DepthSegmProcessing(BaseProcessing):
             ''' Song random rotated image '''
             # data[s + '_masks'] = [self.transform[s](x) for x in crops_mask]
 
-            ''' Song's comments :
-                depth is normalized when dataset._get_frame(
-                should we normalize it again for the crops?s
-
-                x [1, H, W, 1]???
-            '''
             data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth] # 1, 1*384*384
 
             ''' Song :
             Should we increase this prob ? to make Box2Mask ?instead of Mask2Mask
-            because Mask2Mask require too much from template mask 
+            because Mask2Mask require too much from template mask
             '''
             if s == 'train' and random.random() < 0.005:
                 # on random use binary mask generated from axis-aligned bbox
@@ -319,46 +313,6 @@ class DepthSegmProcessingRotation(BaseProcessing):
         mask[int(round(bbox[1].item())):int(round(bbox[1].item() + bbox[3].item())), int(round(bbox[0].item())):int(round(bbox[0].item() + bbox[2].item()))] = 1
         return mask
 
-    # def noisy(self, noise_typ,image):
-    #     if noise_typ == "gauss":
-    #         # row,col,ch= image.shape
-    #         mean = 0
-    #         var = 0.1
-    #         sigma = var**0.5
-    #         gauss = np.random.normal(mean,sigma,image.shape)
-    #         gauss = gauss.reshape(image.shape)
-    #         noisy = image + gauss
-    #
-    #     elif noise_typ == "s&p":
-    #         # row,col,ch = image.shape
-    #         s_vs_p = 0.5
-    #         amount = 0.004
-    #         noisy = np.copy(image)
-    #         # Salt mode
-    #         num_salt = np.ceil(amount * image.size * s_vs_p)
-    #         coords = [np.random.randint(0, i - 1, int(num_salt))
-    #               for i in image.shape]
-    #         noisy[coords] = 1
-    #
-    #         # Pepper mode
-    #         num_pepper = np.ceil(amount* image.size * (1. - s_vs_p))
-    #         coords = [np.random.randint(0, i - 1, int(num_pepper))
-    #                   for i in image.shape]
-    #         noisy[coords] = 0
-    #
-    #     elif noise_typ == "poisson":
-    #         vals = len(np.unique(image))
-    #         vals = 2 ** np.ceil(np.log2(vals))
-    #         noisy = np.random.poisson(image * vals) / float(vals)
-    #
-    #     elif noise_typ =="speckle":
-    #         # row,col,ch = image.shape
-    #         gauss = np.random.randn(image.shape)
-    #         gauss = gauss.reshape(image.shape)
-    #         noisy = image + image * gauss
-    #
-    #     return noisy
-
     def sp_noise(self, image,prob):
         '''
         Add salt and pepper noise to image
@@ -438,11 +392,16 @@ class DepthSegmProcessingRotation(BaseProcessing):
                 crops_depth = [self.sp_noise(x, 0.05) for x in crops_depth]
 
             # # Song : Rotation
+            rotation = False
+            scale = 1
+            h, w = crops_depth[0].shape
+            center = (w/2, h/2)
+            angle = 0
+            M = cv2.getRotationMatrix2D(center, angle, scale)
+
             if random.random() < 0.2:
+                rotation = True # Song
                 angle = random.randint(0, 180)
-                scale = 1
-                h, w = crops_depth[0].shape
-                center = (w/2, h/2)
                 M = cv2.getRotationMatrix2D(center, angle, scale)
 
                 crops_img = [cv2.warpAffine(x, M, (w, h)) for x in crops_img]
@@ -458,23 +417,33 @@ class DepthSegmProcessingRotation(BaseProcessing):
                 y_ = np.linspace(1, crops_img[0].shape[0], crops_img[0].shape[0]) - 1 - cy_
                 X, Y = np.meshgrid(x_, y_)
                 D = np.sqrt(np.square(X) + np.square(Y)).astype(np.float32)
-                # D = 1 - D / np.max(D) # Song : dist map value is too large compared to feat map
-                                  # the closest pixel to the center, should have highter value
+
+                print('... D in depth_segm_processing DepthSegmProcessing : ', D.shape) # H*W
+                # Song
+                if rotation:
+                    D = cv2.warpAffine(D, M, (w, h))
+
                 data['test_dist'] = [torch.from_numpy(np.expand_dims(D, axis=0))]
 
             # Apply transforms
             data[s + '_images'] = [self.transform[s](x) for x in crops_img] # 1 * 3 * H * W
-            data[s + '_anno'] = boxes
+            data[s + '_anno'] = boxes # Song, boxes no rotation
             data[s + '_masks'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_mask] # 1, 1*384*384
             data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth] # 1, 1*384*384
 
-            if s == 'train' and random.random() < 0.005:
+            # if s == 'train' and random.random() < 0.005:
+            if s == 'train' and random.random() < 0.01: # Song increased it
                 # on random use binary mask generated from axis-aligned bbox
                 data['test_images'] = copy.deepcopy(data['train_images'])
                 data['test_depths'] = copy.deepcopy(data['train_depths'])
                 data['test_masks'] = copy.deepcopy(data['train_masks'])
                 data['test_anno'] = copy.deepcopy(data['train_anno'])
-                data[s + '_masks'] = [torch.from_numpy(np.expand_dims(self._make_aabb_mask(x_.shape, bb_), axis=0)) for x_, bb_ in zip(crops_mask, boxes)]
+
+                # Song
+                if rotation:
+                    data[s + '_masks'] = [torch.from_numpy(np.expand_dims(cv2.warpAffine(self._make_aabb_mask(x_.shape, bb_), M, (w, h)), axis=0)) for x_, bb_ in zip(crops_mask, boxes)]
+                else:
+                    data[s + '_masks'] = [torch.from_numpy(np.expand_dims(self._make_aabb_mask(x_.shape, bb_), axis=0)) for x_, bb_ in zip(crops_mask, boxes)]
 
                 if self.use_distance:
                     # there is no need to randomly perturb center since we are working with ground-truth here
@@ -484,7 +453,11 @@ class DepthSegmProcessingRotation(BaseProcessing):
                     y_ = np.linspace(1, crops_img[0].shape[0], crops_img[0].shape[0]) - 1 - cy_
                     X, Y = np.meshgrid(x_, y_)
                     D = np.sqrt(np.square(X) + np.square(Y)).astype(np.float32)
-                    # D = 1 - D / np.max(D) # Song : dist map value is too large compared to feat map
+
+                    # Song
+                    if rotation:
+                        D = cv2.warpAffine(D, M, (w, h))
+
                     data['test_dist'] = [torch.from_numpy(np.expand_dims(D, axis=0))]
 
         # Prepare output
