@@ -418,7 +418,6 @@ class DepthSegmProcessingRotation(BaseProcessing):
                 X, Y = np.meshgrid(x_, y_)
                 D = np.sqrt(np.square(X) + np.square(Y)).astype(np.float32)
 
-                print('... D in depth_segm_processing DepthSegmProcessing : ', D.shape) # H*W
                 # Song
                 if rotation:
                     D = cv2.warpAffine(D, M, (w, h))
