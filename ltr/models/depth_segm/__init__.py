@@ -25,3 +25,4 @@ from .depth_segm_attention_net2_5 import DepthSegmNetAttention as DepthSegmNetAt
 from .depth_segm_attention_net2_6 import DepthSegmNetAttention as DepthSegmNetAttention02_6
 from .depth_segm_attention_net2_7 import DepthSegmNetAttention as DepthSegmNetAttention02_7
 from .depth_segm_attention_net2_8 import DepthSegmNetAttention as DepthSegmNetAttention02_8
+from .depth_segm_attention_net2_9 import DepthSegmNetAttention as DepthSegmNetAttention02_9
