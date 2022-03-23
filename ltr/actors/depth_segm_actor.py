@@ -119,15 +119,14 @@ def save_debug(data, pred_mask, vis_data, batch_element = 0):
     test_img = test_img.numpy().astype(np.uint8)
 
     ''' Song, when using depth colormap and normalization '''
-    train_depth = data['train_depths'][:, batch_element, :, :].permute(1, 2, 0).numpy().squeeze().astype(np.float32)
-    test_depth = data['test_depths'][:, batch_element, :, :].permute(1, 2, 0).numpy().squeeze().astype(np.float32)
+    train_depth = data['train_depths'][:, batch_element, :, :].permute(1, 2, 0) # .numpy().squeeze().astype(np.float32)
+    test_depth = data['test_depths'][:, batch_element, :, :].permute(1, 2, 0) #.numpy().squeeze().astype(np.float32)
 
     train_depth = 255 * (train_depth * std + mu)
     test_depth = 255 * (test_depth * std + mu)
 
     train_depth = train_depth.numpy().astype(np.uint8)
     test_depth = test_depth.numpy().astype(np.uint8)
-
 
 
     train_mask = data['train_masks'][0, batch_element, :, :].numpy().astype(np.float32)

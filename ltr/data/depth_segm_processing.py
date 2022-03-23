@@ -671,7 +671,8 @@ class DepthSegmProcessingRotationDColormap(BaseProcessing):
             data[s + '_masks'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_mask] # 1, 1*384*384
             # data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth] # 1, 1*384*384
 
-            crops_depth = [cv2.applyColormap(np.array(crops_depth*255, dtype=np.uint8), cv2.COLORMAP_JET) for x in crops_depth] # 1, 384*384*3
+            crops_depth = [np.array(x*255, dtype=np.uint8) for x in crops_depth]
+            crops_depth = [cv2.applyColorMap(x, cv2.COLORMAP_JET) for x in crops_depth] # 1, 384*384*3
             data[s + '_depths'] = [self.transform[s](x) for x in crops_depth] # 1, 3*384*384, toTensor and normalize
 
             # if s == 'train' and random.random() < 0.005:
