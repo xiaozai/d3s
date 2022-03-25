@@ -404,8 +404,7 @@ class DepthSegmNetAttention(nn.Module):
         ''' RGB and D features fusion, Now it is too depend on Depth Features :) '''
         feat_rgbd = feat_rgbd.view(feat_rgbd.shape[0], featmap_sz, featmap_sz*2, -1) #
         # feat_rgbd = torch.cat((feat_rgbd[:, :, :featmap_sz, :], feat_rgbd[:, :, featmap_sz:, :]), dim=-1) # cat(f_rgb, f_d),  B x H x W x 2C
-        # feat_rgbd = torch.maximum(feat_rgbd[:, :, :featmap_sz, :], feat_rgbd[:, :, featmap_sz:, :])
-        feat_rgbd = feat_rgbd[:, :, :featmap_sz, :] + feat_rgbd[:, :, featmap_sz:, :]
+        feat_rgbd = torch.maximum(feat_rgbd[:, :, :featmap_sz, :], feat_rgbd[:, :, featmap_sz:, :])
 
         feat_rgbd = feat_rgbd.permute(0, 3, 1, 2).contiguous() # [B, C, H, W]
 

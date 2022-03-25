@@ -29,4 +29,5 @@ from .depth_segm_attention_net2_9 import DepthSegmNetAttention as DepthSegmNetAt
 
 from .depth_segm_attention_net2_8DColormap import DepthSegmNetAttention as DepthSegmNetAttention02_8DC
 from .depth_segm_attention_net2_8DC_max import DepthSegmNetAttention as DepthSegmNetAttention02_8DC_Max
+from .depth_segm_attention_net2_8DC_sum import DepthSegmNetAttention as DepthSegmNetAttention02_8DC_Sum
 #
