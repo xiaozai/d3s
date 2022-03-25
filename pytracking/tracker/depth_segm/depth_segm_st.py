@@ -16,7 +16,7 @@ from pytracking.features import augmentation
 import ltr.data.processing_utils as prutils
 from ltr import load_network
 
-from ltr.external.depthconv.functions import depth_conv
+# from ltr.external.depthconv.functions import depth_conv
 
 from pytracking.bbox_fit import fit_bbox_to_mask
 from pytracking.mask_to_disk import save_mask
@@ -33,6 +33,8 @@ class DepthSegmST(BaseTracker):
         self.frame_num = 1
         self.frame_name = '%08d' % self.frame_num
 
+        # self.params.use_colormap = True # Song
+
         if not hasattr(self.params, 'device'):
             self.params.device = 'cuda' if self.params.use_gpu else 'cpu'
 
@@ -41,6 +43,10 @@ class DepthSegmST(BaseTracker):
 
         # Check if image is color
         color, depth = image['color'], image['depth']
+        if self.params.use_colormap:
+            depth = np.squeeze(depth)
+            depth = np.array(depth*255, dtype=np.uint8)
+            depth = cv2.applyColorMap(depth, cv2.COLORMAP_JET)
 
         self.params.features_filter.set_is_color(color.shape[2] == 3)
 
@@ -281,6 +287,12 @@ class DepthSegmST(BaseTracker):
 
         # Convert image
         color, depth = image['color'], image['depth']
+
+        if self.params.use_colormap:
+            depth = np.squeeze(depth)
+            depth = np.array(depth*255, dtype=np.uint8)
+            depth = cv2.applyColorMap(depth, cv2.COLORMAP_JET)
+
         im, dp = numpy_to_torch(color), numpy_to_torch(depth)
         self.im, self.dp = im, dp  # For debugging only
 
@@ -438,35 +450,35 @@ class DepthSegmST(BaseTracker):
     def apply_filter(self, sample_x: TensorList):
         return operation.conv2d(sample_x, self.filter, mode='same')
 
-    def apply_filter_depthaware(self, feat, filter, depth, alpha):
-        '''DAL depth-aware DCF'''
-        # for i in range(len(feat)):
-        if feat.shape[2]!=depth.shape[2] or feat.shape[2]!=depth.shape[2]:
-            depth=F.upsample(depth, size=(feat.shape[2],feat.shape[3]),mode='bilinear')
-
-        multiple_filters = (feat.dim() == 5)
-        padding = (filter.shape[-2] // 2, filter.shape[-1] // 2)
-        num_images = feat.shape[0]
-        num_sequences = feat.shape[1] if feat.dim() == 5 else 1
-        size_scoreoutput = int(feat.shape[-2] + 2 * padding[0] - filter.shape[-2] / 1 + 1)
-
-        if multiple_filters:
-            scores=torch.zeros(num_images, num_sequences,1,size_scoreoutput,size_scoreoutput).to(feat.device)
-            for seq in range(num_sequences):
-                feat_seq  =feat[:,seq,:,:,:]
-                filter_seq=filter[:,seq,:,:,:]
-                depth_seq =depth[:,seq,:,:,:]
-                depth_seq =alpha*depth_seq.to(feat.device)
-
-                scores_seq=depth_conv(feat_seq,depth_seq,filter_seq,None,stride=1,padding=padding,dilation=1)
-
-                scores[:,seq,:, :,:]=scores_seq
-            return scores.view(num_images, num_sequences, scores.shape[-2], scores.shape[-1])
-
-        depth =alpha*depth
-        depth =depth.to(feat.device)
-        scores=depth_conv(feat,depth,filter,None,stride=1,padding=padding,dilation=1)
-        return scores.view(num_images, num_sequences, scores.shape[-2], scores.shape[-1])
+    # def apply_filter_depthaware(self, feat, filter, depth, alpha):
+    #     '''DAL depth-aware DCF'''
+    #     # for i in range(len(feat)):
+    #     if feat.shape[2]!=depth.shape[2] or feat.shape[2]!=depth.shape[2]:
+    #         depth=F.upsample(depth, size=(feat.shape[2],feat.shape[3]),mode='bilinear')
+    #
+    #     multiple_filters = (feat.dim() == 5)
+    #     padding = (filter.shape[-2] // 2, filter.shape[-1] // 2)
+    #     num_images = feat.shape[0]
+    #     num_sequences = feat.shape[1] if feat.dim() == 5 else 1
+    #     size_scoreoutput = int(feat.shape[-2] + 2 * padding[0] - filter.shape[-2] / 1 + 1)
+    #
+    #     if multiple_filters:
+    #         scores=torch.zeros(num_images, num_sequences,1,size_scoreoutput,size_scoreoutput).to(feat.device)
+    #         for seq in range(num_sequences):
+    #             feat_seq  =feat[:,seq,:,:,:]
+    #             filter_seq=filter[:,seq,:,:,:]
+    #             depth_seq =depth[:,seq,:,:,:]
+    #             depth_seq =alpha*depth_seq.to(feat.device)
+    #
+    #             scores_seq=depth_conv(feat_seq,depth_seq,filter_seq,None,stride=1,padding=padding,dilation=1)
+    #
+    #             scores[:,seq,:, :,:]=scores_seq
+    #         return scores.view(num_images, num_sequences, scores.shape[-2], scores.shape[-1])
+    #
+    #     depth =alpha*depth
+    #     depth =depth.to(feat.device)
+    #     scores=depth_conv(feat,depth,filter,None,stride=1,padding=padding,dilation=1)
+    #     return scores.view(num_images, num_sequences, scores.shape[-2], scores.shape[-1])
 
     def localize_target(self, scores_raw):
         # Weighted sum (if multiple features) with interpolation in fourier domain
@@ -581,9 +593,14 @@ class DepthSegmST(BaseTracker):
     def extract_processed_sample(self, color: torch.Tensor, depth: torch.Tensor, pos: torch.Tensor, scales, sz: torch.Tensor) -> (
     TensorList, TensorList):
         x_rgb, d_crops, rgb_patches = self.extract_sample(color, depth, pos, scales, sz)
+
+        # Song, for vis only
         self.rgb_patches = rgb_patches.clone().detach().cpu().numpy().squeeze()
         self.rgb_patches = np.swapaxes(np.swapaxes(self.rgb_patches, 0, 1), 1, 2).astype(int)
         self.d_patches = d_crops.clone().detach().cpu().numpy().squeeze()
+        if self.params.use_colormap:
+            self.d_patches = np.swapaxes(np.swapaxes(self.d_patches, 0, 1), 1, 2).astype(int)
+
         return self.preprocess_sample(self.project_sample(x_rgb)), d_crops
 
     def preprocess_sample(self, x: TensorList) -> (TensorList, TensorList):
@@ -913,7 +930,8 @@ class DepthSegmST(BaseTracker):
 
         init_patch_crop_d, _ = prutils.sample_target(depth, np.array(bb), self.params.segm_search_area_factor,
                                                     output_sz=self.params.segm_output_sz)
-        init_patch_crop_d = np.expand_dims(init_patch_crop_d, axis=-1)
+        if not self.params.use_colormap:
+            init_patch_crop_d = np.expand_dims(init_patch_crop_d, axis=-1)
 
         self.segmentation_task = False
         if init_mask is not None:
@@ -965,8 +983,12 @@ class DepthSegmST(BaseTracker):
         init_patch_norm_rgb -= self.params.segm_normalize_mean
         init_patch_norm_rgb /= self.params.segm_normalize_std
 
-        # Depth is already normalized when basetracker._read_image()
-        init_patch_norm_d = init_patch_crop_d.astype(np.float32)
+        if self.params.use_colormap:
+            init_patch_norm_d = init_patch_crop_d.astype(np.float32) / float(255)
+            init_patch_norm_d -= self.params.segm_normalize_mean
+            init_patch_norm_d /= self.params.segm_normalize_std
+        else:
+            init_patch_norm_d = init_patch_crop_d.astype(np.float32)
 
         # create distance map for discriminative segmentation
         if self.params.segm_use_dist:
@@ -1116,7 +1138,8 @@ class DepthSegmST(BaseTracker):
                                           output_sz=self.params.segm_output_sz)
         patch_d, _ = prutils.sample_target(depth, np.array(bb), self.params.segm_search_area_factor,
                                           output_sz=self.params.segm_output_sz)
-        patch_d = np.expand_dims(patch_d, axis=-1)
+        if not self.params.use_colormap:
+            patch_d = np.expand_dims(patch_d, axis=-1)
 
         segm_crop_sz = math.ceil(math.sqrt(bb[2] * bb[3]) * self.params.segm_search_area_factor)
 
@@ -1125,7 +1148,13 @@ class DepthSegmST(BaseTracker):
         init_patch_norm_rgb -= self.params.segm_normalize_mean
         init_patch_norm_rgb /= self.params.segm_normalize_std
 
-        init_patch_norm_d = patch_d.astype(np.float32)
+        if self.params.use_colormap:
+            init_patch_norm_d = patch_d.astype(np.float32) / 255
+            init_patch_norm_d -= self.params.segm_normalize_mean
+            init_patch_norm_d /= self.params.segm_normalize_std
+        else:
+
+            init_patch_norm_d = patch_d.astype(np.float32)
 
         # put image patch and mask to GPU
         patch_gpu_rgb = torch.Tensor(init_patch_norm_rgb)
@@ -1257,23 +1286,6 @@ class DepthSegmST(BaseTracker):
             prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
             # prbox = (prbox - np.array([mask.shape[0]/2, mask.shape[1]/2])) / f_ + np.array([pos[1].item(), pos[0].item()])
 
-            # import matplotlib.pyplot as plt
-            # import matplotlib.patches as patches
-            # fig, (ax1, ax2) = plt.subplots(1, 2)
-            # ax1.cla()
-            # ax1.imshow(color)
-            # probox_vis = patches.Polygon(prbox, closed=True, facecolor='none', edgecolor='r')
-            # vis_aabb, _ = self.poly_to_aabbox_noscale(prbox[:, 0], prbox[:,1])
-            # vis_aabb = patches.Rectangle((vis_aabb[0], vis_aabb[1]), vis_aabb[2], vis_aabb[3], edgecolor='b', facecolor='none')
-            # ax1.add_patch(vis_aabb)
-            # ax1.add_patch(probox_vis)
-            #
-            # print(prbox_init)
-            # ax2.cla()
-            # ax2.imshow(mask)
-            # prbox_in_search = patches.Polygon(prbox_init, closed=True, edgecolor='r', facecolor='none')
-            # ax2.add_patch(prbox_in_search)
-            # plt.show()
 
             # self.prbox = prbox
             ''' Song, target_scale is usef for localization target , and update self.pos '''

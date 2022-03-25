@@ -322,8 +322,8 @@ class BaseTracker:
                 self.ax_rgb_patches.set_title('rgb patches')
 
                 self.ax_d_patches.cla()
-                d_patches = np.uint8(self.d_patches *255)
-                self.ax_d_patches.imshow(d_patches)
+                # d_patches = np.uint8(self.d_patches *255)
+                self.ax_d_patches.imshow(self.d_patches)
                 self.ax_d_patches.set_title('d patches')
 
                 rgb_score = Image.fromarray(np.uint8(self.rgb_patches)).convert('RGBA')

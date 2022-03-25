@@ -309,7 +309,7 @@ class DepthSegmNetAttention(nn.Module):
         segm_inter_dim = (4, 16, 32, 64)
         segm_dim = (64, 64)  # convolutions before cosine similarity
 
-        # Use colormap encoding for depth input
+        ''' Use colormap encoding for depth input '''
         self.depth_feat_extractor = DepthNet(input_dim=3, inter_dim=segm_inter_dim)
 
         config0 = get_b16_config(size=(12, 12))
