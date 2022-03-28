@@ -70,38 +70,39 @@ def save_debug(data, pred_mask, vis_data, batch_element = 0):
 
     data = data.detach().clone().cpu()
     pred_mask = pred_mask.detach().clone().cpu()
-    if isinstance(vis_data, list) or isinstance(vis_data, tuple):
-        vis_data = [torch.stack(vid).detach().clone().cpu() if isinstance(vid, list) or isinstance(vid, tuple) \
-                                                            else vid.detach().clone().cpu() \
-                                                            for vid in vis_data]
-    else:
-        vis_data = vis_data.detach().clone().cpu()
+    if vis_data is not None:
+        if isinstance(vis_data, list) or isinstance(vis_data, tuple):
+            vis_data = [torch.stack(vid).detach().clone().cpu() if isinstance(vid, list) or isinstance(vid, tuple) \
+                                                                else vid.detach().clone().cpu() \
+                                                                for vid in vis_data]
+        else:
+            vis_data = vis_data.detach().clone().cpu()
 
 
-    if len(vis_data) == 2:
-        p_rgb, p_d = vis_data
+        if len(vis_data) == 2:
+            p_rgb, p_d = vis_data
 
-        p_rgb = p_rgb[batch_element, ...] # [H, W, 2] F + B
-        p_d = p_d[batch_element, ...]
-        p_rgb = (p_rgb.numpy().squeeze()).astype(np.float32) # [H, W, 2]
-        p_d = (p_d.numpy().squeeze()).astype(np.float32)
+            p_rgb = p_rgb[batch_element, ...] # [H, W, 2] F + B
+            p_d = p_d[batch_element, ...]
+            p_rgb = (p_rgb.numpy().squeeze()).astype(np.float32) # [H, W, 2]
+            p_d = (p_d.numpy().squeeze()).astype(np.float32)
 
-    elif len(vis_data) == 3:
-        attn_weights2, attn_weights1, attn_weights0 = vis_data
-        attn_weights3 = attn_weights2
+        elif len(vis_data) == 3:
+            attn_weights2, attn_weights1, attn_weights0 = vis_data
+            attn_weights3 = attn_weights2
 
-        attn_weights3 = process_attn_maps(attn_weights3, batch_element)# train_mask)
-        attn_weights2 = process_attn_maps(attn_weights2, batch_element)# train_mask)
-        attn_weights1 = process_attn_maps(attn_weights1, batch_element)# train_mask)
-        attn_weights0 = process_attn_maps(attn_weights0, batch_element)# train_mask)
+            attn_weights3 = process_attn_maps(attn_weights3, batch_element)# train_mask)
+            attn_weights2 = process_attn_maps(attn_weights2, batch_element)# train_mask)
+            attn_weights1 = process_attn_maps(attn_weights1, batch_element)# train_mask)
+            attn_weights0 = process_attn_maps(attn_weights0, batch_element)# train_mask)
 
-    elif len(vis_data) == 4:
-        attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data
+        elif len(vis_data) == 4:
+            attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data
 
-        attn_weights3 = process_attn_maps(attn_weights3, batch_element, layer=3)#, train_mask)
-        attn_weights2 = process_attn_maps(attn_weights2, batch_element, layer=2)#, train_mask)
-        attn_weights1 = process_attn_maps(attn_weights1, batch_element, layer=1)#, train_mask)
-        attn_weights0 = process_attn_maps(attn_weights0, batch_element, layer=0)#, train_mask)
+            attn_weights3 = process_attn_maps(attn_weights3, batch_element, layer=3)#, train_mask)
+            attn_weights2 = process_attn_maps(attn_weights2, batch_element, layer=2)#, train_mask)
+            attn_weights1 = process_attn_maps(attn_weights1, batch_element, layer=1)#, train_mask)
+            attn_weights0 = process_attn_maps(attn_weights0, batch_element, layer=0)#, train_mask)
 
 
     dir_path = data['settings'].env.images_dir
@@ -151,16 +152,17 @@ def save_debug(data, pred_mask, vis_data, batch_element = 0):
     draw_axis(ax8, test_dist, 'test_dist')
 
 
-    if len(vis_data) == 2:
-        draw_axis(ax9, test_dist, 'test_dist')
-        draw_axis(ax10, p_rgb, 'similarity rgb')
-        draw_axis(ax11, p_d, 'similarity d')
+    if vis_data is not None:
+        if len(vis_data) == 2:
+            draw_axis(ax9, test_dist, 'test_dist')
+            draw_axis(ax10, p_rgb, 'similarity rgb')
+            draw_axis(ax11, p_d, 'similarity d')
 
-    elif len(vis_data) == 4 or len(vis_data) == 3:
-        draw_axis(ax9, attn_weights3, 'attn_weights3', show_minmax=True)
-        draw_axis(ax10, attn_weights2, 'attn_weights2', show_minmax=True)
-        draw_axis(ax11, attn_weights1, 'attn_weights1', show_minmax=True)
-        draw_axis(ax12, attn_weights0, 'attn_weights0', show_minmax=True)
+        elif len(vis_data) == 4 or len(vis_data) == 3:
+            draw_axis(ax9, attn_weights3, 'attn_weights3', show_minmax=True)
+            draw_axis(ax10, attn_weights2, 'attn_weights2', show_minmax=True)
+            draw_axis(ax11, attn_weights1, 'attn_weights1', show_minmax=True)
+            draw_axis(ax12, attn_weights0, 'attn_weights0', show_minmax=True)
 
 
     save_path = os.path.join(data['settings'].env.images_dir, '%03d-%04d.png' % (data['epoch'], data['iter']))

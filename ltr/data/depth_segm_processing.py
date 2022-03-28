@@ -676,7 +676,7 @@ class DepthSegmProcessingRotationDColormap(BaseProcessing):
             data[s + '_depths'] = [self.transform[s](x) for x in crops_depth] # 1, 3*384*384, toTensor and normalize
 
             # if s == 'train' and random.random() < 0.005:
-            if s == 'train' and random.random() < 0.01: # Song increased it
+            if s == 'train' and random.random() < 0.02: # Song increased it
                 # on random use binary mask generated from axis-aligned bbox
                 data['test_images'] = copy.deepcopy(data['train_images'])
                 data['test_depths'] = copy.deepcopy(data['train_depths'])
