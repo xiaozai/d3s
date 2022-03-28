@@ -113,7 +113,7 @@ class MRG_block(nn.Module):
         self.conv3x3_2 = nn.Conv2d(dims, dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
     def forward(self, x, y):
         x = F.upsample(self.conv3x3_1(x), scale_factor=2)
-        y = F.unsample(self.conv3x3_2(y), scale_factor=2)
+        y = F.upsample(self.conv3x3_2(y), scale_factor=2)
         return x + y
 
 class CPR_block(nn.Module):
@@ -282,5 +282,5 @@ class DepthSegmNet(nn.Module):
         feat_rgbd = self.fusion_layers[layer](self.f_layers[layer](f_test_rgb), f_test_d)
         out = self.refine_layers[layer](self.s_layers[layer](pre_out), feat_rgbd)
         out = self.post_layers[layer](out)
-        
+
         return out
