@@ -97,10 +97,10 @@ class MMFNet(nn.Module):
     we use the simple version by ourselves
 '''
 class RCU_block(nn.Module):
-    def __init__(self, input_dims, output_dims):
+    def __init__(self, input_dims):
         super().__init__()
-        self.conv3x3_1 = nn.Conv2d(input_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
-        self.conv3x3_2 = nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
+        self.conv3x3_1 = nn.Conv2d(input_dims, input_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
+        self.conv3x3_2 = nn.Conv2d(input_dims, input_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
     def forward(self, x):
         y = self.conv3x3_1(F.relu(x))
         y = self.conv3x3_2(F.relu(y))
@@ -133,19 +133,19 @@ class CPR_block(nn.Module):
 
 class RefineNet(nn.Module):
 
-    def __init__(self, input_dims, output_dims):
+    def __init__(self, input_dims):
         super().__init__()
-        self.RCU01 = RCU_block(input_dims, output_dims)
-        self.RCU02 = RCU_block(output_dims, output_dims)
+        self.RCU01 = RCU_block(input_dims)
+        self.RCU02 = RCU_block(input_dims)
 
-        self.RCU03 = RCU_block(input_dims, output_dims)
-        self.RCU04 = RCU_block(output_dims, output_dims)
+        self.RCU03 = RCU_block(input_dims)
+        self.RCU04 = RCU_block(input_dims)
 
-        self.RCU05 = RCU_block(output_dims, output_dims)
+        self.RCU05 = RCU_block(input_dims)
 
-        self.MRF = MRG_block(output_dims)
+        self.MRF = MRG_block(input_dims)
 
-        self.CPR = CPR_block(output_dims)
+        self.CPR = CPR_block(input_dims)
 
 
     def forward(self, pre_out, cur_out):
@@ -232,16 +232,21 @@ class DepthSegmNet(nn.Module):
                                        conv(segm_input_dim[1], segm_inter_dim[1]),
                                        conv(segm_input_dim[2], segm_inter_dim[2]),
                                        conv(segm_input_dim[3], segm_inter_dim[3])])
+
+        self.post_layers = nn.ModuleList([conv_no_relu(segm_inter_dim[0], 2),
+                                          conv(segm_inter_dim[1], segm_inter_dim[0]),
+                                          conv(segm_inter_dim[2], segm_inter_dim[1]),
+                                          conv(segm_inter_dim[3], segm_inter_dim[2])])
         # Fuse RGB+D features
         self.fusion_layers = nn.ModuleList([MMFNet(segm_inter_dim[0], segm_inter_dim[0]),
                                             MMFNet(segm_inter_dim[1], segm_inter_dim[1]),
                                             MMFNet(segm_inter_dim[2], segm_inter_dim[2]),
                                             MMFNet(segm_inter_dim[3], segm_inter_dim[3])])
         # For RGBD features
-        self.refine_layers = nn.ModuleList([RefineNet(segm_inter_dim[0], 2),
-                                            RefineNet(segm_inter_dim[1], segm_inter_dim[0]),
-                                            RefineNet(segm_inter_dim[2], segm_inter_dim[1]),
-                                            RefineNet(segm_inter_dim[3], segm_inter_dim[2])])
+        self.refine_layers = nn.ModuleList([RefineNet(segm_inter_dim[0]),
+                                            RefineNet(segm_inter_dim[1]),
+                                            RefineNet(segm_inter_dim[2]),
+                                            RefineNet(segm_inter_dim[3])])
 
 
         self.initialize_weights()
@@ -276,5 +281,6 @@ class DepthSegmNet(nn.Module):
 
         feat_rgbd = self.fusion_layers[layer](self.f_layers[layer](f_test_rgb), f_test_d)
         out = self.refine_layers[layer](self.s_layers[layer](pre_out), feat_rgbd)
-
-        return out, attn_weights
+        out = self.post_layers[layer](out)
+        
+        return out
