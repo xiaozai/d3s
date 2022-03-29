@@ -924,11 +924,13 @@ class DepthSegmST(BaseTracker):
     def init_segmentation(self, color, depth, bb, init_mask=None):
         '''
         Song init mask sometimes is not correct
+
+        init segm_search_area_factor is too big? because we already know the bbox
         '''
-        init_patch_crop_rgb, f_ = prutils.sample_target(color, np.array(bb), self.params.segm_search_area_factor,
+        init_patch_crop_rgb, f_ = prutils.sample_target(color, np.array(bb), self.params.init_segm_search_area_factor,
                                                     output_sz=self.params.segm_output_sz)
 
-        init_patch_crop_d, _ = prutils.sample_target(depth, np.array(bb), self.params.segm_search_area_factor,
+        init_patch_crop_d, _ = prutils.sample_target(depth, np.array(bb), self.params.init_segm_search_area_factor,
                                                     output_sz=self.params.segm_output_sz)
         if not self.params.use_colormap:
             init_patch_crop_d = np.expand_dims(init_patch_crop_d, axis=-1)
@@ -960,7 +962,7 @@ class DepthSegmST(BaseTracker):
                 mask = mask.astype(np.float32)
 
         init_mask_patch_np, patch_factor_init = prutils.sample_target(mask, np.array(bb),
-                                                                      self.params.segm_search_area_factor,
+                                                                      self.params.init_segm_search_area_factor,
                                                                       output_sz=self.params.segm_output_sz, pad_val=0)
 
         # network was renamed therefore we need to specify constructor_module and constructor_fun_name
