@@ -11,6 +11,11 @@ import ml_collections
 import copy
 import math
 
+def conv3x3_layer(in_planes, out_planes):
+    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
+def conv1x1_layer(in_planes, out_planes):
+    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=1, padding=0, dilation=1, bias=True)
+
 def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1):
     return nn.Sequential(
             nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride,
@@ -248,41 +253,49 @@ class MMFNet(nn.Module):
     def __init__(self, rgb_dims, d_dims, output_dims):
         super().__init__()
 
-        self.conv1x1_rgb = nn.Conv2d(rgb_dims, output_dims, kernel_size=1, stride=1, padding=0, dilation=1, bias=True)
+        self.conv1x1_rgb = conv1x1_layer(rgb_dims, output_dims) # nn.Conv2d(rgb_dims, output_dims, kernel_size=1, stride=1, padding=0, dilation=1, bias=True)
         self.res01_rgb = nn.Sequential(
                             nn.ReLU(inplace=True),
-                            nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True),
+                            conv3x3_layer(output_dims, output_dims),
+                            # nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True),
                             nn.ReLU(inplace=True),
-                            nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True))
+                            # nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
+                            conv3x3_layer(output_dims, output_dims))
 
         self.res02_rgb = nn.Sequential(
                             nn.ReLU(inplace=True),
-                            nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True),
+                            conv3x3_layer(output_dims, output_dims),
+                            # nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True),
                             nn.ReLU(inplace=True),
-                            nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True))
+                            conv3x3_layer(output_dims, output_dims))
+                            # nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True))
 
-        self.conv3x3_rgb = nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
+        self.conv3x3_rgb = conv3x3_layer(output_dims, output_dims) # nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
 
 
-        self.conv1x1_d = nn.Conv2d(d_dims, output_dims, kernel_size=1, stride=1, padding=0, dilation=1, bias=True)
+        self.conv1x1_d = conv1x1_layer(d_dims, output_dims)  # nn.Conv2d(d_dims, output_dims, kernel_size=1, stride=1, padding=0, dilation=1, bias=True)
         self.res01_d = nn.Sequential(
                             nn.ReLU(inplace=True),
-                            nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True),
+                            conv3x3_layer(output_dims, output_dims),
+                            # nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True),
                             nn.ReLU(inplace=True),
-                            nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True))
+                            conv3x3_layer(output_dims, output_dims))
+                            # nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True))
 
         self.res02_d = nn.Sequential(
                             nn.ReLU(inplace=True),
-                            nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True),
+                            conv3x3_layer(output_dims, output_dims),
+                            # nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True),
                             nn.ReLU(inplace=True),
-                            nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True))
+                            conv3x3_layer(output_dims, output_dims))
+                            # nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True))
 
-        self.conv3x3_d = nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
+        self.conv3x3_d = conv3x3_layer(output_dims, output_dims) # nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
 
         self.relu = nn.ReLU(inplace=True)
 
         self.pool5x5 = nn.MaxPool2d(5, stride=1, padding=2)
-        self.conv3x3 = nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
+        self.conv3x3 = conv3x3_layer(output_dims, output_dims) # nn.Conv2d(output_dims, output_dims, kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
 
         self.dropout = Dropout(0.3)
 
