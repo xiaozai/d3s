@@ -367,6 +367,7 @@ class DepthSegmActor_MultiPred(BaseActor):
         masks_gt = data['test_masks'].permute(1, 0, 2, 3) # C, B, H, W -> # B * 1 * H * W
         masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)   # B * 2 * H * W
 
+        print(masks_pred.shape)
         print(masks_pred[0].shape, masks_pred[1].shape, masks_pred[2].shape, masks_pred[3].shape)
         loss0 = self.objective(masks_pred[0], masks_gt_pair)
         loss1 = self.objective(masks_pred[1], masks_gt_pair)
