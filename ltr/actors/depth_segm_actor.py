@@ -270,10 +270,10 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
     draw_axis(ax7, predicted_mask0, 'Prediction0', show_minmax=True)
     draw_axis(ax8, test_dist, 'test_dist')
 
-    draw_axis(ax13, predicted_mask1, 'Prediction0', show_minmax=True)
-    draw_axis(ax14, predicted_mask2, 'Prediction1', show_minmax=True)
-    draw_axis(ax15, predicted_mask3, 'Prediction2', show_minmax=True)
-    draw_axis(ax16, predicted_mask4, 'Prediction4', show_minmax=True)
+    draw_axis(ax13, predicted_mask0, 'Prediction0', show_minmax=True)
+    draw_axis(ax14, predicted_mask1, 'Prediction1', show_minmax=True)
+    draw_axis(ax15, predicted_mask2, 'Prediction2', show_minmax=True)
+    draw_axis(ax16, predicted_mask3, 'Prediction3', show_minmax=True)
 
     if vis_data is not None:
         if len(vis_data) == 2:
