@@ -386,9 +386,6 @@ class DepthSegmActor_MultiPred(BaseActor):
 
         if 'iter' in data and (data['iter'] - 1) % 50 == 0:
 
-            try:
-                save_debug_MP(data, masks_pred, vis_data)
-            except:
-                print('save_debug error ....')
+            save_debug_MP(data, masks_pred, vis_data)
 
         return loss, stats
