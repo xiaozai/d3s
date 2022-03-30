@@ -54,8 +54,8 @@ def process_attn_maps(att_mat, batch_element, layer=0): #, train_mask):
         cols = 2
     elif int(np.sqrt(aug_att_mat.size(-2)//2)) ** 2 * 2 == aug_att_mat.size(-2):
         grid_size = int(np.sqrt(aug_att_mat.size(-2)//2))
-        rows = 1
-        cols = 2
+        rows = 2
+        cols = 1
 
     out_img = np.zeros((v.shape[0],))
     for idx in range(v.shape[0]):
@@ -127,8 +127,8 @@ def save_debug(data, pred_mask, vis_data, batch_element = 0):
         train_depth = 255 * (train_depth * std + mu)
         test_depth = 255 * (test_depth * std + mu)
 
-    train_depth = train_depth.numpy().squeeze().astype(np.uint8)
-    test_depth = test_depth.numpy().squeeze().astype(np.uint8)
+    train_depth = train_depth.numpy().squeeze() #.astype(np.uint8)
+    test_depth = test_depth.numpy().squeeze() # .astype(np.uint8)
 
 
     train_mask = data['train_masks'][0, batch_element, :, :].numpy().astype(np.float32)
