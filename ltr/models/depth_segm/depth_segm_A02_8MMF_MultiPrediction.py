@@ -428,6 +428,8 @@ class DepthSegmNetAttention(nn.Module):
             depth_segm = d3s + depth feat
 
             we also model background feat
+
+            Pyramid supervision for enhancing the deep representation.
         '''
         out = F.interpolate(test_dist[0], size=(feat_test_rgb[3].shape[-2], feat_test_rgb[3].shape[-1]))                 # [B, 1, 24, 24]
 
