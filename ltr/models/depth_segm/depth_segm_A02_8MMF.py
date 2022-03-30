@@ -438,14 +438,14 @@ class DepthSegmNetAttention(nn.Module):
         else:
             return out
 
-    def process(self, pre_out, feat_test_rgb, feat_test_d, feat_train_rgb, feat_train_d, mask_train, layer=0):
+    def process(self, pre_out, test_rgb, test_d, train_rgb, train_d, mask_train, layer=0):
 
-        f_test_rgb, f_test_d, f_train_rgb, f_train_d = feat_test_rgb[layer], feat_test_d[layer], feat_train_rgb[layer], feat_train_d[layer]
+        f_test_rgb, f_test_d, f_train_rgb, f_train_d = test_rgb[layer], test_d[layer], train_rgb[layer], train_d[layer]
         fg_mask = F.interpolate(mask_train[0], size=(f_test_rgb.shape[-2], f_test_rgb.shape[-1]))  # Bx1x24x48
         bg_mask = 1 - fg_mask
 
         f_test_rgbd = self.MMF_layers[layer](f_test_rgb, f_test_d)              # BxCxHxH + BxCxHxW => BxCxHxW
-        f_train_rgbd = self.MMF_layers[layer](feat_train_rgb, f_train_d)
+        f_train_rgbd = self.MMF_layers[layer](f_train_rgb, f_train_d)
 
         if layer in [3, 2, 1]:
             ''' cross-attention '''
