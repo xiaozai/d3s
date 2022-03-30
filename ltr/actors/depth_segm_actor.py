@@ -171,6 +171,127 @@ def save_debug(data, pred_mask, vis_data, batch_element = 0):
     plt.close(f)
 
 
+def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
+
+    data = data.detach().clone().cpu()
+    pred_mask = [pm.detach().clone().cpu() for pm in pred_mask]
+
+    if vis_data is not None:
+        if isinstance(vis_data, list) or isinstance(vis_data, tuple):
+            vis_data = [torch.stack(vid).detach().clone().cpu() if isinstance(vid, list) or isinstance(vid, tuple) \
+                                                                else vid.detach().clone().cpu() \
+                                                                for vid in vis_data]
+        else:
+            vis_data = vis_data.detach().clone().cpu()
+
+
+        if len(vis_data) == 2:
+            p_rgb, p_d = vis_data
+
+            p_rgb = p_rgb[batch_element, ...] # [H, W, 2] F + B
+            p_d = p_d[batch_element, ...]
+            p_rgb = (p_rgb.numpy().squeeze()).astype(np.float32) # [H, W, 2]
+            p_d = (p_d.numpy().squeeze()).astype(np.float32)
+
+        elif len(vis_data) == 3:
+            attn_weights2, attn_weights1, attn_weights0 = vis_data
+            attn_weights3 = attn_weights2
+
+            attn_weights3 = process_attn_maps(attn_weights3, batch_element)# train_mask)
+            attn_weights2 = process_attn_maps(attn_weights2, batch_element)# train_mask)
+            attn_weights1 = process_attn_maps(attn_weights1, batch_element)# train_mask)
+            attn_weights0 = process_attn_maps(attn_weights0, batch_element)# train_mask)
+
+        elif len(vis_data) == 4:
+            attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data
+
+            attn_weights3 = process_attn_maps(attn_weights3, batch_element, layer=3)#, train_mask)
+            attn_weights2 = process_attn_maps(attn_weights2, batch_element, layer=2)#, train_mask)
+            attn_weights1 = process_attn_maps(attn_weights1, batch_element, layer=1)#, train_mask)
+            attn_weights0 = process_attn_maps(attn_weights0, batch_element, layer=0)#, train_mask)
+
+
+    dir_path = data['settings'].env.images_dir
+
+    train_img = data['train_images'][:, batch_element, :, :].permute(1, 2, 0)
+    test_img = data['test_images'][:, batch_element, :, :].permute(1, 2, 0)
+
+    mu = torch.Tensor(data['settings'].normalize_mean).view(1, 1, 3)
+    std = torch.Tensor(data['settings'].normalize_std).view(1, 1, 3)
+
+    train_img = 255 * (train_img * std + mu)
+    test_img = 255 * (test_img * std + mu)
+
+    train_img = train_img.numpy().astype(np.uint8)
+    test_img = test_img.numpy().astype(np.uint8)
+
+    ''' Song, when using depth colormap and normalization '''
+    train_depth = data['train_depths'][:, batch_element, :, :].permute(1, 2, 0) # .numpy().squeeze().astype(np.float32)
+    test_depth = data['test_depths'][:, batch_element, :, :].permute(1, 2, 0) #.numpy().squeeze().astype(np.float32)
+
+    if train_depth.shape[-1] == 3:
+        train_depth = 255 * (train_depth * std + mu)
+        test_depth = 255 * (test_depth * std + mu)
+
+    train_depth = train_depth.numpy().squeeze() #.astype(np.uint8)
+    test_depth = test_depth.numpy().squeeze() # .astype(np.uint8)
+
+
+    train_mask = data['train_masks'][0, batch_element, :, :].numpy().astype(np.float32)
+    test_mask = data['test_masks'][0, batch_element, :, :].numpy().astype(np.float32)
+    test_dist = data['test_dist'][0, batch_element, :, :].numpy().squeeze().astype(np.float32)
+
+
+    # softmax on the mask prediction (since this is done internaly when calculating loss)
+    mask0 = F.softmax(pred_mask[0], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
+    predicted_mask0 = (mask0 > 0.5).astype(np.float32) * mask0
+
+    mask1 = F.softmax(pred_mask[1], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
+    predicted_mask1 = (mask1 > 0.5).astype(np.float32) * mask1
+
+    mask2 = F.softmax(pred_mask[2], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
+    predicted_mask2 = (mask2 > 0.5).astype(np.float32) * mask2
+
+    mask3 = F.softmax(pred_mask[3], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
+    predicted_mask3 = (mask3 > 0.5).astype(np.float32) * mask3
+
+
+    f, ((ax1, ax2, ax3, ax4), \
+        (ax5, ax6, ax7, ax8), \
+        (ax9, ax10, ax11, ax12), \
+        (ax13, ax14, ax15, ax16)) = plt.subplots(4, 4, figsize=(9, 9))
+
+    draw_axis(ax1, train_img, 'Train image')
+    draw_axis(ax3, test_img, 'Test image')
+    draw_axis(ax2, train_depth, 'Train depth')
+    draw_axis(ax4, test_depth, 'Test depth')
+    draw_axis(ax5, train_mask, 'train mask')
+    draw_axis(ax6, test_mask, 'Ground-truth')
+    draw_axis(ax7, predicted_mask0, 'Prediction0', show_minmax=True)
+    draw_axis(ax8, test_dist, 'test_dist')
+
+    draw_axis(ax13, predicted_mask1, 'Prediction0', show_minmax=True)
+    draw_axis(ax14, predicted_mask2, 'Prediction1', show_minmax=True)
+    draw_axis(ax15, predicted_mask3, 'Prediction2', show_minmax=True)
+    draw_axis(ax16, predicted_mask4, 'Prediction4', show_minmax=True)
+
+    if vis_data is not None:
+        if len(vis_data) == 2:
+            draw_axis(ax9, test_dist, 'test_dist')
+            draw_axis(ax10, p_rgb, 'similarity rgb')
+            draw_axis(ax11, p_d, 'similarity d')
+
+        elif len(vis_data) == 4 or len(vis_data) == 3:
+            draw_axis(ax9, attn_weights3, 'attn_weights3', show_minmax=True)
+            draw_axis(ax10, attn_weights2, 'attn_weights2', show_minmax=True)
+            draw_axis(ax11, attn_weights1, 'attn_weights1', show_minmax=True)
+            draw_axis(ax12, attn_weights0, 'attn_weights0', show_minmax=True)
+
+
+    save_path = os.path.join(data['settings'].env.images_dir, '%03d-%04d.png' % (data['epoch'], data['iter']))
+    plt.savefig(save_path)
+    plt.close(f)
+
 class DepthSegmActor(BaseActor):
     """ Actor for training the Segmentation in ATOM"""
     def __call__(self, data):
@@ -212,6 +333,61 @@ class DepthSegmActor(BaseActor):
 
             try:
                 save_debug(data, masks_pred, vis_data)
+            except:
+                print('save_debug error ....')
+
+        return loss, stats
+
+class DepthSegmActor_MultiPred(BaseActor):
+    """ Actor for training the Segmentation in ATOM"""
+    def __call__(self, data):
+        """
+        args:
+            data - The input data, should contain the fields 'train_images', 'test_images', 'train_anno',
+                    'test_proposals' and 'proposal_iou'.
+
+        returns:
+            loss    - the training loss
+            states  -  dict containing detailed losses
+        """
+
+        test_dist = None
+        if 'test_dist' in data:
+            test_dist = data['test_dist'].permute(1, 0, 2, 3)
+
+        masks_pred, vis_data = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
+                                        data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
+                                        data['test_images'].permute(1, 0, 2, 3),
+                                        data['test_depths'].permute(1, 0, 2, 3),
+                                        data['train_masks'].permute(1, 0, 2, 3),
+                                        test_dist=test_dist,
+                                        debug=True) # Song :  vis pos and neg maps
+
+
+        masks_gt = data['test_masks'].permute(1, 0, 2, 3) # C, B, H, W -> # B * 1 * H * W
+        masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)   # B * 2 * H * W
+
+        loss0 = self.objective(masks_pred[0], masks_gt_pair)
+        loss1 = self.objective(masks_pred[1], masks_gt_pair)
+        loss2 = self.objective(masks_pred[2], masks_gt_pair)
+        loss3 = self.objective(masks_pred[3], masks_gt_pair)
+
+        loss = loss0 + loss1 * 0.1 + loss2 * 0.1 + loss3 * 0.1
+        if torch.isnan(loss):
+            print('loss segm is Nan .....')
+
+        stats = {'Loss/total': loss.item(),
+                 'Loss/segm': loss.item(),
+                 'Loss0/MP': loss0.item(),
+                 'Loss1/MP': loss1.item(),
+                 'Loss2/MP': loss2.item(),
+                 'Loss3/MP': loss3.item(),
+                 }
+
+        if 'iter' in data and (data['iter'] - 1) % 50 == 0:
+
+            try:
+                save_debug_MP(data, masks_pred, vis_data)
             except:
                 print('save_debug error ....')
 
