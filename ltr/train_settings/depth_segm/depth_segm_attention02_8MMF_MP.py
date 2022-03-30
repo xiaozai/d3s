@@ -102,7 +102,7 @@ def run(settings):
 
     # Create network
     # resnet50 or resnet18
-    net = segm_models.depth_segm_attention02_8MMF_resnet50(backbone_pretrained=True, topk_pos=settings.segm_topk_pos,
+    net = segm_models.depth_segm_attention02_8MMF_MP_resnet50(backbone_pretrained=True, topk_pos=settings.segm_topk_pos,
                                                         topk_neg=settings.segm_topk_neg, mixer_channels=mixer_channels)
 
     # Set objective
