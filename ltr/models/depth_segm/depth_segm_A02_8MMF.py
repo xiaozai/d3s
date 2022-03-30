@@ -77,7 +77,7 @@ class Attention(nn.Module):
 
         if mask is None:
             # Song add mask here for background pixels, force background probs is 0
-            attention_scores[:, :, self.patches//2:, :] = -math.inf # 0
+            attention_scores[:, :, self.patches//2:, :] = 0
         else:
             # Song add mask for similarity between template and search region
             attention_scores = attention_scores * mask.view(mask.shape[0], 1, 1, -1) # head, layers, Pq, P_kv * [1, B, 1, 1, P_kv]
