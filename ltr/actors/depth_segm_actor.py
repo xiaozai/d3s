@@ -372,9 +372,10 @@ class DepthSegmActor_MultiPred(BaseActor):
         loss2 = self.objective(masks_pred[2], masks_gt_pair)
         loss3 = self.objective(masks_pred[3], masks_gt_pair)
 
-        loss = loss0 + loss1 * 0.5 + loss2 * 0.5 + loss3 * 0.5
-        if torch.isnan(loss):
-            print('loss segm is Nan .....')
+        if self.loss_weights is None:
+            self.loss_weights = [1, 0.1, 0.1, 0.1]
+        loss = loss0 * self.loss_weights[0] + loss1 * self.loss_weights[1] + loss2 * self.loss_weights[2] + loss3 * self.loss_weights[3]
+
 
         stats = {'Loss/total': loss.item(),
                  'Loss/segm': loss.item(),
