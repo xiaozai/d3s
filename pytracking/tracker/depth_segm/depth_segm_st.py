@@ -352,7 +352,8 @@ class DepthSegmST(BaseTracker):
 
             ''' Song, self.target_sz increases always, because of target_scale '''
             pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
-
+            if isinstance(pred_segm_region, tuple) and len(pred_segm_region) == 4:
+                pred_segm_region = pred_segm_region[0]
             if pred_segm_region is None:
                 # print('segment_target is None, use DCF results...')
                 self.pos = new_pos.clone()
@@ -1055,7 +1056,8 @@ class DepthSegmST(BaseTracker):
                 segm_pred = segm_net.segm_predictor(test_feat_segm_rgb, train_feat_segm_d,
                                                     train_feat_segm_rgb, train_feat_segm_d, # if we use the feature correlation
                                                     train_masks, test_dist_map)
-
+                if isinstance(segm_pred, tuple) and len(segm_pred) == 4:
+                    segm_pred = segm_pred[0]
                 # softmax on the prediction (during training this is done internaly when calculating loss)
                 # take only the positive channel as predicted segmentation mask
                 mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy()
