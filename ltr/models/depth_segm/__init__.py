@@ -36,3 +36,5 @@ from .depth_segm_RDFNet import DepthSegmNet as DepthSegmNet_RDF
 
 from .depth_segm_A02_8MMF import DepthSegmNetAttention as DepthSegmNetAttention02_8MMF
 from .depth_segm_A02_8MMF_MultiPrediction import DepthSegmNetAttention as DepthSegmNetAttention02_8MMF_MP
+
+from .depth_segm_A02_8ACNet_MP import DepthSegmNetAttention as DepthSegmNetAttention02_8ACNet_MP
