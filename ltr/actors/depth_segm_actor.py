@@ -378,11 +378,11 @@ class DepthSegmActor_MultiPred(BaseActor):
 
 
         stats = {'Loss/total': loss.item(),
-                 'Loss/segm': loss.item(),
-                 'Loss0/MP': loss0.item(),
-                 'Loss1/MP': loss1.item(),
-                 'Loss2/MP': loss2.item(),
-                 'Loss3/MP': loss3.item(),
+                 # 'Loss/segm': loss.item(),
+                 'Layer0': loss0.item(),
+                 'Layer1': loss1.item(),
+                 'Layer2': loss2.item(),
+                 'Layer3': loss3.item(),
                  }
 
         if 'iter' in data and (data['iter'] - 1) % 50 == 0:
