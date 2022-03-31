@@ -267,13 +267,13 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
     draw_axis(ax4, test_depth, 'Test depth')
     draw_axis(ax5, train_mask, 'train mask')
     draw_axis(ax6, test_mask, 'Ground-truth')
-    draw_axis(ax7, predicted_mask0, 'Prediction0', show_minmax=True)
+    draw_axis(ax7, predicted_mask0, 'Prediction', show_minmax=True)
     draw_axis(ax8, test_dist, 'test_dist')
 
-    draw_axis(ax13, predicted_mask0, 'Prediction0', show_minmax=True)
-    draw_axis(ax14, predicted_mask1, 'Prediction1', show_minmax=True)
-    draw_axis(ax15, predicted_mask2, 'Prediction2', show_minmax=True)
-    draw_axis(ax16, predicted_mask3, 'Prediction3', show_minmax=True)
+    draw_axis(ax13, predicted_mask0, 'Layer0') #, show_minmax=True)
+    draw_axis(ax14, predicted_mask1, 'Layer1') #, show_minmax=True)
+    draw_axis(ax15, predicted_mask2, 'Layer2') #, show_minmax=True)
+    draw_axis(ax16, predicted_mask3, 'Layer3') #, show_minmax=True)
 
     if vis_data is not None:
         if len(vis_data) == 2:

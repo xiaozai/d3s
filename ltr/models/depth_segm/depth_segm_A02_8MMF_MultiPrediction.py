@@ -51,6 +51,7 @@ class Attention(nn.Module):
         self.attn_dropout = Dropout(config.transformer["attention_dropout_rate"])
         self.proj_dropout = Dropout(config.transformer["attention_dropout_rate"])
 
+        # self.relu = torch.nn.ReLU(inplace=True)
         self.softmax = Softmax(dim=-1)
 
     def transpose_for_scores(self, x):
@@ -74,6 +75,8 @@ class Attention(nn.Module):
 
         attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2)) # Bx12x64x64 * Bx12x64x64 = Bx12x64x64
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
+
+        # attention_scores = self.relu(attention_scores)
 
         if mask is None:
             # Song add mask here for background pixels, force background probs is 0
