@@ -1056,7 +1056,7 @@ class DepthSegmST(BaseTracker):
                 segm_pred = segm_net.segm_predictor(test_feat_segm_rgb, train_feat_segm_d,
                                                     train_feat_segm_rgb, train_feat_segm_d, # if we use the feature correlation
                                                     train_masks, test_dist_map)
-                if isinstance(segm_pred, tuple) and len(segm_pred) == 4:
+                if isinstance(segm_pred, tuple):
                     segm_pred = segm_pred[0]
                 # softmax on the prediction (during training this is done internaly when calculating loss)
                 # take only the positive channel as predicted segmentation mask
@@ -1193,6 +1193,8 @@ class DepthSegmST(BaseTracker):
         segm_pred = self.segm_net.segm_predictor(test_feat_segm_rgb, test_feat_d,
                                                  self.train_feat_segm_rgb, self.train_feat_segm_d,
                                                  train_masks, test_dist_map)
+        if isinstance(segm_pred, tuple):
+            segm_pred = segm_pred[0]
         # softmax on the prediction (during training this is done internaly when calculating loss)
         # take only the positive channel as predicted segmentation mask
         mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy() # [1,2,384, 384] -> [384,384]
