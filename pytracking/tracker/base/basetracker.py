@@ -249,9 +249,10 @@ class BaseTracker:
         self.pause_mode = False
 
         if self.params.debug == 5:
-            self.fig, ((self.ax, self.ax_d), (self.ax_initmask, self.ax_initmaskimg), \
-                       (self.ax_rgb_patches, self.ax_d_patches), (self.ax_m, self.ax_mrgb), \
-                       (self.ax_score, self.ax_rgb_scoremap)) = plt.subplots(5, 2)
+            self.fig, ((self.ax, self.ax_d), \
+                       (self.ax_initmask, self.ax_initmaskimg), \
+                       (self.ax_rgb_patches, self.ax_d_patches), \
+                       (self.ax_m, self.ax_mrgb)) = plt.subplots(4, 2)
 
         elif self.params.debug == 4:
             self.ax_m = None
@@ -318,26 +319,31 @@ class BaseTracker:
 
             if self.rgb_patches is not None:
                 self.ax_rgb_patches.cla()
-                self.ax_rgb_patches.imshow(self.rgb_patches)
-                self.ax_rgb_patches.set_title('rgb patches')
+                rgb_score = Image.fromarray(np.uint8(self.rgb_patches)).convert('RGBA')
+                if self.score_map is not None:
+                    max_score = np.max(self.score_map)
+                    scoremap = scoremap.resize(rgb_score.size)
+                    rgb_score = Image.blend(rgb_score, scoremap, 0.3)
+                else:
+                    max_score = 0
+
+                self.ax_rgb_patches.imshow(rgb_score)
+                self.ax_rgb_patches.set_title('rgb patches %.02f'%max_score)
 
                 self.ax_d_patches.cla()
                 # d_patches = np.uint8(self.d_patches *255)
                 self.ax_d_patches.imshow(self.d_patches)
                 self.ax_d_patches.set_title('d patches')
 
-                rgb_score = Image.fromarray(np.uint8(self.rgb_patches)).convert('RGBA')
-                if self.score_map is not None:
-                    scoremap = scoremap.resize(rgb_score.size)
-                    rgb_score = Image.blend(rgb_score, scoremap, 0.3)
-                self.ax_rgb_scoremap.cla()
-                self.ax_rgb_scoremap.imshow(rgb_score)
-                self.ax_rgb_scoremap.set_title('scoremap over rgb')
+
+                # self.ax_rgb_scoremap.cla()
+                # self.ax_rgb_scoremap.imshow(rgb_score)
+                # self.ax_rgb_scoremap.set_title('scoremap over rgb')
 
             # Song
             if self.polygon is not None:
                 polygon = patches.Polygon(self.polygon, closed=True, facecolor='none', edgecolor='r')
-                prbox = patches.Polygon(self.prbox, closed=True, facecolor='none', edgecolor='b')
+                # prbox = patches.Polygon(self.prbox, closed=True, facecolor='none', edgecolor='b')
                 self.ax_m.add_patch(polygon)
                 # x1, y1, w, h = self.aabb
                 # aabb = patches.Rectangle((x1, y1), w, h, linewidth=2, edgecolor='g', facecolor='none')
@@ -345,23 +351,29 @@ class BaseTracker:
 
 
 
-            if self.score_map is not None:
-                self.ax_score.cla()
-                self.ax_score.imshow(self.score_map)
-                max_score = np.max(self.score_map)
-                self.ax_score.set_title('score map %f'%max_score)
+            # if self.score_map is not None:
+            #     self.ax_score.cla()
+            #     self.ax_score.imshow(self.score_map)
+            #     max_score = np.max(self.score_map)
+            #     self.ax_score.set_title('score map %f'%max_score)
 
-            if self.vis_search_center is not None:
-                center = self.vis_search_center# .clone().cpu().detach().numpy()
-                search_sz = self.vis_serach_size * self.vis_search_scales[0]
-                search_tp, search_bm = center - search_sz/2, center + search_sz/2
-                search_tp = [max(0, search_tp[0]), max(0, search_tp[1])]
-                search_bm = [min(im_h, search_bm[0]), min(im_w, search_bm[1])]
-                search_hw = [search_bm[0] - search_tp[0], search_bm[1] - search_tp[1]]
-                search = patches.Rectangle((search_tp[1], search_tp[0]), search_hw[1], search_hw[0], linewidth=2, edgecolor='b', facecolor='none')
-                self.ax.add_patch(search)
+            # if self.vis_search_center is not None:
+            #     center = self.vis_search_center# .clone().cpu().detach().numpy()
+            #     search_sz = self.vis_serach_size * self.vis_search_scales[0]
+            #     search_tp, search_bm = center - search_sz/2, center + search_sz/2
+            #     search_tp = [max(0, search_tp[0]), max(0, search_tp[1])]
+            #     search_bm = [min(im_h, search_bm[0]), min(im_w, search_bm[1])]
+            #     search_hw = [search_bm[0] - search_tp[0], search_bm[1] - search_tp[1]]
+            #     search = patches.Rectangle((search_tp[1], search_tp[0]), search_hw[1], search_hw[0], linewidth=2, edgecolor='b', facecolor='none')
+            #     self.ax.add_patch(search)
 
         if len(state) == 4:
+            state[0] = max(state[0], 0)
+            state[1] = max(state[1], 0)
+            if state[0]+state[2] > im_w:
+                state[2] = im_w - state[0]
+            if state[1]+state[3] > im_h:
+                state[3] = im_h - state[1]
             pred = patches.Rectangle((state[0], state[1]), state[2], state[3], linewidth=2, edgecolor='r', facecolor='none')
             pred_d = patches.Rectangle((state[0], state[1]), state[2], state[3], linewidth=2, edgecolor='r', facecolor='none')
         elif len(state) == 8:

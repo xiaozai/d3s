@@ -177,7 +177,8 @@ class DepthSegm(BaseTracker):
         # Song , vis only
         self.rgb_patches = None
         self.d_patches = None
-
+        self.polygon = None
+        
     def init_optimization(self, train_x, init_y):
         # Initialize filter
         filter_init_method = getattr(self.params, 'filter_init_method', 'zeros')
@@ -209,13 +210,13 @@ class DepthSegm(BaseTracker):
             # Initialize optimizer
             analyze_convergence = getattr(self.params, 'analyze_convergence', False)
             if optimizer == 'GaussNewtonCG':
-                self.joint_optimizer = GaussNewtonCG(self.joint_problem, joint_var, plotting=(self.params.debug >= 3),
+                self.joint_optimizer = GaussNewtonCG(self.joint_problem, joint_var, plotting=(self.params.debug == 3),
                                                      analyze=analyze_convergence, fig_num=(12, 13, 14))
             elif optimizer == 'GradientDescentL2':
                 self.joint_optimizer = GradientDescentL2(self.joint_problem, joint_var,
                                                          self.params.optimizer_step_length,
                                                          self.params.optimizer_momentum,
-                                                         plotting=(self.params.debug >= 3), debug=analyze_convergence,
+                                                         plotting=(self.params.debug == 3), debug=analyze_convergence,
                                                          fig_num=(12, 13))
 
             # Do joint optimization
@@ -249,10 +250,10 @@ class DepthSegm(BaseTracker):
             self.filter_optimizer = ConjugateGradient(self.conv_problem, self.filter,
                                                       fletcher_reeves=self.params.fletcher_reeves,
                                                       direction_forget_factor=self.params.direction_forget_factor,
-                                                      debug=(self.params.debug >= 3), fig_num=(12, 13))
+                                                      debug=(self.params.debug == 3), fig_num=(12, 13))
         elif optimizer == 'GradientDescentL2':
             self.filter_optimizer = GradientDescentL2(self.conv_problem, self.filter, self.params.optimizer_step_length,
-                                                      self.params.optimizer_momentum, debug=(self.params.debug >= 3),
+                                                      self.params.optimizer_momentum, debug=(self.params.debug == 3),
                                                       fig_num=12)
 
         # Transfer losses from previous optimization
@@ -326,6 +327,8 @@ class DepthSegm(BaseTracker):
 
         if self.params.debug == 2:
             show_tensor(s[scale_ind, ...], 5, title='Max score = {:.2f}'.format(torch.max(s[scale_ind, ...]).item()))
+
+        self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy() # if self.params.debug == 5 else None
 
         # just a sanity check so that it does not get out of image
         if new_pos[0] < 0:
@@ -414,7 +417,7 @@ class DepthSegm(BaseTracker):
         translation_vec *= self.params.scale_factors[scale_ind]
 
         # Shift the score output for visualization purposes
-        if self.params.debug >= 2:
+        if self.params.debug == 2:
             sz = scores.shape[-2:]
             scores = torch.cat([scores[..., sz[0] // 2:, :], scores[..., :sz[0] // 2, :]], -2)
             scores = torch.cat([scores[..., :, sz[1] // 2:], scores[..., :, :sz[1] // 2]], -1)
@@ -859,7 +862,7 @@ class DepthSegm(BaseTracker):
         if self.params.segm_use_dist:
             if self.params.segm_dist_map_type == 'center':
                 # center-based dist map
-                dist_map = self.create_dist(init_patch_crop.shape[0], init_patch_crop.shape[1])
+                dist_map = self.create_dist(init_patch_crop_rgb.shape[0], init_patch_crop_rgb.shape[1])
             elif self.params.segm_dist_map_type == 'bbox':
                 # bbox-based dist map
                 dist_map = self.create_dist_gauss(self.params.segm_output_sz, bb[2] * patch_factor_init,
@@ -1065,6 +1068,7 @@ class DepthSegm(BaseTracker):
             mask = np.zeros(mask.shape, dtype=np.uint8)
             cv2.drawContours(mask, [contour], -1, 1, thickness=-1)
             self.mask = mask # song
+            self.polygon = polygon
 
             prbox_opt = np.array([])
             if self.params.segm_optimize_polygon:
