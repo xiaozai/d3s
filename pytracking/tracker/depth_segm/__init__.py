@@ -4,8 +4,8 @@ from .depth_segm import DepthSegm
 
 def get_tracker_class(model="depthsegm_st"):
     if model == 'depth_segm_st':
-        # return DepthSegmST
-        return DepthSegm
+        return DepthSegmST
+        # return DepthSegm
     elif model == 'depth_segm_lt':
         return DepthSegmLT
     else:

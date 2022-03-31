@@ -108,6 +108,7 @@ def parameters():
 
     params.use_segmentation = True
     params.use_colormap = False
+    params.init_segm_search_area_factor = 4.0
 
     params.model = 'depth_segm_st'
     params.constructor_module = 'ltr.models.depth_segm.depth_segm'
