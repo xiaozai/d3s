@@ -154,7 +154,7 @@ class DepthSegmST(BaseTracker):
         self.load_segmnet()
 
         # Extract and transform sample
-        if params.use_rgbd_classifier:
+        if self.params.use_rgbd_classifier:
             x_rgb = self.generate_init_samples(im, dp=dp) # Song
         else:
             x_rgb = self.generate_init_samples(im) # crops and augments and Generated ResNet50 feature maps for DCF
