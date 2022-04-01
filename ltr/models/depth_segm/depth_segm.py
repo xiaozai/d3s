@@ -719,3 +719,22 @@ def depth_segm_attention02_8ACNet_MP_resnet50(segm_input_dim=(256,256), segm_int
                        segm_layers=['conv1', 'layer1', 'layer2', 'layer3'], extractor_grad=False)  # extractor_grad=False
 
     return net
+
+@model_constructor
+def depth_segm_attention02_8ACNet_MP_woBG_resnet50(segm_input_dim=(256,256), segm_inter_dim=(256,256),
+                        backbone_pretrained=True, topk_pos=3, topk_neg=3, mixer_channels=2):
+    # backbone
+    backbone_net = backbones.resnet50(pretrained=backbone_pretrained)
+
+    # segmentation dimensions
+    segm_input_dim = (64, 256, 512, 1024)
+    segm_inter_dim = (4, 16, 32, 64)
+    segm_dim = (64, 64)  # convolutions before cosine similarity
+
+    # segmentation
+    segm_predictor = segmmodels.DepthSegmNetAttention02_8ACNet_MP_woBG()
+
+    net = DepthSegmNet(feature_extractor=backbone_net, segm_predictor=segm_predictor,
+                       segm_layers=['conv1', 'layer1', 'layer2', 'layer3'], extractor_grad=False)  # extractor_grad=False
+
+    return net
