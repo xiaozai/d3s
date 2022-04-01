@@ -159,7 +159,7 @@ class DepthSegmST(BaseTracker):
         else:
             x_rgb = self.generate_init_samples(im) # crops and augments and Generated ResNet50 feature maps for DCF
 
-        print(len(x_rgb), x_rgb[0].shape)
+        print(x_rgb.shape, x_rgb[0].shape)
 
         # Initialize projection matrix
         self.init_projection_matrix(x_rgb)
