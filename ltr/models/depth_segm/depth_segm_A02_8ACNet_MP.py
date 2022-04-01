@@ -273,19 +273,21 @@ class ACNet(nn.Module):
 
         self.bn_rgb = nn.BatchNorm2d(output_dims)
         self.bn_d = nn.BatchNorm2d(output_dims)
-        self.relu = nn.ReLU(inplace=True)
 
+        self.relu_rgb = nn.ReLU(inplace=True)
+        self.relu_d = nn.ReLU(inplace=True)
+        
         self.attn_rgb = channel_attention(output_dims)
         self.attn_d = channel_attention(output_dims)
 
     def forward(self, f_rgb, f_d):
         f_rgb = self.conv1x1_rgb(f_rgb)
         f_rgb = self.bn_rgb(f_rgb)
-        f_rgb = self.relu(f_rgb)
+        f_rgb = self.relu_rgb(f_rgb)
 
         f_d = self.conv1x1_d(f_d)
         f_d = self.bn_rgb(f_d)
-        f_d = self.relu(f_d)
+        f_d = self.relu_d(f_d)
 
         weight_rgb = self.attn_rgb(f_rgb)
         weight_d = self.attn_d(f_d)
