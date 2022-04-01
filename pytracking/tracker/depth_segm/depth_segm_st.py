@@ -33,8 +33,6 @@ class DepthSegmST(BaseTracker):
         self.frame_num = 1
         self.frame_name = '%08d' % self.frame_num
 
-        # self.params.use_colormap = True # Song
-
         if not hasattr(self.params, 'device'):
             self.params.device = 'cuda' if self.params.use_gpu else 'cpu'
 
@@ -322,6 +320,10 @@ class DepthSegmST(BaseTracker):
         test_x_rgb, test_d_crops = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
 
         ''' Song, use the fused RGBD features for locatiozation ???? '''
+        if self.params.use_rgbd_classifier:
+            test_x_d = self.segm_net.segm_predictor.depth_feat_extractor(test_d_crops)
+            test_x_rgb = self.segm_net.segm_predictor.rgbd_fusion[-1](test_x_rgb, test_d_crops)
+
         # Compute scores
         scores_raw = self.apply_filter(test_x_rgb)
 
@@ -676,10 +678,10 @@ class DepthSegmST(BaseTracker):
                                                                                        dp=dp)
         # init_samples is the TensorList([ResNet50_layer3])
         print('init_samples', len(init_samples, init_samples[0].shape))
-        if init_dp_patches is not None:
+        if self.params.use_rgbd_classifier and init_dp_patches is not None:
             init_samples_d = torch.TensorList([self.segm_net.segm_predictor.depth_feat_extractor(init_patch_d)[-1] for init_patch_d in init_dp_patches])
             ''' merge rgb and d features '''
-            init_samples= torch.TensorList([self.segm_net.segm_predictor.MMF_layers[-1](f_rgb, f_d) for f_rgb, f_d in zip(init_samples, init_samples_d)])
+            init_samples= torch.TensorList([self.segm_net.segm_predictor.rgbd_fusion[-1](f_rgb, f_d) for f_rgb, f_d in zip(init_samples, init_samples_d)])
 
 
         # Remove augmented samples for those that shall not have
