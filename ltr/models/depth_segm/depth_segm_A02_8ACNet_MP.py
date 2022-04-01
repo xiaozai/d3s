@@ -257,11 +257,10 @@ def get_b16_config(size=(16,16)):
 '''
 
 def channel_attention(num_channel):
-    pool = nn.AdaptiveAvgPool2d(1)
-    conv = conv1x1_layer(num_channel, num_channel)
-    activation = nn.Sigmoid()
+    return nn.Sequential([nn.AdaptiveAvgPool2d(1),
+                          conv1x1_layer(num_channel, num_channel),
+                          nn.Sigmoid()])
 
-    return nn.Sequential(*[pool, conv, activation])
 
 class ACNet(nn.Module):
     def __init__(self, rgb_dims, d_dims, output_dims):
@@ -278,7 +277,7 @@ class ACNet(nn.Module):
 
         self.attn_rgb = channel_attention(output_dims)
         self.attn_d = channel_attention(output_dims)
-        
+
     def forward(self, f_rgb, f_d):
         f_rgb = self.conv1x1_rgb(f_rgb)
         f_rgb = self.bn_rgb(f_rgb)
