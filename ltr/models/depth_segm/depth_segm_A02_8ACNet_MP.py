@@ -52,7 +52,7 @@ class Attention(nn.Module):
         self.attn_dropout = Dropout(config.transformer["attention_dropout_rate"])
         self.proj_dropout = Dropout(config.transformer["attention_dropout_rate"])
 
-        self.relu = nn.ReLU(inplace=True)
+        # self.relu = nn.ReLU(inplace=True)
         self.softmax = Softmax(dim=-1)
 
     def transpose_for_scores(self, x):
@@ -78,7 +78,7 @@ class Attention(nn.Module):
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
 
         ''' Song, to force the bg pixels to get 0 prob'''
-        attention_scores = self.relu(attention_scores)
+        # attention_scores = self.relu(attention_scores)
 
         if mask is None:
             # Song add mask here for background pixels, force background probs is 0
@@ -107,7 +107,7 @@ class Mlp(nn.Module):
         self.fc1 = Linear(config.hidden_size, config.transformer["mlp_dim"])
         self.fc2 = Linear(config.transformer["mlp_dim"], config.hidden_size)
         # self.act_fn = torch.nn.functional.gelu
-        self.act_fn = torch.nn.ReLU(inplace=True)
+        self.act_fn = nn.ReLU(inplace=True)
         self.dropout = Dropout(config.transformer["dropout_rate"])
 
         self._init_weights()
@@ -276,7 +276,7 @@ class ACNet(nn.Module):
 
         self.relu_rgb = nn.ReLU(inplace=True)
         self.relu_d = nn.ReLU(inplace=True)
-        
+
         self.attn_rgb = channel_attention(output_dims)
         self.attn_d = channel_attention(output_dims)
 
