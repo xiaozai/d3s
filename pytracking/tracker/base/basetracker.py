@@ -43,6 +43,7 @@ class BaseTracker:
         # Track
         tracked_bb = [sequence.init_state]
         tracked_conf = [1]
+        idx = 1
         for frame in sequence.frames[1:]:
             image = self._read_image(frame, max_depth=sequence.max_depth, min_depth=sequence.min_depth)
 
@@ -54,8 +55,9 @@ class BaseTracker:
             tracked_conf.append(conf)
 
             if self.params.visualization:
-                self.visualize(image, state)
-
+                self.visualize(image, state, idx=idx)
+            idx += 1
+            
         return tracked_bb, times, tracked_conf
 
     def track_videofile(self, videofilepath, optional_box=None):
@@ -269,7 +271,7 @@ class BaseTracker:
         plt.tight_layout()
 
 
-    def visualize(self, image, state):
+    def visualize(self, image, state, idx=0):
         if isinstance(image, dict) and self.params.debug >= 4:
             color, depth = image['color'], image['depth']
             im_h, im_w, im_c = color.shape
@@ -283,7 +285,7 @@ class BaseTracker:
                 im_h, im_w, im_c = image.shape
             self.ax.cla()
             self.ax.imshow(image)
-
+        self.ax.set_title('Frame %d'%idx)
 
         if self.params.debug == 5:
             self.ax_m.cla()
@@ -335,37 +337,10 @@ class BaseTracker:
                 self.ax_d_patches.imshow(self.d_patches)
                 self.ax_d_patches.set_title('d patches')
 
-
-                # self.ax_rgb_scoremap.cla()
-                # self.ax_rgb_scoremap.imshow(rgb_score)
-                # self.ax_rgb_scoremap.set_title('scoremap over rgb')
-
             # Song
             if self.polygon is not None:
                 polygon = patches.Polygon(self.polygon, closed=True, facecolor='none', edgecolor='r')
-                # prbox = patches.Polygon(self.prbox, closed=True, facecolor='none', edgecolor='b')
                 self.ax_m.add_patch(polygon)
-                # x1, y1, w, h = self.aabb
-                # aabb = patches.Rectangle((x1, y1), w, h, linewidth=2, edgecolor='g', facecolor='none')
-                # self.ax_m.add_patch(aabb)
-
-
-
-            # if self.score_map is not None:
-            #     self.ax_score.cla()
-            #     self.ax_score.imshow(self.score_map)
-            #     max_score = np.max(self.score_map)
-            #     self.ax_score.set_title('score map %f'%max_score)
-
-            # if self.vis_search_center is not None:
-            #     center = self.vis_search_center# .clone().cpu().detach().numpy()
-            #     search_sz = self.vis_serach_size * self.vis_search_scales[0]
-            #     search_tp, search_bm = center - search_sz/2, center + search_sz/2
-            #     search_tp = [max(0, search_tp[0]), max(0, search_tp[1])]
-            #     search_bm = [min(im_h, search_bm[0]), min(im_w, search_bm[1])]
-            #     search_hw = [search_bm[0] - search_tp[0], search_bm[1] - search_tp[1]]
-            #     search = patches.Rectangle((search_tp[1], search_tp[0]), search_hw[1], search_hw[0], linewidth=2, edgecolor='b', facecolor='none')
-            #     self.ax.add_patch(search)
 
         if len(state) == 4:
             state[0] = max(state[0], 0)

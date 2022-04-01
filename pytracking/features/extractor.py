@@ -115,6 +115,7 @@ class MultiResolutionExtractor(ExtractorBase):
         if dp is not None:
             dp_patches = torch.cat([sample_patch(dp, pos, s*image_sz, image_sz) for s in scales])
         # Compute features
+        ''' Song, do we adddepth featuremap here ??? '''
         feature_map = TensorList([f.get_feature(im_patches) for f in self.features]).unroll()
 
         if dp is not None:
@@ -122,7 +123,7 @@ class MultiResolutionExtractor(ExtractorBase):
         else:
             return feature_map
 
-    def extract_transformed(self, im, pos, scale, image_sz, transforms):
+    def extract_transformed(self, im, pos, scale, image_sz, transforms, dp=None):
         """Extract features from a set of transformed image samples.
         args:
             im: Image.
@@ -138,15 +139,13 @@ class MultiResolutionExtractor(ExtractorBase):
         # Apply transforms
         im_patches = torch.cat([T(im_patch) for T in transforms])
 
-        # import cv2
-        # import numpy as np
-        # cv2.namedWindow('Patch', cv2.WINDOW_AUTOSIZE)
-        # for p in im_patches:
-        #     p_ = p.permute(1, 2, 0).cpu().numpy()
-        #     cv2.imshow('Patch', p_.astype(np.uint8))
-        #     cv2.waitKey(0)
+        if dp is not None:
+            dp_patch = sample_patch(dp, pos, scale*image_sz, image_sz)
+            dp_patches = torch.cat([T(dp_patch) for T in transforms])
+        else:
+            dp_patches = None
 
         # Compute features
         feature_map = TensorList([f.get_feature(im_patches) for f in self.features]).unroll()
 
-        return feature_map
+        return feature_map, dp_patches
