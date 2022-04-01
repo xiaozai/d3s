@@ -374,7 +374,9 @@ class DepthSegmActor_MultiPred(BaseActor):
 
         if self.loss_weights is None:
             self.loss_weights = [1, 0.1, 0.1, 0.1]
-        loss = loss0 * self.loss_weights[0] + loss1 * self.loss_weights[1] + loss2 * self.loss_weights[2] + loss3 * self.loss_weights[3]
+        # loss = loss0 * self.loss_weights[0] + loss1 * self.loss_weights[1] + loss2 * self.loss_weights[2] + loss3 * self.loss_weights[3]
+
+        loss = loss0 * 1.0 + loss1 * 1.0 + loss2 * 1.0 + loss3 * 1.0
 
 
         stats = {'Loss/total': loss.item(),
