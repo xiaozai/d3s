@@ -81,6 +81,10 @@ class ACNet(nn.Module):
 
         return f_rgbd
 
+''' Song, :)
+we should try the DepthNet in TIP2022
+Learning Discriminative Cross-Modality Features for RGB-D Saliency Detection
+'''
 class DepthNet(nn.Module):
     def __init__(self, input_dim=1, inter_dim=(4, 16, 32, 64)):
         super().__init__()
@@ -183,7 +187,7 @@ class SegmNet(nn.Module):
 
     def forward(self, feat_test, feat_test_d, feat_train, feat_train_d, mask_train, test_dist=None):
         ''' Song's comments:
-            just add rgbd-fusion, 
+            just add rgbd-fusion,
         '''
         f_test = self.segment1(self.segment0(feat_test[3]))    # 1x1x64 conv + 3x3x64 conv -> [1, 1024, 24,24] -> [1, 64, 24, 24]
         f_train = self.segment1(self.segment0(feat_train[3]))  # 1x1x64 conv + 3x3x64 conv -> [1, 1024, 24,24] -> [1, 64, 24, 24]
