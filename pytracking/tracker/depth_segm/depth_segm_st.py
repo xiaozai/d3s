@@ -159,7 +159,7 @@ class DepthSegmST(BaseTracker):
         else:
             x_rgb = self.generate_init_samples(im) # crops and augments and Generated ResNet50 feature maps for DCF
 
-        print(x_rgb.shape, x_rgb[0].shape)
+        print(len(x_rgb), x_rgb[0].shape)
 
         # Initialize projection matrix
         self.init_projection_matrix(x_rgb)
@@ -677,7 +677,7 @@ class DepthSegmST(BaseTracker):
                                                                                        aug_expansion_sz, self.transforms,
                                                                                        dp=dp)
         # init_samples is the TensorList([ResNet50_layer3])
-        print('init_samples', len(init_samples, init_samples[0].shape))
+        print('init_samples', len(init_samples), init_samples[0].shape)
         if self.params.use_rgbd_classifier and init_dp_patches is not None:
             init_samples_d = torch.TensorList([self.segm_net.segm_predictor.depth_feat_extractor(init_patch_d)[-1] for init_patch_d in init_dp_patches])
             ''' merge rgb and d features '''
