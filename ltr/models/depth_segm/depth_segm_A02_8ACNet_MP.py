@@ -257,9 +257,9 @@ def get_b16_config(size=(16,16)):
 '''
 
 def channel_attention(num_channel):
-    return nn.Sequential([nn.AdaptiveAvgPool2d(1),
-                          conv1x1_layer(num_channel, num_channel),
-                          nn.Sigmoid()])
+    return nn.Sequential(nn.AdaptiveAvgPool2d(1),
+                         conv1x1_layer(num_channel, num_channel),
+                         nn.Sigmoid())
 
 
 class ACNet(nn.Module):
