@@ -70,7 +70,7 @@ class ACNet(nn.Module):
                 nn.init.kaiming_normal_(m.weight.data, mode='fan_in')
                 if m.bias is not None:
                     m.bias.data.zero_()
-                    
+
     def forward(self, f_rgb, f_d):
         f_rgb = self.conv1x1_rgb(f_rgb)
         f_rgb = self.bn_rgb(f_rgb)
