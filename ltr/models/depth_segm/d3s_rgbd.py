@@ -158,10 +158,16 @@ class SegmNet(nn.Module):
         self.post1 = conv(segm_inter_dim[1], segm_inter_dim[0])
         self.post0 = conv_no_relu(segm_inter_dim[0], 2)
 
+        self.pyramid_pred3 = conv_no_relu(segm_inter_dim[3], 2)
+        self.pyramid_pred2 = conv_no_relu(segm_inter_dim[2], 2)
+        self.pyramid_pred1 = conv_no_relu(segm_inter_dim[1], 2)
+
         self.rgbd_fusion3 = ACNet(segm_inter_dim[3], segm_inter_dim[3], segm_inter_dim[3])
         self.rgbd_fusion2 = ACNet(segm_inter_dim[2], segm_inter_dim[2], segm_inter_dim[2])
         self.rgbd_fusion1 = ACNet(segm_inter_dim[1], segm_inter_dim[1], segm_inter_dim[1])
         self.rgbd_fusion0 = ACNet(segm_inter_dim[0], segm_inter_dim[0], segm_inter_dim[0])
+
+
 
         # Init weights
         for m in self.modules():
@@ -204,16 +210,18 @@ class SegmNet(nn.Module):
             segm_layers = torch.cat((torch.unsqueeze(pred_sm[:, :, :, 0], dim=1), torch.unsqueeze(pred_pos, dim=1)), dim=1)
 
         out = self.mixer(segm_layers)
-        out3 = self.s3(F.upsample(out, scale_factor=2))
-
-        out2 = self.post2(F.upsample(self.rgbd_fusion2(self.f2(feat_test[2]), feat_test_d[2]) + self.s2(out3), scale_factor=2))
-        out1 = self.post1(F.upsample(self.rgbd_fusion1(self.f1(feat_test[1]), feat_test_d[1]) + self.s1(out2), scale_factor=2))
-        out0 = self.post0(F.upsample(self.rgbd_fusion0(self.f0(feat_test[0]), feat_test_d[0]) + self.s0(out1), scale_factor=2))
+        out = self.s3(F.upsample(out, scale_factor=2))
+        out3 = self.pyramid_pred3(out)
+        out = self.post2(F.upsample(self.rgbd_fusion2(self.f2(feat_test[2]), feat_test_d[2]) + self.s2(out), scale_factor=2))
+        out2 = self.pyramid_pred2(out)
+        out = self.post1(F.upsample(self.rgbd_fusion1(self.f1(feat_test[1]), feat_test_d[1]) + self.s1(out), scale_factor=2))
+        out1 = self.pyramid_pred1(out)
+        out = self.post0(F.upsample(self.rgbd_fusion0(self.f0(feat_test[0]), feat_test_d[0]) + self.s0(out), scale_factor=2))
 
         if not debug:
-            return (out0, out1, out2, out3)
+            return (out, out1, out2, out3)
         else:
-            return (out0, out1, out2, out3), None
+            return (out, out1, out2, out3), None
 
 
     def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg):
