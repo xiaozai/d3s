@@ -46,7 +46,6 @@ def channel_attention(num_channel):
                          conv1x1_layer(num_channel, num_channel),
                          nn.Sigmoid())
 
-
 class ACNet(nn.Module):
     def __init__(self, rgb_dims, d_dims, output_dims):
         super().__init__()
@@ -125,64 +124,7 @@ class DepthNet(nn.Module):
         out1 = self.d1(d) # 96 * 96
         out2 = self.d2(d) # 48 * 48
         out3 = self.d3(d) # 24 * 24
-
         return [out0, out1, out2, out3]
-
-# class DepthNet(nn.Module):
-#     def __init__(self, input_dim=1, inter_dim=(4, 16, 32, 64)):
-#         super().__init__()
-#
-#         self.conv0 = conv(input_dim, inter_dim[0])    # 1  -> 4
-#         self.conv0_1 = conv(inter_dim[0]*2, inter_dim[0], kernel_size=1, stride=1, padding=0)
-#
-#         self.conv1 = conv(inter_dim[0], inter_dim[1]) # 4 -> 16
-#         self.conv1_1 = conv(inter_dim[1]*2, inter_dim[1], kernel_size=1, stride=1, padding=0)
-#
-#         self.conv2 = conv(inter_dim[1], inter_dim[2]) # 16 -> 32
-#         self.conv2_1 = conv(inter_dim[2]*2, inter_dim[2], kernel_size=1, stride=1, padding=0)
-#
-#         self.conv3 = conv(inter_dim[2], inter_dim[3]) # 32 -> 64
-#         self.conv3_1 = conv(inter_dim[3]*2, inter_dim[3], kernel_size=1, stride=1, padding=0)
-#
-#
-#         # AvgPool2d , more smooth, MaxPool2d, more sharp
-#         self.maxpool0 = nn.MaxPool2d(2, stride=2)
-#         self.maxpool1 = nn.MaxPool2d(2, stride=2)
-#         self.maxpool2 = nn.MaxPool2d(2, stride=2)
-#         self.maxpool3 = nn.MaxPool2d(2, stride=2)
-#
-#         self.avgpool0 = nn.AvgPool2d(2, stride=2)
-#         self.avgpool1 = nn.AvgPool2d(2, stride=2)
-#         self.avgpool2 = nn.AvgPool2d(2, stride=2)
-#         self.avgpool3 = nn.AvgPool2d(2, stride=2)
-#
-#         self.initialize()
-#
-#     def initialize(self):
-#         for m in self.modules():
-#             if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
-#                 nn.init.kaiming_normal_(m.weight.data, mode='fan_in')
-#                 if m.bias is not None:
-#                     m.bias.data.zero_()
-#
-#     def forward(self, dp):
-#         feat0 = self.conv0(dp)
-#         feat0 = torch.cat((self.maxpool0(feat0), self.avgpool0(feat0)), dim=1)
-#         feat0 = self.conv0_1(feat0)
-#
-#         feat1 = self.conv1(feat0)
-#         feat1 = torch.cat((self.maxpool1(feat1), self.avgpool1(feat1)), dim=1)
-#         feat1 = self.conv1_1(feat1)
-#
-#         feat2 = self.conv2(feat1)
-#         feat2 = torch.cat((self.maxpool2(feat2), self.avgpool2(feat2)), dim=1)
-#         feat2 = self.conv2_1(feat2)
-#
-#         feat3 = self.conv3(feat2)
-#         feat3 = torch.cat((self.maxpool3(feat3), self.avgpool3(feat3)), dim=1)
-#         feat3 = self.conv3_1(feat3)
-#
-#         return [feat0, feat1, feat2, feat3] # [4, 16, 32, 64]
 
 class SegmNet(nn.Module):
     """ Network module for IoU prediction. Refer to the paper for an illustration of the architecture."""
