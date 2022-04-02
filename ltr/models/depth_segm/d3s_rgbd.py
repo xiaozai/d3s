@@ -124,18 +124,14 @@ class DepthNet(nn.Module):
     def forward(self, dp):
         d = self.stem(dp) # 384 * 384
         out0 = self.d0(d) # 192 * 192
-        print(out0.shape)
         out1 = self.d1(d) # 96 * 96
-        print(out1.shape)
         out2 = self.d2(d) # 48 * 48
-        print(out2.shape)
         out3 = self.d3(d) # 24 * 24
-        print(out3.shape)
         return [out0, out1, out2, out3]
 
 class SegmNet(nn.Module):
     """ Network module for IoU prediction. Refer to the paper for an illustration of the architecture."""
-    def __init__(self, mixer_channels=2, topk_pos=3, topk_neg=3):
+    def __init__(self, mixer_channels=3, topk_pos=3, topk_neg=3):
         super().__init__()
 
         segm_input_dim = (64, 256, 512, 1024)
