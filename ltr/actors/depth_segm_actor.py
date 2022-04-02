@@ -267,7 +267,7 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
     draw_axis(ax4, test_depth, 'Test depth')
     draw_axis(ax5, train_mask, 'train mask')
     draw_axis(ax6, test_mask, 'Ground-truth')
-    draw_axis(ax7, predicted_mask0, 'Prediction', show_minmax=True)
+    draw_axis(ax7, predicted_mask0, 'Prediction') # , show_minmax=True)
     draw_axis(ax8, test_dist, 'test_dist')
 
     draw_axis(ax13, predicted_mask0, 'Layer0') #, show_minmax=True)
@@ -374,9 +374,9 @@ class DepthSegmActor_MultiPred(BaseActor):
 
         if self.loss_weights is None:
             self.loss_weights = [1, 0.1, 0.1, 0.1]
-        # loss = loss0 * self.loss_weights[0] + loss1 * self.loss_weights[1] + loss2 * self.loss_weights[2] + loss3 * self.loss_weights[3]
+        loss = loss0 * self.loss_weights[0] + loss1 * self.loss_weights[1] + loss2 * self.loss_weights[2] + loss3 * self.loss_weights[3]
 
-        loss = loss0 * 1.0 + loss1 * 1.0 + loss2 * 1.0 + loss3 * 1.0
+        # loss = loss0 * 1.0 + loss1 * 1.0 + loss2 * 1.0 + loss3 * 1.0
 
 
         stats = {'Loss/total': loss.item(),

@@ -39,3 +39,5 @@ from .depth_segm_A02_8MMF_MultiPrediction import DepthSegmNetAttention as DepthS
 
 from .depth_segm_A02_8ACNet_MP import DepthSegmNetAttention as DepthSegmNetAttention02_8ACNet_MP
 from .depth_segm_A02_8ACNet_MP_woBG import DepthSegmNetAttention as DepthSegmNetAttention02_8ACNet_MP_woBG
+
+from .d3s_rgbd import SegmNet as D3S_RGBD

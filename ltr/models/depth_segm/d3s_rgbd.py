@@ -65,6 +65,12 @@ class ACNet(nn.Module):
         self.attn_rgb = channel_attention(output_dims)
         self.attn_d = channel_attention(output_dims)
 
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight.data, mode='fan_in')
+                if m.bias is not None:
+                    m.bias.data.zero_()
+                    
     def forward(self, f_rgb, f_d):
         f_rgb = self.conv1x1_rgb(f_rgb)
         f_rgb = self.bn_rgb(f_rgb)
@@ -81,41 +87,32 @@ class ACNet(nn.Module):
 
         return f_rgbd
 
-''' Song, :)
-we should try the DepthNet in TIP2022
+''' Song, :) TIP2022
 Learning Discriminative Cross-Modality Features for RGB-D Saliency Detection
 '''
+
 class DepthNet(nn.Module):
-    def __init__(self, input_dim=1, inter_dim=(4, 16, 32, 64)):
+    def __init__(self, input_dim=1, inter_dim(4, 16, 32, 64):
         super().__init__()
+        self.stem = nn.Sequential(conv1x1_layer(input_dim, inter_dim[0]),
+                                  conv1x1_layer(inter_dim[0], inter_dim[0]),
+                                  conv1x1_layer(inter_dim[0], inter_dim[0]),
+                                  conv1x1_layer(inter_dim[0], inter_dim[0]),
+                                  conv3x3_layer(inter_dim[0], inter_dim[0]))
 
-        self.conv0 = conv(input_dim, inter_dim[0])    # 1  -> 4
-        self.conv0_1 = conv(inter_dim[0]*2, inter_dim[0], kernel_size=1, stride=1, padding=0)
+        self.d0 = nn.Sequential(conv1x1_layer(inter_dim[0], inter_dim[0]),
+                                nn.Conv2d(inter_dim[0], inter_dim[0], kernel_size=5, stride=2, padding=1, dilation=2, bias=True))
 
-        self.conv1 = conv(inter_dim[0], inter_dim[1]) # 4 -> 16
-        self.conv1_1 = conv(inter_dim[1]*2, inter_dim[1], kernel_size=1, stride=1, padding=0)
+        self.d1 = nn.Sequential(conv1x1_layer(inter_dim[0], inter_dim[1]),
+                                nn.Conv2d(inter_dim[1], inter_dim[1], kernel_size=9, stride=4, padding=1, dilation=2, bias=True))
 
-        self.conv2 = conv(inter_dim[1], inter_dim[2]) # 16 -> 32
-        self.conv2_1 = conv(inter_dim[2]*2, inter_dim[2], kernel_size=1, stride=1, padding=0)
+        self.d2 = nn.Sequential(conv1x1_layer(inter_dim[0], inter_dim[2]),
+                                nn.Conv2d(inter_dim[2], inter_dim[2], kernel_size=9, stride=8, padding=1, dilation=2, bias=True))
 
-        self.conv3 = conv(inter_dim[2], inter_dim[3]) # 32 -> 64
-        self.conv3_1 = conv(inter_dim[3]*2, inter_dim[3], kernel_size=1, stride=1, padding=0)
+        self.d3 = nn.Sequential(conv1x1_layer(inter_dim[0], inter_dim[3]),
+                                nn.Conv2d(inter_dim[3], inter_dim[3], kernel_size=5, stride=2, padding=1, dilation=2, bias=True)
+                                nn.Conv2d(inter_dim[3], inter_dim[3], kernel_size=9, stride=8, padding=1, dilation=2, bias=True))
 
-
-        # AvgPool2d , more smooth, MaxPool2d, more sharp
-        self.maxpool0 = nn.MaxPool2d(2, stride=2)
-        self.maxpool1 = nn.MaxPool2d(2, stride=2)
-        self.maxpool2 = nn.MaxPool2d(2, stride=2)
-        self.maxpool3 = nn.MaxPool2d(2, stride=2)
-
-        self.avgpool0 = nn.AvgPool2d(2, stride=2)
-        self.avgpool1 = nn.AvgPool2d(2, stride=2)
-        self.avgpool2 = nn.AvgPool2d(2, stride=2)
-        self.avgpool3 = nn.AvgPool2d(2, stride=2)
-
-        self.initialize()
-
-    def initialize(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
                 nn.init.kaiming_normal_(m.weight.data, mode='fan_in')
@@ -123,32 +120,80 @@ class DepthNet(nn.Module):
                     m.bias.data.zero_()
 
     def forward(self, dp):
-        feat0 = self.conv0(dp)
-        feat0 = torch.cat((self.maxpool0(feat0), self.avgpool0(feat0)), dim=1)
-        feat0 = self.conv0_1(feat0)
+        d = self.stem(dp) # 384 * 384
+        out0 = self.d0(d) # 192 * 192
+        out1 = self.d1(d) # 96 * 96
+        out2 = self.d2(d) # 48 * 48
+        out3 = self.d3(d) # 24 * 24
 
-        feat1 = self.conv1(feat0)
-        feat1 = torch.cat((self.maxpool1(feat1), self.avgpool1(feat1)), dim=1)
-        feat1 = self.conv1_1(feat1)
+        return [out0, out1, out2, out3]
 
-        feat2 = self.conv2(feat1)
-        feat2 = torch.cat((self.maxpool2(feat2), self.avgpool2(feat2)), dim=1)
-        feat2 = self.conv2_1(feat2)
-
-        feat3 = self.conv3(feat2)
-        feat3 = torch.cat((self.maxpool3(feat3), self.avgpool3(feat3)), dim=1)
-        feat3 = self.conv3_1(feat3)
-
-        return [feat0, feat1, feat2, feat3] # [4, 16, 32, 64]
+# class DepthNet(nn.Module):
+#     def __init__(self, input_dim=1, inter_dim=(4, 16, 32, 64)):
+#         super().__init__()
+#
+#         self.conv0 = conv(input_dim, inter_dim[0])    # 1  -> 4
+#         self.conv0_1 = conv(inter_dim[0]*2, inter_dim[0], kernel_size=1, stride=1, padding=0)
+#
+#         self.conv1 = conv(inter_dim[0], inter_dim[1]) # 4 -> 16
+#         self.conv1_1 = conv(inter_dim[1]*2, inter_dim[1], kernel_size=1, stride=1, padding=0)
+#
+#         self.conv2 = conv(inter_dim[1], inter_dim[2]) # 16 -> 32
+#         self.conv2_1 = conv(inter_dim[2]*2, inter_dim[2], kernel_size=1, stride=1, padding=0)
+#
+#         self.conv3 = conv(inter_dim[2], inter_dim[3]) # 32 -> 64
+#         self.conv3_1 = conv(inter_dim[3]*2, inter_dim[3], kernel_size=1, stride=1, padding=0)
+#
+#
+#         # AvgPool2d , more smooth, MaxPool2d, more sharp
+#         self.maxpool0 = nn.MaxPool2d(2, stride=2)
+#         self.maxpool1 = nn.MaxPool2d(2, stride=2)
+#         self.maxpool2 = nn.MaxPool2d(2, stride=2)
+#         self.maxpool3 = nn.MaxPool2d(2, stride=2)
+#
+#         self.avgpool0 = nn.AvgPool2d(2, stride=2)
+#         self.avgpool1 = nn.AvgPool2d(2, stride=2)
+#         self.avgpool2 = nn.AvgPool2d(2, stride=2)
+#         self.avgpool3 = nn.AvgPool2d(2, stride=2)
+#
+#         self.initialize()
+#
+#     def initialize(self):
+#         for m in self.modules():
+#             if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
+#                 nn.init.kaiming_normal_(m.weight.data, mode='fan_in')
+#                 if m.bias is not None:
+#                     m.bias.data.zero_()
+#
+#     def forward(self, dp):
+#         feat0 = self.conv0(dp)
+#         feat0 = torch.cat((self.maxpool0(feat0), self.avgpool0(feat0)), dim=1)
+#         feat0 = self.conv0_1(feat0)
+#
+#         feat1 = self.conv1(feat0)
+#         feat1 = torch.cat((self.maxpool1(feat1), self.avgpool1(feat1)), dim=1)
+#         feat1 = self.conv1_1(feat1)
+#
+#         feat2 = self.conv2(feat1)
+#         feat2 = torch.cat((self.maxpool2(feat2), self.avgpool2(feat2)), dim=1)
+#         feat2 = self.conv2_1(feat2)
+#
+#         feat3 = self.conv3(feat2)
+#         feat3 = torch.cat((self.maxpool3(feat3), self.avgpool3(feat3)), dim=1)
+#         feat3 = self.conv3_1(feat3)
+#
+#         return [feat0, feat1, feat2, feat3] # [4, 16, 32, 64]
 
 class SegmNet(nn.Module):
     """ Network module for IoU prediction. Refer to the paper for an illustration of the architecture."""
-    def __init__(self, segm_input_dim=(128,256), segm_inter_dim=(256,256), segm_dim=(64, 64), mixer_channels=2, topk_pos=3, topk_neg=3):
+    def __init__(self, mixer_channels=2, topk_pos=3, topk_neg=3):
         super().__init__()
 
         segm_input_dim = (64, 256, 512, 1024)
         segm_inter_dim = (4, 16, 32, 64)
         segm_dim = (64, 64)
+
+        self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
         self.segment0 = conv(segm_input_dim[3], segm_dim[0], kernel_size=1, padding=0)
         self.segment1 = conv_no_relu(segm_dim[0], segm_dim[1])
@@ -173,8 +218,6 @@ class SegmNet(nn.Module):
         self.rgbd_fusion1 = ACNet(segm_inter_dim[1], segm_inter_dim[1], segm_inter_dim[1])
         self.rgbd_fusion0 = ACNet(segm_inter_dim[0], segm_inter_dim[0], segm_inter_dim[0])
 
-        self.depth_feat_extractor = DepthNet(input_dim=1)
-
         # Init weights
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
@@ -185,7 +228,7 @@ class SegmNet(nn.Module):
         self.topk_pos = topk_pos
         self.topk_neg = topk_neg
 
-    def forward(self, feat_test, feat_test_d, feat_train, feat_train_d, mask_train, test_dist=None):
+    def forward(self, feat_test, feat_test_d, feat_train, feat_train_d, mask_train, test_dist=None, debug=False):
         ''' Song's comments:
             just add rgbd-fusion,
         '''
@@ -216,13 +259,16 @@ class SegmNet(nn.Module):
             segm_layers = torch.cat((torch.unsqueeze(pred_sm[:, :, :, 0], dim=1), torch.unsqueeze(pred_pos, dim=1)), dim=1)
 
         out = self.mixer(segm_layers)
-        out = self.s3(F.upsample(out, scale_factor=2))
+        out3 = self.s3(F.upsample(out, scale_factor=2))
 
-        out = self.post2(F.upsample(self.rgbd_fusion2(self.f2(feat_test[2]), feat_test_d[2]) + self.s2(out), scale_factor=2))
-        out = self.post1(F.upsample(self.rgbd_fusion1(self.f1(feat_test[1]), feat_test_d[1]) + self.s1(out), scale_factor=2))
-        out = self.post0(F.upsample(self.rgbd_fusion0(self.f0(feat_test[0]), feat_test_d[0]) + self.s0(out), scale_factor=2))
+        out2 = self.post2(F.upsample(self.rgbd_fusion2(self.f2(feat_test[2]), feat_test_d[2]) + self.s2(out3), scale_factor=2))
+        out1 = self.post1(F.upsample(self.rgbd_fusion1(self.f1(feat_test[1]), feat_test_d[1]) + self.s1(out2), scale_factor=2))
+        out0 = self.post0(F.upsample(self.rgbd_fusion0(self.f0(feat_test[0]), feat_test_d[0]) + self.s0(out1), scale_factor=2))
 
-        return out
+        if not debug:
+            return (out0, out1, out2, out3)
+        else:
+            return (out0, out1, out2, out3), None
 
 
     def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg):
