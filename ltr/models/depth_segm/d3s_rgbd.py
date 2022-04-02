@@ -91,7 +91,7 @@ Learning Discriminative Cross-Modality Features for RGB-D Saliency Detection
 '''
 
 class DepthNet(nn.Module):
-    def __init__(self, input_dim=1, inter_dim(4, 16, 32, 64):
+    def __init__(self, input_dim=1, inter_dim(4, 16, 32, 64)):
         super().__init__()
         self.stem = nn.Sequential(conv1x1_layer(input_dim, inter_dim[0]),
                                   conv1x1_layer(inter_dim[0], inter_dim[0]),
