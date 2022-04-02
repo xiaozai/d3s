@@ -100,17 +100,20 @@ class DepthNet(nn.Module):
                                   conv3x3_layer(inter_dim[0], inter_dim[0]))
 
         self.d0 = nn.Sequential(conv1x1_layer(inter_dim[0], inter_dim[0]),
-                                nn.Conv2d(inter_dim[0], inter_dim[0], kernel_size=5, stride=2, padding=1, dilation=2, bias=True))
+                                nn.Conv2d(inter_dim[0], inter_dim[0], kernel_size=3, stride=2, padding=1, dilation=1, bias=True))
+                                # nn.Conv2d(inter_dim[0], inter_dim[0], kernel_size=5, stride=2, padding=1, dilation=2, bias=True)
 
         self.d1 = nn.Sequential(conv1x1_layer(inter_dim[0], inter_dim[1]),
-                                nn.Conv2d(inter_dim[1], inter_dim[1], kernel_size=9, stride=4, padding=1, dilation=2, bias=True))
+                                nn.Conv2d(inter_dim[1], inter_dim[1], kernel_size=9, stride=4, padding=3, dilation=1, bias=True))
+                                # nn.Conv2d(inter_dim[1], inter_dim[1], kernel_size=9, stride=4, padding=1, dilation=2, bias=True))
 
         self.d2 = nn.Sequential(conv1x1_layer(inter_dim[0], inter_dim[2]),
-                                nn.Conv2d(inter_dim[2], inter_dim[2], kernel_size=9, stride=8, padding=1, dilation=2, bias=True))
+                                nn.Conv2d(inter_dim[2], inter_dim[2], kernel_size=9, stride=8, padding=5, dilation=2, bias=True))
+                                # nn.Conv2d(inter_dim[2], inter_dim[2], kernel_size=9, stride=8, padding=1, dilation=2, bias=True))
 
         self.d3 = nn.Sequential(conv1x1_layer(inter_dim[0], inter_dim[3]),
-                                nn.Conv2d(inter_dim[3], inter_dim[3], kernel_size=5, stride=2, padding=1, dilation=2, bias=True),
-                                nn.Conv2d(inter_dim[3], inter_dim[3], kernel_size=9, stride=8, padding=1, dilation=2, bias=True))
+                                nn.Conv2d(inter_dim[3], inter_dim[3], kernel_size=3, stride=2, padding=1, dilation=1, bias=True),
+                                nn.Conv2d(inter_dim[3], inter_dim[3], kernel_size=9, stride=8, padding=5, dilation=2, bias=True))
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
