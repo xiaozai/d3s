@@ -80,9 +80,7 @@ class ACNet(nn.Module):
         f_d = self.relu_d(f_d)
 
         weight_rgb = self.attn_rgb(f_rgb)
-        print(weight_rgb.shape)
         weight_d = self.attn_d(f_d)
-        print(weight_d.shape)
         f_rgbd = f_rgb.mul(weight_rgb) + f_d.mul(weight_d)
 
         return f_rgbd, weight_rgb, weight_d

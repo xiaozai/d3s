@@ -171,16 +171,17 @@ def save_debug(data, pred_mask, vis_data, batch_element = 0):
     plt.close(f)
 
 def process_feature_weights(weight_rgb, weight_d, batch_element=0):
+    # 64, 32, 16, 4, 2
     weight_rgb = weight_rgb.numpy().squeeze()
     weight_rgb = weight_rgb[batch_element, ...]
     weight_rgb = weight_rgb.squeeze()
     weight_d = weight_d.numpy().squeeze()
     weight_d = weight_d[batch_element, ...]
     weight_d = weight_d.squeeze()
-    channels = weight_rgb.shape[0]
-    row = int(math.sqrt(channels))
-    weight_rgb = weight_rgb.reshape(row, -1)
-    weight_d = weight_d.reshape(row, -1)
+    # channels = weight_rgb.shape[0]
+    # row = int(math.sqrt(channels))
+    weight_rgb = weight_rgb.reshape(4, -1)
+    weight_d = weight_d.reshape(4, -1)
 
     weight = np.concatenate((weight_rgb, weight_d), axis=1)
     return weight
