@@ -170,6 +170,20 @@ def save_debug(data, pred_mask, vis_data, batch_element = 0):
     plt.savefig(save_path)
     plt.close(f)
 
+def process_feature_weights(weight_rgb, weight_d, batch_element=0):
+    weight_rgb = weight_rgb.numpy().squeeze()
+    weight_rgb = weight_rgb[batch_element, ...]
+    weight_rgb = weight_rgb.squeeze()
+    weight_d = weight_d.numpy().squeeze()
+    weight_d = weight_d[batch_element, ...]
+    weight_d = weight_d.squeeze()
+    channels = weight_rgb.shape[0]
+    row = int(math.sqrt(channels))
+    weight_rgb = weight_rgb.reshape(row, -1)
+    weight_d = weight_d.reshape(row, -1)
+
+    weight = np.concatenate((weight_rgb, weight_d), axis=1)
+    return weight
 
 def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
 
@@ -213,6 +227,12 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
         elif len(vis_data) == 8:
             weight_rgb3, weight_rgb2, weight_rgb1, weight_rgb0, weight_d3, weight_d2, weight_d1, weight_d0 = vis_data
             # feature channel attention weights , B, C, 1, 1
+            weight3 = process_feature_weights(weight_rgb3, weight_d3, batch_element=batch_element)
+            weight2 = process_feature_weights(weight_rgb2, weight_d2, batch_element=batch_element)
+            weight1 = process_feature_weights(weight_rgb1, weight_d1, batch_element=batch_element)
+            weight0 = process_feature_weights(weight_rgb0, weight_d0, batch_element=batch_element)
+
+
     dir_path = data['settings'].env.images_dir
 
     train_img = data['train_images'][:, batch_element, :, :].permute(1, 2, 0)
@@ -291,6 +311,10 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
 
         elif len(vis_data) == 8:
             print('feature weights for RGB and D')
+            draw_axis(ax9, weights3, 'channel_weights3', show_minmax=True)
+            draw_axis(ax10, weights2, 'channel_weights2', show_minmax=True)
+            draw_axis(ax11, weights1, 'channel_weights1', show_minmax=True)
+            draw_axis(ax12, weights0, 'channel_weights0', show_minmax=True)
 
     save_path = os.path.join(data['settings'].env.images_dir, '%03d-%04d.png' % (data['epoch'], data['iter']))
     plt.savefig(save_path)
