@@ -80,11 +80,12 @@ class ACNet(nn.Module):
         f_d = self.relu_d(f_d)
 
         weight_rgb = self.attn_rgb(f_rgb)
+        print(weight_rgb.shape)
         weight_d = self.attn_d(f_d)
-
+        print(weight_d.shape)
         f_rgbd = f_rgb.mul(weight_rgb) + f_d.mul(weight_d)
 
-        return f_rgbd
+        return f_rgbd, weight_rgb, weight_d
 
 # ''' Song, :) TIP2022
 # Learning Discriminative Cross-Modality Features for RGB-D Saliency Detection
@@ -177,6 +178,11 @@ class SegmNet(nn.Module):
         self.post1 = conv(segm_inter_dim[1], segm_inter_dim[0])
         self.post0 = conv_no_relu(segm_inter_dim[0], 2)
 
+
+        self.m2 = conv(segm_inter_dim[2], segm_inter_dim[2])
+        self.m1 = conv(segm_inter_dim[1], segm_inter_dim[1])
+        self.m0 = conv(segm_inter_dim[0], segm_inter_dim[0])
+
         self.rgbd_fusion3 = ACNet(segm_inter_dim[3], segm_inter_dim[3], segm_inter_dim[3])
         self.rgbd_fusion2 = ACNet(segm_inter_dim[2], segm_inter_dim[2], segm_inter_dim[2])
         self.rgbd_fusion1 = ACNet(segm_inter_dim[1], segm_inter_dim[1], segm_inter_dim[1])
@@ -203,8 +209,8 @@ class SegmNet(nn.Module):
         f_test = self.segment1(self.segment0(feat_test[3]))    # 1x1x64 conv + 3x3x64 conv -> [1, 1024, 24,24] -> [1, 64, 24, 24]
         f_train = self.segment1(self.segment0(feat_train[3]))  # 1x1x64 conv + 3x3x64 conv -> [1, 1024, 24,24] -> [1, 64, 24, 24]
         # Fusion RGBD Features
-        f_test = self.rgbd_fusion3(f_test, feat_test_d[3])
-        f_train = self.rgbd_fusion3(f_train, feat_train_d[3])
+        f_test, fw_rgb3, fw_d3 = self.rgbd_fusion3(f_test, feat_test_d[3])
+        f_train, _, _ = self.rgbd_fusion3(f_train, feat_train_d[3])
 
         # reshape mask to the feature size
         mask_pos = F.interpolate(mask_train[0], size=(f_train.shape[-2], f_train.shape[-1])) # [1,1,384, 384] -> [1,1,24,24]
@@ -229,9 +235,15 @@ class SegmNet(nn.Module):
 
         out = self.mixer(segm_layers)
         out3 = self.s3(F.upsample(out, scale_factor=2))
-        out2 = self.post2(F.upsample(self.rgbd_fusion2(self.f2(feat_test[2]), feat_test_d[2]) + self.s2(out3), scale_factor=2))
-        out1 = self.post1(F.upsample(self.rgbd_fusion1(self.f1(feat_test[1]), feat_test_d[1]) + self.s1(out2), scale_factor=2))
-        out0 = self.post0(F.upsample(self.rgbd_fusion0(self.f0(feat_test[0]), feat_test_d[0]) + self.s0(out1), scale_factor=2))
+
+        f_test_rgbd2, fw_rgb2, fw_d2 = self.rgbd_fusion2(self.f2(feat_test[2]), feat_test_d[2])
+        out2 = self.post2(F.upsample(self.m2(f_test_rgbd2) + self.s2(out3), scale_factor=2))
+
+        f_test_rgbd1, fw_rgb1, fw_d1 = self.rgbd_fusion1(self.f1(feat_test[1]), feat_test_d[1])
+        out1 = self.post1(F.upsample(self.m1(f_test_rgbd1) + self.s1(out2), scale_factor=2))
+
+        f_test_rgbd0, fw_rgb0, fw_d0 = self.rgbd_fusion0(self.f0(feat_test[0]), feat_test_d[0])
+        out0 = self.post0(F.upsample(self.m0(f_test_rgbd0) + self.s0(out1), scale_factor=2))
 
         pred3 = self.pyramid_pred3(F.upsample(out3, scale_factor=8))
         pred2 = self.pyramid_pred2(F.upsample(out2, scale_factor=4))
@@ -240,7 +252,7 @@ class SegmNet(nn.Module):
         if not debug:
             return (out0, pred1, pred2, pred3)
         else:
-            return (out0, pred1, pred2, pred3), None
+            return (out0, pred1, pred2, pred3), (fw_rgb3, fw_rgb2, fw_rgb1, fw_rgb0, fw_d3, fw_d2, fw_d1, fw_d0)
 
 
     def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg):

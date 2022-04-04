@@ -210,7 +210,9 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
             attn_weights1 = process_attn_maps(attn_weights1, batch_element, layer=1)#, train_mask)
             attn_weights0 = process_attn_maps(attn_weights0, batch_element, layer=0)#, train_mask)
 
-
+        elif len(vis_data) == 8:
+            weight_rgb3, weight_rgb2, weight_rgb1, weight_rgb0, weight_d3, weight_d2, weight_d1, weight_d0 = vis_data
+            # feature channel attention weights , B, C, 1, 1
     dir_path = data['settings'].env.images_dir
 
     train_img = data['train_images'][:, batch_element, :, :].permute(1, 2, 0)
@@ -287,6 +289,8 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
             draw_axis(ax11, attn_weights1, 'attn_weights1', show_minmax=True)
             draw_axis(ax12, attn_weights0, 'attn_weights0', show_minmax=True)
 
+        elif len(vis_data) == 8:
+            print('feature weights for RGB and D')
 
     save_path = os.path.join(data['settings'].env.images_dir, '%03d-%04d.png' % (data['epoch'], data['iter']))
     plt.savefig(save_path)
