@@ -42,3 +42,4 @@ from .depth_segm_A02_8ACNet_MP_woBG import DepthSegmNetAttention as DepthSegmNet
 
 from .d3s_rgbd import SegmNet as D3S_RGBD
 from .d3s_rgbd_CBAM import SegmNet as D3S_CBAM_RGBD
+from .d3s_rgbd_CBAM02 import SegmNet as D3S_CBAM_RGBD02
