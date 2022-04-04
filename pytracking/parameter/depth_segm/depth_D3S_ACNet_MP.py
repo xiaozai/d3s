@@ -10,7 +10,6 @@ def parameters():
     params.debug = 1                        # Debug level
     params.visualization = True            # Do visualization
 
-    # params.longterm = False                # Song : dal longterm or shortterm
     # Use GPU or not (IoUNet requires this to be True)
     params.use_gpu = True
     params.use_dal = False
@@ -112,8 +111,8 @@ def parameters():
     
     params.model = 'depth_segm_st'
     params.constructor_module = 'ltr.models.depth_segm.depth_segm'
-    params.constructor_fun_name = 'depth_segm_attention02_8ACNet_MP_resnet50'
-    params.segm_net_path = '/home/yan/Data2/d3s/checkpoints/ltr/depth_segm/depth_segm_attention02_8ACNet_MP/DepthSegmNet_ep0040.pth.tar'
+    params.constructor_fun_name = 'depth_segm_D3S_ACNet_MP_resnet50'
+    params.segm_net_path = '/home/yan/Data2/d3s/checkpoints/ltr/depth_segm/depth_segm_D3S_ACNet_MP/DepthSegmNet_ep0040.pth.tar'
     params.segm_use_dist = True
     params.segm_normalize_mean = [0.485, 0.456, 0.406]
     params.segm_normalize_std = [0.229, 0.224, 0.225]

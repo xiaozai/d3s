@@ -178,7 +178,7 @@ class DepthSegm(BaseTracker):
         self.rgb_patches = None
         self.d_patches = None
         self.polygon = None
-        
+
     def init_optimization(self, train_x, init_y):
         # Initialize filter
         filter_init_method = getattr(self.params, 'filter_init_method', 'zeros')
