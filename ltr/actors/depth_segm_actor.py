@@ -311,11 +311,10 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
             draw_axis(ax12, attn_weights0, 'attn_weights0', show_minmax=True)
 
         elif len(vis_data) == 8:
-            print('feature weights for RGB and D')
-            draw_axis(ax9, weights3, 'channel_weights3', show_minmax=True)
-            draw_axis(ax10, weights2, 'channel_weights2', show_minmax=True)
-            draw_axis(ax11, weights1, 'channel_weights1', show_minmax=True)
-            draw_axis(ax12, weights0, 'channel_weights0', show_minmax=True)
+            draw_axis(ax9, weight3, 'channel_weights3', show_minmax=True)
+            draw_axis(ax10, weight2, 'channel_weights2', show_minmax=True)
+            draw_axis(ax11, weight1, 'channel_weights1', show_minmax=True)
+            draw_axis(ax12, weight0, 'channel_weights0', show_minmax=True)
 
     save_path = os.path.join(data['settings'].env.images_dir, '%03d-%04d.png' % (data['epoch'], data['iter']))
     plt.savefig(save_path)
