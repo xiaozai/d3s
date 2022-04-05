@@ -141,6 +141,10 @@ class CBAM(nn.Module):
         ''' We calculate the weights for rgb and d features
             by using spatial attention for each pixel
             weights for each pixel across all channels (RGB, D)
+
+            1) softmax(w_rgb, w_d)
+            2) cat(f_rgb, f_d) along channels
+            2) cat(channel_attn_rgb, channel_attn_d) -> spatial attention
         '''
         # spatial attention map, Bx1xHxW
         spa_rgb = self.spatial_attn_rgb(f_rgb)
