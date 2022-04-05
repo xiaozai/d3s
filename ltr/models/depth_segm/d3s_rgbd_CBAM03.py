@@ -115,8 +115,8 @@ def logsumexp_2d(tensor):
 class CBAM(nn.Module):
     def __init__(self, rgb_dims, d_dims, output_dims):
         super().__init__()
-        self.conv_rgb = conv(rgb_dims, output_dims, kernel_size=1, stride=1, padding=0, dilation=1, bias=True)
-        self.conv_d = conv(d_dims, output_dims, kernel_size=1, stride=1, padding=0, dilation=1, bias=True)
+        self.conv_rgb = conv(rgb_dims, output_dims, kernel_size=1, stride=1, padding=0, dilation=1)
+        self.conv_d = conv(d_dims, output_dims, kernel_size=1, stride=1, padding=0, dilation=1)
 
         self.channel_attn_rgb = channel_attention(output_dims)
         self.channel_attn_d = channel_attention(output_dims)
