@@ -221,6 +221,9 @@ class Encoder(nn.Module):
         encoded = self.encoder_norm(hidden_states)
         return encoded, attn_weights
 
+''' Inspired by :
+Revisiting Stereo Depth Estimation From a Sequence-to-Sequence Perspective with Transformers
+'''
 
 class Transformer(nn.Module):
     def __init__(self, config, img_size, in_channels, vis):
