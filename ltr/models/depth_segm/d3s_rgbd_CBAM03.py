@@ -131,11 +131,11 @@ class CBAM(nn.Module):
         self.spatial_attn_rgb = spatial_attention()
         self.spatial_attn_d = spatial_attention()
 
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight.data, mode='fan_in')
-                if m.bias is not None:
-                    m.bias.data.zero_()
+        # for m in self.modules():
+        #     if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
+        #         nn.init.kaiming_normal_(m.weight.data, mode='fan_in')
+        #         if m.bias is not None:
+        #             m.bias.data.zero_()
 
     def forward(self, f_rgb, f_d):
         ''' channel attention + spatial attention '''
@@ -245,11 +245,11 @@ class SegmNet(nn.Module):
         self.pyramid_pred1 = conv_no_relu(segm_inter_dim[0], 2)
 
         # Init weights
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight.data, mode='fan_in')
-                if m.bias is not None:
-                    m.bias.data.zero_()
+        # for m in self.modules():
+        #     if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
+        #         nn.init.kaiming_normal_(m.weight.data, mode='fan_in')
+        #         if m.bias is not None:
+        #             m.bias.data.zero_()
 
         self.topk_pos = topk_pos
         self.topk_neg = topk_neg
