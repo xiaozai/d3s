@@ -125,17 +125,17 @@ class CBAM(nn.Module):
         self.conv_rgb = conv(rgb_dims, output_dims, kernel_size=1, stride=1, padding=0, dilation=1)
         self.conv_d = conv(d_dims, output_dims, kernel_size=1, stride=1, padding=0, dilation=1)
 
-        self.channel_attn_rgb = channel_attention(output_dims)
-        self.channel_attn_d = channel_attention(output_dims)
+        self.channel_attn_rgb = channel_attention(output_dims, reduction_ratio=output_dims//4) # 4, 16, 32, 64
+        self.channel_attn_d = channel_attention(output_dims, reduction_ratio=output_dims//4)
 
         self.spatial_attn_rgb = spatial_attention()
         self.spatial_attn_d = spatial_attention()
 
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
-        #         nn.init.kaiming_normal_(m.weight.data, mode='fan_in')
-        #         if m.bias is not None:
-        #             m.bias.data.zero_()
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight.data, mode='fan_in')
+                if m.bias is not None:
+                    m.bias.data.zero_()
 
     def forward(self, f_rgb, f_d):
         ''' channel attention + spatial attention '''
@@ -245,11 +245,11 @@ class SegmNet(nn.Module):
         self.pyramid_pred1 = conv_no_relu(segm_inter_dim[0], 2)
 
         # Init weights
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
-        #         nn.init.kaiming_normal_(m.weight.data, mode='fan_in')
-        #         if m.bias is not None:
-        #             m.bias.data.zero_()
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight.data, mode='fan_in')
+                if m.bias is not None:
+                    m.bias.data.zero_()
 
         self.topk_pos = topk_pos
         self.topk_neg = topk_neg
