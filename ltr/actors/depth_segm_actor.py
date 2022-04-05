@@ -47,19 +47,17 @@ def process_attn_maps(att_mat, batch_element, layer=0): #, train_mask):
 
     v = joint_attentions[-1] # last layer of multihead attention, [P_q, P_kv]
 
-
-    if int(np.sqrt(aug_att_mat.size(-2)//4)) ** 2 * 4 == aug_att_mat.size(-2):
-        grid_size = int(np.sqrt(aug_att_mat.size(-2)//4))
-        rows = 2
-        cols = 2
+    if int(np.sqrt(aug_att_mat.size(-2))) ** 2 == aug_att_mat.size(-2):
+        grid_size = int(np.sqrt(aug_att_mat.size(-2)))
+        rows = 1
+        cols = 1
+    # elif int(np.sqrt(aug_att_mat.size(-2)//4)) ** 2 * 4 == aug_att_mat.size(-2):
+    #     grid_size = int(np.sqrt(aug_att_mat.size(-2)//4))
+    #     rows = 2
+    #     cols = 2
     elif int(np.sqrt(aug_att_mat.size(-2)//2)) ** 2 * 2 == aug_att_mat.size(-2):
         grid_size = int(np.sqrt(aug_att_mat.size(-2)//2))
         rows = 2
-        cols = 1
-
-    elif int(np.sqrt(aug_att_mat.size(-2))) ** 2 == aug_att_mat.size(-2):
-        grid_size = int(np.sqrt(aug_att_mat.size(-2)))
-        rows = 1
         cols = 1
 
     out_img = np.zeros((v.shape[0],))
@@ -229,8 +227,9 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
                 ''' transformer attn maps '''
                 attn_weights3 = process_attn_maps(attn_weights3, batch_element, layer=3)
                 attn_weights2 = process_attn_maps(attn_weights2, batch_element, layer=2)
-                attn_weights1 = process_attn_maps(attn_weights1, batch_element, layer=1)#, train_mask)
-                attn_weights0 = process_attn_maps(attn_weights0, batch_element, layer=0)#, train_mask)
+                attn_weights1 = process_attn_maps(attn_weights1, batch_element, layer=1)
+                attn_weights0 = process_attn_maps(attn_weights0, batch_element, layer=0)
+
             elif len(attn_weights3.shape) == 4 and attn_weights3.shape[1] == 2:
                 ''' spatial attn maps '''
                 attn_weights3 = attn_weights3[batch_element, 0, ...].numpy().squeeze() # H * W for RGB weights
@@ -319,6 +318,7 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
             draw_axis(ax11, p_d, 'similarity d')
 
         elif len(vis_data) == 4 or len(vis_data) == 3:
+            print(attn_weights3.shape)
             draw_axis(ax9, attn_weights3, 'attn_weights3', show_minmax=True)
             draw_axis(ax10, attn_weights2, 'attn_weights2', show_minmax=True)
             draw_axis(ax11, attn_weights1, 'attn_weights1', show_minmax=True)
