@@ -219,11 +219,11 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
 
         elif len(vis_data) == 4:
             attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data
-
+            print(' check attn_weight : ', isinstance(attn_weights3, list))
             if isinstance(attn_weights3, list) or isinstance(attn_weights3, tuple):
                 ''' transformer attn maps '''
-                attn_weights3 = process_attn_maps(attn_weights3, batch_element, layer=3)#, train_mask)
-                attn_weights2 = process_attn_maps(attn_weights2, batch_element, layer=2)#, train_mask)
+                attn_weights3 = process_attn_maps(attn_weights3, batch_element, layer=3)
+                attn_weights2 = process_attn_maps(attn_weights2, batch_element, layer=2)
                 attn_weights1 = process_attn_maps(attn_weights1, batch_element, layer=1)#, train_mask)
                 attn_weights0 = process_attn_maps(attn_weights0, batch_element, layer=0)#, train_mask)
             elif len(attn_weights3.shape) == 4 and attn_weights3.shape[1] == 2:
