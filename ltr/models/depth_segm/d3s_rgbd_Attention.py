@@ -240,11 +240,11 @@ class Transformer(nn.Module):
         f_rgbd, attn_weights = self.encoder(f_rgbd)  # encoded [B, 2*patches, C=768]
 
         # ''' We use the encoded RGB feat '''
-        f_rgb, f_d = f_rgbd[:, :self.patches, :], f_rgbd[:, self.patches, :]
-        f_rgb = f_rgb + f_d
+        f_rgbd = f_rgbd[:, :self.patches, :] + f_rgbd[:, self.patches:, :]
+
         featmap_sz = int(math.sqrt(self.patches))
 
-        encoded = f_rgb.view(f_rgb.shape[0], featmap_sz, featmap_sz, -1).permute(0, 3, 1, 2) #
+        encoded = f_rgbd.view(f_rgbd.shape[0], featmap_sz, featmap_sz, -1).permute(0, 3, 1, 2).contiguous()
         encoded = F.interpolate(encoded, size=(H, W))                     # B x 2C x 4 x 4 ->  B x 2C x 48 x 48
         encoded = self.conv(encoded)
         return encoded, attn_weights
