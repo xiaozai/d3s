@@ -24,7 +24,7 @@ def conv1x1_layer(in_planes, out_planes):
 
 def conv131_layer(input_dim, output_dim):
     return nn.Sequential(conv1x1_layer(input_dim, output_dim),
-                         conv(output_dim, output_dim, kernel_size=3, stride=2, padding=1, dilation=1, bias=True),
+                         conv(output_dim, output_dim, kernel_size=3, stride=2),
                          conv1x1_layer(output_dim, output_dim))
 
 # def valid_roi(roi: torch.Tensor, image_size: torch.Tensor):
