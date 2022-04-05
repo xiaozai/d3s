@@ -318,7 +318,6 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
             draw_axis(ax11, p_d, 'similarity d')
 
         elif len(vis_data) == 4 or len(vis_data) == 3:
-            print(attn_weights3.shape)
             draw_axis(ax9, attn_weights3, 'attn_weights3', show_minmax=True)
             draw_axis(ax10, attn_weights2, 'attn_weights2', show_minmax=True)
             draw_axis(ax11, attn_weights1, 'attn_weights1', show_minmax=True)
