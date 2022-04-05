@@ -65,13 +65,8 @@ class Attention(nn.Module):
     def forward(self, Q=None, K=None, V=None):
 
         mixed_query_layer = self.query(Q)      # [B, Patches, C]
-
-        if kv is not None:
-            mixed_key_layer = self.key(K)        # [B, Patches, C]
-            mixed_value_layer = self.value(V)  # [B, Patches, C]
-        else:
-            mixed_key_layer = self.key(Q)      # [B, Patches, C]
-            mixed_value_layer = self.value(Q)  # [B, Patches, C]
+        mixed_key_layer = self.key(K)        # [B, Patches, C]
+        mixed_value_layer = self.value(V)  # [B, Patches, C]
 
         query_layer = self.transpose_for_scores(mixed_query_layer) # [B, patches, C] -> [B, num_attention_heads, patches, attention_head_size]
         key_layer = self.transpose_for_scores(mixed_key_layer)     # [B, 12, 64, 64], 12 heads, 64 head size, 768 = 12 * 64
