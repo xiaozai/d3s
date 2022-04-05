@@ -334,10 +334,10 @@ class SegmNet(nn.Module):
         config2 = get_b16_config(size=(3, 3))
         config3 = get_b16_config(size=(2, 2))
 
-        self.rgbd_fusion0 = Transformer(config0, (192, 192), 4)
-        self.rgbd_fusion1 = Transformer(config1, (96, 96), 16)
-        self.rgbd_fusion2 = Transformer(config2, (48, 48), 32)
-        self.rgbd_fusion3 = Transformer(config3, (24, 24), 64)
+        self.rgbd_fusion0 = Transformer(config0, (192, 192), 4, True)
+        self.rgbd_fusion1 = Transformer(config1, (96, 96), 16, True)
+        self.rgbd_fusion2 = Transformer(config2, (48, 48), 32, True)
+        self.rgbd_fusion3 = Transformer(config3, (24, 24), 64, True)
 
         self.pyramid_pred3 = conv_no_relu(segm_inter_dim[2], 2)
         self.pyramid_pred2 = conv_no_relu(segm_inter_dim[1], 2)
