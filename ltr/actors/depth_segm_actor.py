@@ -57,6 +57,11 @@ def process_attn_maps(att_mat, batch_element, layer=0): #, train_mask):
         rows = 2
         cols = 1
 
+    elif int(np.sqrt(aug_att_mat.size(-2))) ** 2 == aug_att_mat.size(-2):
+        grid_size = int(np.sqrt(aug_att_mat.size(-2)))
+        rows = 1
+        cols = 1
+
     out_img = np.zeros((v.shape[0],))
     for idx in range(v.shape[0]):
         pixel = v[idx, :].detach().numpy()
