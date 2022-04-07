@@ -296,6 +296,8 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
         (ax9, ax10, ax11, ax12), \
         (ax13, ax14, ax15, ax16)) = plt.subplots(4, 4, figsize=(9, 9))
 
+    plt.axis('off')
+    
     draw_axis(ax1, train_img, 'Train image')
     draw_axis(ax3, test_img, 'Test image')
     draw_axis(ax2, train_depth, 'Train depth')
