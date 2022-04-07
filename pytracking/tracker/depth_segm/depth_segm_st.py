@@ -681,7 +681,7 @@ class DepthSegmST(BaseTracker):
         if self.params.use_rgbd_classifier and init_dp_patches is not None:
             init_samples_d = torch.TensorList([self.segm_net.segm_predictor.depth_feat_extractor(init_patch_d)[-1] for init_patch_d in init_dp_patches])
             ''' merge rgb and d features '''
-            init_samples= torch.TensorList([self.segm_net.segm_predictor.rgbd_fusion[-1](f_rgb, f_d) for f_rgb, f_d in zip(init_samples, init_samples_d)])
+            init_samples= torch.TensorList([self.segm_net.segm_predictor.rgbd_fusion3(f_rgb, f_d) for f_rgb, f_d in zip(init_samples, init_samples_d)])
 
 
         # Remove augmented samples for those that shall not have
