@@ -43,9 +43,9 @@ class DepthSegmNet(nn.Module):
         if test_dist is not None:
             test_dist = [test_dist]
 
-        # Obtain iou prediction
-        segm_pred = self.segm_predictor(train_feat_rgb, test_feat_d,
-                                        test_feat_rgb, train_feat_d,
+        #
+        segm_pred = self.segm_predictor(test_feat_rgb, test_feat_d,
+                                        train_feat_rgb, train_feat_d,
                                         train_masks, test_dist, debug=debug)
         return segm_pred
 
