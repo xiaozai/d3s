@@ -79,11 +79,11 @@ class channel_attention(nn.Module):
         channel_att_sum = None
         for pool_type in self.pool_types:
             if pool_type == 'avg':
-                x_pool = F.avg_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x_size(3)))
+                x_pool = F.avg_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
             elif pool_type == 'max':
-                x_pool = F.max_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x_size(3)))
+                x_pool = F.max_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
             elif pool_type == 'lp':
-                x_pool = F.lp_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x_size(3)))
+                x_pool = F.lp_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
             elif pool_type == 'lse':
                 x_pool = logsumexp_2d(x)
 
