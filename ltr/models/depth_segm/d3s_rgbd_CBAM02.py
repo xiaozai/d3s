@@ -3,6 +3,19 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 
+from torch.nn import Dropout, Softmax, Linear, Conv2d, LayerNorm
+
+from torch.nn.modules.utils import _pair
+from scipy import ndimage
+import ml_collections
+import copy
+import math
+
+''' Torch 1.1.0, can not from torch.nn import Flatten '''
+class Flatten(nn.Module):
+    def forward(self, input):
+        return input.flatten(1)
+
 def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1):
     return nn.Sequential(
             nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride,
@@ -26,18 +39,6 @@ def conv131_layer(input_dim, output_dim):
     return nn.Sequential(conv1x1_layer(input_dim, output_dim),
                          conv(output_dim, output_dim, kernel_size=3, stride=2),
                          conv1x1_layer(output_dim, output_dim))
-
-# def valid_roi(roi: torch.Tensor, image_size: torch.Tensor):
-#     valid = all(0 <= roi[:, 1]) and all(0 <= roi[:, 2]) and all(roi[:, 3] <= image_size[0]-1) and \
-#             all(roi[:, 4] <= image_size[1]-1)
-#     return valid
-
-
-# def normalize_vis_img(x):
-#     x = x - np.min(x)
-#     x = x / np.max(x)
-#     return (x * 255).astype(np.uint8)
-
 
 
 '''In spired by ECCV2020
@@ -101,28 +102,18 @@ def logsumexp_2d(tensor):
     outputs = s + (tensor_flatten - s).exp().sum(dim=2, keepdim=True).log()
     return outputs
 
-
-# ''' Inspired by
-#     ACNet : Attention based network to exploit complementary features for RGBD semantic segmentation
-#     (ICIP2019)
-#     https://github.com/anheidelonghu/ACNet
-# '''
-# def channel_attention(num_channel):
-#     return nn.Sequential(nn.AdaptiveAvgPool2d(1),
-#                          conv1x1_layer(num_channel, num_channel),
-#                          nn.Sigmoid())
-
 class CBAM(nn.Module):
     def __init__(self, rgb_dims, d_dims, output_dims):
         super().__init__()
-        self.conv_rgb = conv(rgb_dims, output_dims, kernel_size=1, stride=1, padding=0, dilation=1, bias=True)
-        self.conv_d = conv(d_dims, output_dims, kernel_size=1, stride=1, padding=0, dilation=1, bias=True)
+        self.conv_rgb = conv(rgb_dims, output_dims, kernel_size=1, stride=1, padding=0, dilation=1)
+        self.conv_d = conv(d_dims, output_dims, kernel_size=1, stride=1, padding=0, dilation=1)
+
+        self.conv = conv(output_dims*2, output_dims, kernel_size=1, stride=1, padding=0, dilation=1)
 
         self.channel_attn_rgb = channel_attention(output_dims)
         self.channel_attn_d = channel_attention(output_dims)
 
-        self.spatial_attn_rgb = spatial_attention()
-        self.spatial_attn_d = spatial_attention()
+        self.spatial_attn = spatial_attention()
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
@@ -135,9 +126,13 @@ class CBAM(nn.Module):
         f_rgb = self.conv_rgb(f_rgb)
         f_d = self.conv_d(f_d)
 
-        f_rgb = self.spatial_attn_rgb(self.channel_attn_rgb(f_rgb))
-        f_d = self.spatial_attn_d(self.channel_attn_d(f_d))
-        f_rgbd = f_rgb + f_d
+        f_rgb = self.channel_attn_rgb(f_rgb) # BxCxHxW
+        f_d = self.channel_attn_d(f_d)       # BxCxHxW
+
+        f_rgbd = torch.cat((f_rgb, f_d), 1) # Bx2CxHxW
+        f_rgbd = self.spatial_attn(f_rgbd)  # Bx2CxHxW
+        f_rgbd = self.conv(f_rgbd)
+
         return f_rgbd
 
 class DepthNet(nn.Module):
@@ -148,11 +143,6 @@ class DepthNet(nn.Module):
         self.conv1 = conv131_layer(inter_dim[0], inter_dim[1])
         self.conv2 = conv131_layer(inter_dim[1], inter_dim[2])
         self.conv3 = conv131_layer(inter_dim[2], inter_dim[3])
-
-        # self.layer0 = channel_attention(inter_dim[0]) # 192x192
-        # self.layer1 = channel_attention(inter_dim[1]) # 96x96
-        # self.layer2 = channel_attention(inter_dim[2]) # 48x48
-        # self.layer3 = channel_attention(inter_dim[3]) # 24x24
 
         self.initialize()
 
@@ -165,17 +155,10 @@ class DepthNet(nn.Module):
 
     def forward(self, dp):
         feat0 = self.conv0(dp)
-        # feat0 = self.layer0(feat0)
-
         feat1 = self.conv1(feat0)
-        # feat1 = self.layer1(feat1)
-
         feat2 = self.conv2(feat1)
-        # feat2 = self.layer2(feat2)
-
         feat3 = self.conv3(feat2)
-        # feat3 = self.layer3(feat3)
-
+        
         return [feat0, feat1, feat2, feat3] # [4, 16, 32, 64]
 
 
