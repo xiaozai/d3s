@@ -60,8 +60,8 @@ class spatial_attention(nn.Module):
     def forward(self, x):
         x_compress = self.compress(x)
         x_out = self.spatial(x_compress)
-        scale = F.sigmoid(x_out)
-        return x * scale
+        scale = F.sigmoid(x_out) # Bx1xHxW
+        return x * scale, scale
 
 class channel_attention(nn.Module):
     def __init__(self, input_channels, reduction_ratio=None, pool_types=['avg', 'max']):
@@ -132,10 +132,10 @@ class CBAM(nn.Module):
         f_d = self.channel_attn_d(f_d)       # BxCxHxW
 
         f_rgbd = torch.cat((f_rgb, f_d), 1) # Bx2CxHxW
-        f_rgbd = self.spatial_attn(f_rgbd)  # Bx2CxHxW
+        f_rgbd, spatial_attn = self.spatial_attn(f_rgbd)  # Bx2CxHxW
         f_rgbd = self.conv(f_rgbd) # should put it before spatial_attn or here ?
 
-        return f_rgbd
+        return f_rgbd, spatial_attn
 
 class DepthNet(nn.Module):
     def __init__(self, input_dim=1, inter_dim=(4, 16, 32, 64)):
@@ -224,8 +224,8 @@ class SegmNet(nn.Module):
         f_test = self.segment1(self.segment0(feat_test[3]))    # 1x1x64 conv + 3x3x64 conv -> [1, 1024, 24,24] -> [1, 64, 24, 24]
         f_train = self.segment1(self.segment0(feat_train[3]))  # 1x1x64 conv + 3x3x64 conv -> [1, 1024, 24,24] -> [1, 64, 24, 24]
         # Fusion RGBD Features
-        f_test = self.rgbd_fusion3(f_test, feat_test_d[3])
-        f_train = self.rgbd_fusion3(f_train, feat_train_d[3])
+        f_test, attn03 = self.rgbd_fusion3(f_test, feat_test_d[3])
+        f_train, _ = self.rgbd_fusion3(f_train, feat_train_d[3])
 
         # reshape mask to the feature size
         mask_pos = F.interpolate(mask_train[0], size=(f_train.shape[-2], f_train.shape[-1])) # [1,1,384, 384] -> [1,1,24,24]
@@ -251,13 +251,13 @@ class SegmNet(nn.Module):
         out = self.mixer(segm_layers)
         out3 = self.s3(F.upsample(out, scale_factor=2))
 
-        f_test_rgbd2 = self.rgbd_fusion2(self.f2(feat_test[2]), feat_test_d[2])
+        f_test_rgbd2, attn02 = self.rgbd_fusion2(self.f2(feat_test[2]), feat_test_d[2])
         out2 = self.post2(F.upsample(self.m2(f_test_rgbd2) + self.s2(out3), scale_factor=2))
 
-        f_test_rgbd1 = self.rgbd_fusion1(self.f1(feat_test[1]), feat_test_d[1])
+        f_test_rgbd1, attn01 = self.rgbd_fusion1(self.f1(feat_test[1]), feat_test_d[1])
         out1 = self.post1(F.upsample(self.m1(f_test_rgbd1) + self.s1(out2), scale_factor=2))
 
-        f_test_rgbd0 = self.rgbd_fusion0(self.f0(feat_test[0]), feat_test_d[0])
+        f_test_rgbd0, attn00 = self.rgbd_fusion0(self.f0(feat_test[0]), feat_test_d[0])
         out0 = self.post0(F.upsample(self.m0(f_test_rgbd0) + self.s0(out1), scale_factor=2))
 
         pred3 = self.pyramid_pred3(F.upsample(out3, scale_factor=8))
@@ -267,7 +267,7 @@ class SegmNet(nn.Module):
         if not debug:
             return (out0, pred1, pred2, pred3)
         else:
-            return (out0, pred1, pred2, pred3), None
+            return (out0, pred1, pred2, pred3), (attn00, attn01, attn02, attn03)
 
 
     def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg):
