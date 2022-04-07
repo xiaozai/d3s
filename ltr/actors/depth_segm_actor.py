@@ -297,7 +297,7 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
         (ax13, ax14, ax15, ax16)) = plt.subplots(4, 4, figsize=(9, 9))
 
     plt.axis('off')
-    
+
     draw_axis(ax1, train_img, 'Train image')
     draw_axis(ax3, test_img, 'Test image')
     draw_axis(ax2, train_depth, 'Train depth')
@@ -319,16 +319,16 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
             draw_axis(ax11, p_d, 'similarity d')
 
         elif len(vis_data) == 4 or len(vis_data) == 3:
-            draw_axis(ax9, attn_weights3, 'attn_weights3')
-            draw_axis(ax10, attn_weights2, 'attn_weights2')
-            draw_axis(ax11, attn_weights1, 'attn_weights1')
-            draw_axis(ax12, attn_weights0, 'attn_weights0')
+            draw_axis(ax9, attn_weights0, 'attn_weights3')
+            draw_axis(ax10, attn_weights1, 'attn_weights2')
+            draw_axis(ax11, attn_weights2, 'attn_weights1')
+            draw_axis(ax12, attn_weights3, 'attn_weights0')
 
         elif len(vis_data) == 8:
-            draw_axis(ax9, weight3, 'channel_weights3')
-            draw_axis(ax10, weight2, 'channel_weights2')
-            draw_axis(ax11, weight1, 'channel_weights1')
-            draw_axis(ax12, weight0, 'channel_weights0')
+            draw_axis(ax9, weight0, 'channel_weights3')
+            draw_axis(ax10, weight1, 'channel_weights2')
+            draw_axis(ax11, weight2, 'channel_weights1')
+            draw_axis(ax12, weight3, 'channel_weights0')
 
     save_path = os.path.join(data['settings'].env.images_dir, '%03d-%04d.png' % (data['epoch'], data['iter']))
     plt.savefig(save_path)
