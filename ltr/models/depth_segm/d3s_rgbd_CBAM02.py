@@ -64,9 +64,11 @@ class spatial_attention(nn.Module):
         return x * scale
 
 class channel_attention(nn.Module):
-    def __init__(self, input_channels, reduction_ratio=16, pool_types=['avg', 'max']):
+    def __init__(self, input_channels, reduction_ratio=None, pool_types=['avg', 'max']):
         super().__init__()
         self.input_channels = input_channels
+        if reduction_ratio is None:
+            reduction_ratio = input_channels // 4
         self.mlp = nn.Sequential(Flatten(),
                                  nn.Linear(input_channels, input_channels//reduction_ratio),
                                  nn.ReLU(),
@@ -110,8 +112,8 @@ class CBAM(nn.Module):
 
         self.conv = conv(output_dims*2, output_dims, kernel_size=1, stride=1, padding=0, dilation=1)
 
-        self.channel_attn_rgb = channel_attention(output_dims)
-        self.channel_attn_d = channel_attention(output_dims)
+        self.channel_attn_rgb = channel_attention(output_dims, reduction_ratio=output_dims//4)
+        self.channel_attn_d = channel_attention(output_dims, reduction_ratio=output_dims//4)
 
         self.spatial_attn = spatial_attention()
 
