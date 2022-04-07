@@ -134,7 +134,6 @@ class CBAM(nn.Module):
         # f_rgbd = torch.cat((f_rgb, f_d), 1) # Bx2CxHxW
         f_rgbd = torch.max(f_rgb, f_d)
         f_rgbd, spatial_attn = self.spatial_attn(f_rgbd)  # Bx2CxHxW
-        # f_rgbd = self.conv(f_rgbd) # should put it before spatial_attn or here ?
 
         return f_rgbd, spatial_attn
 
