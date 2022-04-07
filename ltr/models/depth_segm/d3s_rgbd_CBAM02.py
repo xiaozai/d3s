@@ -132,8 +132,9 @@ class CBAM(nn.Module):
         f_d = self.channel_attn_d(f_d)       # BxCxHxW
 
         f_rgbd = torch.cat((f_rgb, f_d), 1) # Bx2CxHxW
-        f_rgbd, spatial_attn = self.spatial_attn(f_rgbd)  # Bx2CxHxW
         f_rgbd = self.conv(f_rgbd) # should put it before spatial_attn or here ?
+        f_rgbd, spatial_attn = self.spatial_attn(f_rgbd)  # Bx2CxHxW
+
 
         return f_rgbd, spatial_attn
 
