@@ -110,7 +110,7 @@ class CBAM(nn.Module):
         self.conv_rgb = conv(rgb_dims, output_dims, kernel_size=1, stride=1, padding=0, dilation=1)
         self.conv_d = conv(d_dims, output_dims, kernel_size=1, stride=1, padding=0, dilation=1)
 
-        self.conv = conv(output_dims*2, output_dims, kernel_size=1, stride=1, padding=0, dilation=1)
+        self.conv = conv1x1_layer(output_dims*2, output_dims)
 
         self.channel_attn_rgb = channel_attention(output_dims, reduction_ratio=output_dims//4)
         self.channel_attn_d = channel_attention(output_dims, reduction_ratio=output_dims//4)
