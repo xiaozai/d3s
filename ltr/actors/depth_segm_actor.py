@@ -221,7 +221,7 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
             attn_weights0 = process_attn_maps(attn_weights0, batch_element)# train_mask)
 
         elif len(vis_data) == 4:
-            attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data
+            attn_weights0, attn_weights1, attn_weights2, attn_weights3 = vis_data
 
             if isinstance(attn_weights3, list) or isinstance(attn_weights3, tuple) or len(attn_weights3.shape) == 5:
                 ''' transformer attn maps '''
