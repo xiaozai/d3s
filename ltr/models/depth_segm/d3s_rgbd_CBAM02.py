@@ -94,7 +94,7 @@ class channel_attention(nn.Module):
             else:
                 channel_att_sum += channel_att_raw
 
-        scale = F.sigmoid(channel_attm_sum).unsqueeze(2).unsqueeze(3).expand_as(x)
+        scale = F.sigmoid(channel_att_sum).unsqueeze(2).unsqueeze(3).expand_as(x)
 
         return x * scale
 
