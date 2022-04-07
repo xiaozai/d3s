@@ -3,12 +3,20 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 
-from torch.nn import Dropout, Softmax, Linear, Conv2d, LayerNorm, Flatten
+from torch.nn import Dropout, Softmax, Linear, Conv2d, LayerNorm
+
 from torch.nn.modules.utils import _pair
 from scipy import ndimage
 import ml_collections
 import copy
 import math
+
+# from torch.nn import Flatten
+''' Torch 1.1.0, can not from torch.nn import Flatten '''
+class Flatten(nn.Module):
+    def forward(self, input):
+        # return input.view(input.size[0], -1)
+        return input.flatten(1)
 
 def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1):
     return nn.Sequential(
