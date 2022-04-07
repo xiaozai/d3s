@@ -131,7 +131,7 @@ class CBAM(nn.Module):
 
         f_rgbd = torch.cat((f_rgb, f_d), 1) # Bx2CxHxW
         f_rgbd = self.spatial_attn(f_rgbd)  # Bx2CxHxW
-        f_rgbd = self.conv(f_rgbd)
+        f_rgbd = self.conv(f_rgbd) # should put it before spatial_attn or here ?
 
         return f_rgbd
 
@@ -158,7 +158,7 @@ class DepthNet(nn.Module):
         feat1 = self.conv1(feat0)
         feat2 = self.conv2(feat1)
         feat3 = self.conv3(feat2)
-        
+
         return [feat0, feat1, feat2, feat3] # [4, 16, 32, 64]
 
 
