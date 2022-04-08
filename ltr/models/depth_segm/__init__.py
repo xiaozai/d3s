@@ -47,3 +47,5 @@ from .d3s_rgbd_CBAM02_2 import SegmNet as D3S_CBAM_RGBD02_2
 from .d3s_rgbd_CBAM03 import SegmNet as D3S_CBAM_RGBD03
 
 from .d3s_rgbd_Attention import SegmNet as D3S_Attention_RGBD
+
+from .d3s_rgbd_DWeight import SegmNet as D3S_DW_RGBD
