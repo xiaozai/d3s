@@ -183,7 +183,7 @@ class SegmNet(nn.Module):
     def __init__(self):
         super().__init__()
 
-        mixer_channels=2
+        mixer_channels=4
         topk_pos=3
         topk_neg=3
         segm_input_dim = (64, 256, 512, 1024)
@@ -213,7 +213,7 @@ class SegmNet(nn.Module):
         self.post1 = conv(segm_inter_dim[1], segm_inter_dim[0])
         self.post0 = conv_no_relu(segm_inter_dim[0], 2)
 
-        self.m3 = conv(config.hidden_size, 1)
+        self.m3 = conv(config.hidden_size, 3)
         self.m2 = conv(segm_inter_dim[2], segm_inter_dim[2])
         self.m1 = conv(segm_inter_dim[1], segm_inter_dim[1])
         self.m0 = conv(segm_inter_dim[0], segm_inter_dim[0])
