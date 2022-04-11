@@ -59,12 +59,12 @@ class Attention(nn.Module):
         if mask is not None:
             attention_scores = attention_scores * mask.view(mask.shape[0], 1, 1, -1) # head, layers, Pq, P_kv * [1, B, 1, 1, P_kv]
 
-        attention_probs = self.softmax(attention_scores) # dim=-1 Bx12xpatchesx64
+        attention_probs = self.softmax(attention_scores) # [B,Heads, Pq, Pkv]
 
         weights = attention_probs if self.vis else None
         attention_probs = self.attn_dropout(attention_probs)
 
-        context_layer = torch.matmul(attention_probs, value_layer)                  # Bx12xPatchesx64 * Bx12x64x64
+        context_layer = torch.matmul(attention_probs, value_layer)                  # [B, heads, Pq, Pk] * [B, heads, Pv, HeadSize]
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()              # [B, Patches, heads, head_size]
         new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,) # [B, Patches, C=768]
         context_layer = context_layer.view(*new_context_layer_shape)

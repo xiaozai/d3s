@@ -183,7 +183,7 @@ class SegmNet(nn.Module):
     def __init__(self):
         super().__init__()
 
-        mixer_channels=4
+        mixer_channels=2
         topk_pos=3
         topk_neg=3
         segm_input_dim = (64, 256, 512, 1024)
@@ -213,7 +213,7 @@ class SegmNet(nn.Module):
         self.post1 = conv(segm_inter_dim[1], segm_inter_dim[0])
         self.post0 = conv_no_relu(segm_inter_dim[0], 2)
 
-        self.m3 = conv(config.hidden_size, 3)
+        self.m3 = conv(config.transformer.num_heads, 1)
         self.m2 = conv(segm_inter_dim[2], segm_inter_dim[2])
         self.m1 = conv(segm_inter_dim[1], segm_inter_dim[1])
         self.m0 = conv(segm_inter_dim[0], segm_inter_dim[0])
@@ -249,18 +249,24 @@ class SegmNet(nn.Module):
 
         #-----------------------------------------------------------------------
         mask_pos = F.interpolate(mask_train[0], size=(f_train.shape[-2], f_train.shape[-1])) # [1,1,384, 384] -> [1,1,24,24]
-        attn_rgbd, attn_weigths = self.cross_attn(f_test, kv=f_train, mask=mask_pos) # B, Patches, C
-        attn_sz = int(math.sqrt(attn_rgbd.shape[1]))
-        attn_rgbd = attn_rgbd.view(attn_rgbd.shape[0], attn_sz, attn_sz, -1) # B, H, W, C
-        attn_rgbd = attn_rgbd.permute(0, 3, 1, 2).contiguous()
-        attn_rgbd = F.interpolate(attn_rgbd, size=(f_train.shape[-2], f_train.shape[-1]))
-        pred_sm = self.m3(attn_rgbd) # 64 -> 1
+        attn_rgbd, attn_weigths = self.cross_attn(f_test, kv=f_train, mask=mask_pos) #  # weights: list [B,Heads, Pq, Pkv]
+        pos_map = attn_weigths[-1] # [B,Heads = 12, Pq, Pkv]
+        pos_map = torch.mean(torch.topk(pos_map, self.topk_pos, dim=-1).values, dim=-1) # [B, Heads, Pq]
+        attn_sz = int(math.sqrt(pos_map.shape[-1]))
+        pos_map = pos_map.view(pos_map.shape[0], -1, attn_sz, attn_sz) # B, C, H, W
+        pos_map = F.interpolate(pos_map, size=(f_train.shape[-2], f_train.shape[-1]))
+        pos_map = self.m3(pos_map) # heads=3 -> 1, [B, 1, H, W]
+        # attn_sz = int(math.sqrt(attn_rgbd.shape[1]))
+        # attn_rgbd = attn_rgbd.view(attn_rgbd.shape[0], attn_sz, attn_sz, -1) # B, H, W, C
+        # attn_rgbd = attn_rgbd.permute(0, 3, 1, 2).contiguous()
+        # attn_rgbd = F.interpolate(attn_rgbd, size=(f_train.shape[-2], f_train.shape[-1]))
+        # pred_sm = self.m3(attn_rgbd) # 96 -> 3
 
         dist = F.interpolate(test_dist[0], size=(f_train.shape[-2], f_train.shape[-1])) # [1,1,24,24]
-        segm_layers = torch.cat((pred_sm, dist), dim=1)
+        segm_layers = torch.cat((pos_map, dist), dim=1)
         # ----------------------------------------------------------------------
 
-        out = self.mixer(segm_layers) # 3 -> 64
+        out = self.mixer(segm_layers) # 4 -> 64
         out3 = self.s3(F.upsample(out, scale_factor=2))
 
         f_test_rgbd2, attn02 = self.rgbd_fusion2(self.f2(feat_test[2]), feat_test_d[2])
@@ -279,7 +285,7 @@ class SegmNet(nn.Module):
         if not debug:
             return (out0, pred1, pred2, pred3)
         else:
-            return (out0, pred1, pred2, pred3), (attn00, attn01, attn02, attn_weigths)
+            return (out0, pred1, pred2, pred3), (attn00, attn01, attn02, pos_map)
 
 
     # def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg):
