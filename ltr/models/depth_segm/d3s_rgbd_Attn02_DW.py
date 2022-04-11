@@ -265,12 +265,6 @@ class SegmNet(nn.Module):
         pos_map = F.interpolate(pos_map, size=(f_train.shape[-2], f_train.shape[-1]))   # [B, Heads, H, W]
         pos_map = self.m3(pos_map)                                                      # [B, heads, H, W]
 
-        # attn_sz = int(math.sqrt(attn_rgbd.shape[1]))
-        # attn_rgbd = attn_rgbd.view(attn_rgbd.shape[0], attn_sz, attn_sz, -1) # B, H, W, C
-        # attn_rgbd = attn_rgbd.permute(0, 3, 1, 2).contiguous()
-        # attn_rgbd = F.interpolate(attn_rgbd, size=(f_train.shape[-2], f_train.shape[-1]))
-        # pred_sm = self.m3(attn_rgbd) # 96 -> 3
-
         dist = F.interpolate(test_dist[0], size=(f_train.shape[-2], f_train.shape[-1])) # [1,1,24,24]
         segm_layers = torch.cat((pos_map, dist), dim=1)
         # ----------------------------------------------------------------------
