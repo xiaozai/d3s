@@ -228,7 +228,7 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
                 attn_weights3 = process_attn_maps(attn_weights3, batch_element, layer=3)
             elif len(attn_weights3.shape) == 4:
                 ''' spatial attn maps '''
-                attn_weights3 = attn_weights3[batch_element, 0, ...].numpy().squeeze() # H * W for RGB weights
+                attn_weights3 = torch.mean(attn_weights3[batch_element, 0, ...], dim=0).numpy().squeeze() # H * W for RGB weights
 
 
             if isinstance(attn_weights2, list) or isinstance(attn_weights2, tuple) or len(attn_weights2.shape) == 5:
