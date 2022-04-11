@@ -220,7 +220,7 @@ class SegmNet(nn.Module):
         self.post1 = conv(segm_inter_dim[1], segm_inter_dim[0])
         self.post0 = conv_no_relu(segm_inter_dim[0], 2)
 
-        # self.m3 = conv(config.transformer.num_heads, 1)
+        self.m3 = conv1x1_relu(config.transformer.num_heads, config.transformer.num_heads)
         self.m2 = conv(segm_inter_dim[2], segm_inter_dim[2])
         self.m1 = conv(segm_inter_dim[1], segm_inter_dim[1])
         self.m0 = conv(segm_inter_dim[0], segm_inter_dim[0])
@@ -262,7 +262,7 @@ class SegmNet(nn.Module):
         attn_sz = int(math.sqrt(pos_map.shape[-1]))
         pos_map = pos_map.view(pos_map.shape[0], -1, attn_sz, attn_sz)                  # [B, Heads, H, W]
         pos_map = F.interpolate(pos_map, size=(f_train.shape[-2], f_train.shape[-1]))   # [B, Heads, H, W]
-        # pos_map = self.m3(pos_map)                                                      # [B, 1, H, W]
+        pos_map = self.m3(pos_map)                                                    # [B, 1, H, W]
 
         # attn_sz = int(math.sqrt(attn_rgbd.shape[1]))
         # attn_rgbd = attn_rgbd.view(attn_rgbd.shape[0], attn_sz, attn_sz, -1) # B, H, W, C

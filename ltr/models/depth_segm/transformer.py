@@ -57,7 +57,7 @@ class Attention(nn.Module):
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
 
         if mask is not None:
-            attention_scores = attention_scores * mask.view(mask.shape[0], 1, 1, -1) # head, layers, Pq, P_kv * [1, B, 1, 1, P_kv]
+            attention_scores = attention_scores * mask.view(mask.shape[0], 1, 1, -1) # B, Head, Pq, Pkv
 
         attention_probs = self.softmax(attention_scores) # [B,Heads, Pq, Pkv]
 
