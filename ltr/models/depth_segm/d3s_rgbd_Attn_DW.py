@@ -249,13 +249,14 @@ class SegmNet(nn.Module):
 
         #-----------------------------------------------------------------------
         mask_pos = F.interpolate(mask_train[0], size=(f_train.shape[-2], f_train.shape[-1])) # [1,1,384, 384] -> [1,1,24,24]
-        attn_rgbd, attn_weigths = self.cross_attn(f_test, kv=f_train, mask=mask_pos) #  # weights: list [B,Heads, Pq, Pkv]
+        attn_rgbd, attn_weigths = self.cross_attn(f_test, kv=f_train, mask=mask_pos) #  # weights: layers * [B,Heads, Pq, Pkv]
         pos_map = attn_weigths[-1] # [B,Heads = 12, Pq, Pkv]
-        pos_map = torch.mean(torch.topk(pos_map, self.topk_pos, dim=-1).values, dim=-1) # [B, Heads, Pq]
+        pos_map = torch.mean(pos_map, dim=1) # [B, Pq, Pkv]
+        pos_map = torch.mean(torch.topk(pos_map, self.topk_pos, dim=-1).values, dim=-1) # [B, Pq]
         attn_sz = int(math.sqrt(pos_map.shape[-1]))
         pos_map = pos_map.view(pos_map.shape[0], -1, attn_sz, attn_sz) # B, C, H, W
         pos_map = F.interpolate(pos_map, size=(f_train.shape[-2], f_train.shape[-1]))
-        pos_map = self.m3(pos_map) # heads=3 -> 1, [B, 1, H, W]
+        # pos_map = self.m3(pos_map) # heads=3 -> 1, [B, 1, H, W]
         # attn_sz = int(math.sqrt(attn_rgbd.shape[1]))
         # attn_rgbd = attn_rgbd.view(attn_rgbd.shape[0], attn_sz, attn_sz, -1) # B, H, W, C
         # attn_rgbd = attn_rgbd.permute(0, 3, 1, 2).contiguous()
