@@ -35,6 +35,12 @@ def conv_no_relu(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dila
 def conv3x3_layer(in_planes, out_planes):
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
 
+def conv1x1_relu(in_planes, out_planes):
+    return  nn.Sequential(
+             nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=1, padding=0, dilation=1, bias=True),
+             nn.BatchNorm2d(out_planes),
+             nn.ReLU(inplace=True))
+
 def conv1x1_layer(in_planes, out_planes):
     return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=1, padding=0, dilation=1, bias=True)
 
@@ -214,7 +220,7 @@ class SegmNet(nn.Module):
         self.post0 = conv_no_relu(segm_inter_dim[0], 2)
 
         # self.m3 = conv(config.transformer.num_heads, 1)
-        self.m3 = conv1x1_layer(config.transformer.num_heads, 1)
+        self.m3 = conv1x1_relu(config.transformer.num_heads, 1)
         self.m2 = conv(segm_inter_dim[2], segm_inter_dim[2])
         self.m1 = conv(segm_inter_dim[1], segm_inter_dim[1])
         self.m0 = conv(segm_inter_dim[0], segm_inter_dim[0])
@@ -254,10 +260,10 @@ class SegmNet(nn.Module):
         pos_map = attn_weigths[-1] # [B,Heads = 12, Pq, Pkv]
         pos_map = torch.mean(torch.topk(pos_map, self.topk_pos, dim=-1).values, dim=-1) # [B, Heads, Pq]
         attn_sz = int(math.sqrt(pos_map.shape[-1]))
-        pos_map = pos_map.view(pos_map.shape[0], -1, attn_sz, attn_sz)          # B, Heads, H, W
+        pos_map = pos_map.view(pos_map.shape[0], -1, attn_sz, attn_sz)          # [B, Heads, H, W]
         pos_map = F.interpolate(pos_map, size=(f_train.shape[-2], f_train.shape[-1]))
         # pos_map = torch.mean(pos_map, dim=1) # [B, Heads, H, W]
-        pos_map = self.m3(pos_map) # heads=3 -> 1, [B, 1, H, W]
+        pos_map = F.relu(self.m3(pos_map), inplace=True) # heads=3 -> 1, [B, 1, H, W]
 
         # attn_sz = int(math.sqrt(attn_rgbd.shape[1]))
         # attn_rgbd = attn_rgbd.view(attn_rgbd.shape[0], attn_sz, attn_sz, -1) # B, H, W, C
