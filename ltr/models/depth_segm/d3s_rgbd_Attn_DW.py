@@ -219,8 +219,8 @@ class SegmNet(nn.Module):
         self.post1 = conv(segm_inter_dim[1], segm_inter_dim[0])
         self.post0 = conv_no_relu(segm_inter_dim[0], 2)
 
-        # self.m3 = conv(config.transformer.num_heads, 1)
-        self.m3 = conv1x1_relu(config.transformer.num_heads, 1)
+        self.m3 = conv(config.transformer.num_heads, 1)
+        # self.m3 = conv1x1_relu(config.transformer.num_heads, 1)
         self.m2 = conv(segm_inter_dim[2], segm_inter_dim[2])
         self.m1 = conv(segm_inter_dim[1], segm_inter_dim[1])
         self.m0 = conv(segm_inter_dim[0], segm_inter_dim[0])
