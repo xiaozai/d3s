@@ -189,7 +189,9 @@ class SegmNet(nn.Module):
     def __init__(self):
         super().__init__()
 
-        mixer_channels=2
+        config = get_b16_config(size=(3,3))
+
+        mixer_channels= config.transformer.num_heads + 1
         topk_pos=3
         topk_neg=3
         segm_input_dim = (64, 256, 512, 1024)
@@ -198,7 +200,6 @@ class SegmNet(nn.Module):
 
         self.depth_feat_extractor = DepthNet(input_dim=1, inter_dim=segm_inter_dim)
 
-        config = get_b16_config(size=(3,3))
         self.cross_attn = Transformer(config, (24, 24), 64, vis=True, mask=True)
 
         self.segment0 = conv(segm_input_dim[3], segm_dim[0], kernel_size=1, padding=0)
@@ -219,8 +220,7 @@ class SegmNet(nn.Module):
         self.post1 = conv(segm_inter_dim[1], segm_inter_dim[0])
         self.post0 = conv_no_relu(segm_inter_dim[0], 2)
 
-        self.m3 = conv(config.transformer.num_heads, 1)
-        # self.m3 = conv1x1_relu(config.transformer.num_heads, 1)
+        # self.m3 = conv(config.transformer.num_heads, 1)
         self.m2 = conv(segm_inter_dim[2], segm_inter_dim[2])
         self.m1 = conv(segm_inter_dim[1], segm_inter_dim[1])
         self.m0 = conv(segm_inter_dim[0], segm_inter_dim[0])
@@ -256,14 +256,13 @@ class SegmNet(nn.Module):
 
         #-----------------------------------------------------------------------
         mask_pos = F.interpolate(mask_train[0], size=(f_train.shape[-2], f_train.shape[-1])) # [1,1,384, 384] -> [1,1,24,24]
-        attn_rgbd, attn_weigths = self.cross_attn(f_test, kv=f_train, mask=mask_pos) #  # weights: layers * [B,Heads, Pq, Pkv]
-        pos_map = attn_weigths[-1] # [B,Heads = 12, Pq, Pkv]
+        attn_rgbd, attn_weigths = self.cross_attn(f_test, kv=f_train, mask=mask_pos)    # weights: layers * [B,Heads, Pq, Pkv]
+        pos_map = attn_weigths[-1]                                                      # [B,Heads=12, Pq, Pkv]
         pos_map = torch.mean(torch.topk(pos_map, self.topk_pos, dim=-1).values, dim=-1) # [B, Heads, Pq]
         attn_sz = int(math.sqrt(pos_map.shape[-1]))
-        pos_map = pos_map.view(pos_map.shape[0], -1, attn_sz, attn_sz)          # [B, Heads, H, W]
-        pos_map = F.interpolate(pos_map, size=(f_train.shape[-2], f_train.shape[-1]))
-        # pos_map = torch.mean(pos_map, dim=1) # [B, Heads, H, W]
-        pos_map = self.m3(pos_map) # heads=3 -> 1, [B, 1, H, W]
+        pos_map = pos_map.view(pos_map.shape[0], -1, attn_sz, attn_sz)                  # [B, Heads, H, W]
+        pos_map = F.interpolate(pos_map, size=(f_train.shape[-2], f_train.shape[-1]))   # [B, Heads, H, W]
+        # pos_map = self.m3(pos_map)                                                      # [B, 1, H, W]
 
         # attn_sz = int(math.sqrt(attn_rgbd.shape[1]))
         # attn_rgbd = attn_rgbd.view(attn_rgbd.shape[0], attn_sz, attn_sz, -1) # B, H, W, C
