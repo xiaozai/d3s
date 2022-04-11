@@ -261,7 +261,7 @@ class SegmNet(nn.Module):
         pos_map = torch.mean(torch.topk(pos_map, self.topk_pos, dim=-1).values, dim=-1) # [B, Heads, Pq]
         attn_sz = int(math.sqrt(pos_map.shape[-1]))
         pos_map = pos_map.view(pos_map.shape[0], -1, attn_sz, attn_sz)                  # [B, Heads, H, W]
-        pos_map = F.sigmoid(pos_map, dim=1)
+        pos_map = F.sigmoid(pos_map)
         pos_map = F.interpolate(pos_map, size=(f_train.shape[-2], f_train.shape[-1]))   # [B, Heads, H, W]
         pos_map = self.m3(pos_map)                                                      # [B, heads, H, W]
 
