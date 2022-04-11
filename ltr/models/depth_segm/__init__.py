@@ -32,6 +32,8 @@ from .depth_segm_attention_net2_8DC_Max import DepthSegmNetAttention as DepthSeg
 from .depth_segm_attention_net2_8DC_Sum import DepthSegmNetAttention as DepthSegmNetAttention02_8DC_Sum
 #
 
+# from .transformer import Transformer
+
 from .depth_segm_RDFNet import DepthSegmNet as DepthSegmNet_RDF
 
 from .depth_segm_A02_8MMF import DepthSegmNetAttention as DepthSegmNetAttention02_8MMF
@@ -49,3 +51,4 @@ from .d3s_rgbd_CBAM03 import SegmNet as D3S_CBAM_RGBD03
 from .d3s_rgbd_Attention import SegmNet as D3S_Attention_RGBD
 
 from .d3s_rgbd_DWeight import SegmNet as D3S_DW_RGBD
+from .d3s_rgbd_Attn_DW import SegmNet as D3S_Attn_DW_RGBD
