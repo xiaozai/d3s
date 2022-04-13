@@ -263,7 +263,7 @@ class SegmNet(nn.Module):
         # B, 32+16+4, 192, 192
         f_test_rgbd = torch.cat((F.upsample(self.m2(f_test_rgbd2), scale_factor=4),
                                  F.upsample(self.m1(f_test_rgbd1), scale_factor=2),
-                                 self.m0(f_test_rgbd2)),
+                                 self.m0(f_test_rgbd0)),
                                  dim=1)
 
         out0 = self.post(F.upsample(self.m(f_test_rgbd), self.s0(out3), scale_factor=2))
