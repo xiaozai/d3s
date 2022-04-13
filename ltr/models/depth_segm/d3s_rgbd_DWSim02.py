@@ -266,7 +266,7 @@ class SegmNet(nn.Module):
                                  self.m0(f_test_rgbd0)),
                                  dim=1)
 
-        out0 = self.post(F.upsample(self.m(f_test_rgbd), self.s0(out3), scale_factor=2))
+        out0 = self.post(F.upsample(self.m(f_test_rgbd), self.s0(out3)), scale_factor=2))
         pred3 = self.pyramid_pred3(F.upsample(out3, scale_factor=2))
 
         if not debug:
