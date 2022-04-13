@@ -427,25 +427,43 @@ class DepthSegmActor_MultiPred(BaseActor):
         masks_gt = data['test_masks'].permute(1, 0, 2, 3) # C, B, H, W -> # B * 1 * H * W
         masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)   # B * 2 * H * W
 
-        loss0 = self.objective(masks_pred[0], masks_gt_pair)
-        loss1 = self.objective(masks_pred[1], masks_gt_pair)
-        loss2 = self.objective(masks_pred[2], masks_gt_pair)
-        loss3 = self.objective(masks_pred[3], masks_gt_pair)
+        if len(masks_pred) == 4:
+            loss0 = self.objective(masks_pred[0], masks_gt_pair)
+            loss1 = self.objective(masks_pred[1], masks_gt_pair)
+            loss2 = self.objective(masks_pred[2], masks_gt_pair)
+            loss3 = self.objective(masks_pred[3], masks_gt_pair)
 
-        if self.loss_weights is None:
-            self.loss_weights = [1, 0.1, 0.1, 0.1]
-        loss = loss0 * self.loss_weights[0] + loss1 * self.loss_weights[1] + loss2 * self.loss_weights[2] + loss3 * self.loss_weights[3]
+            if self.loss_weights is None:
+                self.loss_weights = [1, 0.1, 0.1, 0.1]
+            loss = loss0 * self.loss_weights[0] + loss1 * self.loss_weights[1] + loss2 * self.loss_weights[2] + loss3 * self.loss_weights[3]
 
+            stats = {'Loss/total': loss.item(),
+                     # 'Loss/segm': loss.item(),
+                     'Layer0': loss0.item(),
+                     'Layer1': loss1.item(),
+                     'Layer2': loss2.item(),
+                     'Layer3': loss3.item(),
+                     }
+
+        elif len(masks_pred) == 2:
+            loss1 = self.objective(masks_pred[0], masks_gt_pair)
+            loss3 = self.objective(masks_pred[1], masks_gt_pair)
+            loss = loss1 + loss3 * 0.5
         # loss = loss0 * 1.0 + loss1 * 1.0 + loss2 * 1.0 + loss3 * 1.0
 
+            stats = {'Loss/total': loss.item(),
+                     'Layer1': loss1.item(),
+                     'Layer3': loss3.item(),
+                     }
 
-        stats = {'Loss/total': loss.item(),
-                 # 'Loss/segm': loss.item(),
-                 'Layer0': loss0.item(),
-                 'Layer1': loss1.item(),
-                 'Layer2': loss2.item(),
-                 'Layer3': loss3.item(),
-                 }
+        #
+        # stats = {'Loss/total': loss.item(),
+        #          # 'Loss/segm': loss.item(),
+        #          'Layer0': loss0.item(),
+        #          'Layer1': loss1.item(),
+        #          'Layer2': loss2.item(),
+        #          'Layer3': loss3.item(),
+        #          }
 
         if 'iter' in data and (data['iter'] - 1) % 50 == 0:
 
