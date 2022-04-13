@@ -298,7 +298,7 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
         mask3 = F.softmax(pred_mask[3], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
         predicted_mask3 = (mask3 > 0.5).astype(np.float32) * mask3
 
-    elif len(pred_mask) = 2:
+    elif len(pred_mask) == 2:
         mask1 = F.softmax(pred_mask[0], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
         predicted_mask1 = (mask1 > 0.5).astype(np.float32) * mask1
 
