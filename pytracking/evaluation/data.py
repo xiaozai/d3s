@@ -28,20 +28,20 @@ class Sequence:
 
         ''' Song : added some term for RGBD'''
         self.init_mask = init_mask
-        self.max_depth = None # only for RGBD dataset
-        self.min_depth = None
+        # self.max_depth = None # only for RGBD dataset
+        # self.min_depth = None
 
-        if isinstance(self.frames[0], dict) and ('depth' in self.frames[0]):
-            init_depth = cv2.imread(self.frames[0]['depth'], -1)
-            init_bbox = self.ground_truth_rect[0]
-            if len(init_bbox) == 4:
-                xywh = [int(float(b)) for b in init_bbox]
-                depth_crop = init_depth[xywh[1]:xywh[1]+xywh[3], xywh[0]:xywh[0]+xywh[2]]
-                depth_crop = np.nan_to_num(depth_crop)
-                self.max_depth = np.median(depth_crop[depth_crop>0]) + 2500 # 2500 # *1.5
-                self.min_depth = max(0, np.median(depth_crop[depth_crop>0]) - 1500) # 1500)
-            else:
-                print('not implement for polygon groundtruth in RGBD datasets...')
+        # if isinstance(self.frames[0], dict) and ('depth' in self.frames[0]):
+        #     init_depth = cv2.imread(self.frames[0]['depth'], -1)
+        #     init_bbox = self.ground_truth_rect[0]
+        #     if len(init_bbox) == 4:
+        #         xywh = [int(float(b)) for b in init_bbox]
+        #         depth_crop = init_depth[xywh[1]:xywh[1]+xywh[3], xywh[0]:xywh[0]+xywh[2]]
+        #         depth_crop = np.nan_to_num(depth_crop)
+        #         self.max_depth = np.median(depth_crop[depth_crop>0]) + 2500 # 2500 # *1.5
+        #         self.min_depth = max(0, np.median(depth_crop[depth_crop>0]) - 1500) # 1500)
+        #     else:
+        #         print('not implement for polygon groundtruth in RGBD datasets...')
 
 class SequenceList(list):
     """List of sequences. Supports the addition operator to concatenate sequence lists."""

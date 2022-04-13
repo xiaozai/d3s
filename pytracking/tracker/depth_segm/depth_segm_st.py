@@ -16,11 +16,10 @@ from pytracking.features import augmentation
 import ltr.data.processing_utils as prutils
 from ltr import load_network
 
-# from ltr.external.depthconv.functions import depth_conv
-
 from pytracking.bbox_fit import fit_bbox_to_mask
 from pytracking.mask_to_disk import save_mask
 
+from scipy.signal import find_peaks
 
 class DepthSegmST(BaseTracker):
     def initialize_features(self):
@@ -28,25 +27,54 @@ class DepthSegmST(BaseTracker):
             self.params.features_filter.initialize()
         self.features_initialized = True
 
+    def depth_processing(self, depth, bbox=None, use_colormap=False):
+        ''' Get the depth range for the sequence, [min, max] '''
+        if bbox is not None:
+            bbox = [int(b) for b in bbox]
+            num_pixels = bbox[2]*bbox[3]
+            depth_crop = depth[bbox[1]:bbox[1]+bbox[3], bbox[0]:bbox[0]+bbox[2]]
+            depth_pixels = depth_crop.flatten()
+            depth_pixels = depth_pixels[depth_pixels>0]
+
+            depth_hist, depth_edges = np.histogram(depth_pixels, bins=20)
+            hist_bins = (depth_edges[:-1] + depth_edges[1:]) / 2.0
+            peaks, _ = find_peaks(depth_hist, height=num_pixels/10)
+
+            if len(peaks) > 0:
+                target_depth = hist_bins[peaks[0]]
+            else:
+                target_depth = np.median(depth_pixles)
+            print('target depth:', target_depth)
+
+            self.target_depth = target_depth
+            self.min_depth = max(0, target_depth-1500)
+            self.max_depth = target_depth + 2500
+
+        depth = (depth - self.min_depth) / (self.max_depth - self.min_depth) * 1.0
+        depth = np.clip(depth, 0, 1.0)
+
+        if use_colormap:
+            depth = np.array(depth*255, dtype=np.uint8)
+            depth = cv2.applyColorMap(depth, cv2.COLORMAP_JET)
+        else:
+            depth = np.expand_dims(np.asarray(depth), axis=-1)
+
+        return depth
+
     def initialize(self, image, state, init_mask=None, *args, **kwargs):
         # Initialize some stuff
         self.frame_num = 1
         self.frame_name = '%08d' % self.frame_num
+
+        # Song, add the depth processing into initialize
+        self.max_depth = 10000
+        self.min_depth = 0
 
         if not hasattr(self.params, 'device'):
             self.params.device = 'cuda' if self.params.use_gpu else 'cpu'
 
         # Initialize features for ResNet50
         self.initialize_features()
-
-        # Check if image is color
-        color, depth = image['color'], image['depth']
-        if self.params.use_colormap:
-            depth = np.squeeze(depth)
-            depth = np.array(depth*255, dtype=np.uint8)
-            depth = cv2.applyColorMap(depth, cv2.COLORMAP_JET)
-
-        self.params.features_filter.set_is_color(color.shape[2] == 3)
 
         # Get feature specific params
         self.fparams = self.params.features_filter.get_fparams('feature_params')
@@ -89,6 +117,12 @@ class DepthSegmST(BaseTracker):
 
             self.prev_box = state # song
             self.rotated_bbox = False
+
+
+        # Check if image is color
+        color, depth = image['color'], image['depth']
+        depth = self.depth_processing(depth, bbox=state, use_colormap=self.params.use_colormap)
+        self.params.features_filter.set_is_color(color.shape[2] == 3)
 
         # Set search area
         self.target_scale = 1.0
@@ -155,12 +189,9 @@ class DepthSegmST(BaseTracker):
 
         # Extract and transform sample
         if self.params.use_rgbd_classifier:
-            x_rgb = self.generate_init_samples(im, dp=dp) # Song
+            x_rgb = self.generate_init_samples(im, dp=dp) #
         else:
-            x_rgb = self.generate_init_samples(im) # crops and augments and Generated ResNet50 feature maps for DCF
-
-        print(len(x_rgb), x_rgb[0].shape)
-
+            x_rgb = self.generate_init_samples(im) # TensorList [27, 1024, 16, 16]
         # Initialize projection matrix
         self.init_projection_matrix(x_rgb)
 
@@ -304,11 +335,12 @@ class DepthSegmST(BaseTracker):
 
         # Convert image
         color, depth = image['color'], image['depth']
+        depth = self.depth_processing(depth, use_colormap=self.params.use_colormap)
 
-        if self.params.use_colormap:
-            depth = np.squeeze(depth)
-            depth = np.array(depth*255, dtype=np.uint8)
-            depth = cv2.applyColorMap(depth, cv2.COLORMAP_JET)
+        # if self.params.use_colormap:
+        #     depth = np.squeeze(depth)
+        #     depth = np.array(depth*255, dtype=np.uint8)
+        #     depth = cv2.applyColorMap(depth, cv2.COLORMAP_JET)
 
         im, dp = numpy_to_torch(color), numpy_to_torch(depth)
         self.im, self.dp = im, dp  # For debugging only
@@ -908,11 +940,7 @@ class DepthSegmST(BaseTracker):
         return 1 - np.exp(-((np.power(X, p) / (sz_weight * w ** p)) + (np.power(Y, p) / (sz_weight * h ** p))))
 
     def init_segmentation(self, color, depth, bb, init_mask=None):
-        '''
-        Song init mask sometimes is not correct
 
-        init segm_search_area_factor is too big? because we already know the bbox
-        '''
         init_patch_crop_rgb, f_ = prutils.sample_target(color, np.array(bb), self.params.segm_search_area_factor,
                                                     output_sz=self.params.segm_output_sz, pad_val=0)
 
@@ -951,19 +979,6 @@ class DepthSegmST(BaseTracker):
                                                                       self.params.segm_search_area_factor,
                                                                       output_sz=self.params.segm_output_sz, pad_val=0)
 
-        # # network was renamed therefore we need to specify constructor_module and constructor_fun_name
-        # segm_net, _ = load_network(self.params.segm_net_path, backbone_pretrained=False,
-        #                            constructor_module=self.params.constructor_module,
-        #                            constructor_fun_name=self.params.constructor_fun_name) #
-        #
-        # if self.params.use_gpu:
-        #     segm_net.cuda()
-        # segm_net.eval()
-        #
-        # for p in segm_net.segm_predictor.parameters():
-        #     p.requires_grad = False
-        #
-        # self.segm_net = segm_net
 
         self.params.segm_normalize_mean = np.array(self.params.segm_normalize_mean).reshape((1, 1, 3))
         self.params.segm_normalize_std = np.array(self.params.segm_normalize_std).reshape((1, 1, 3))
@@ -1108,8 +1123,6 @@ class DepthSegmST(BaseTracker):
         self.init_masked_img = init_patch_crop_rgb * np.expand_dims(mask, axis=-1)
 
         self.polygon = None
-        self.prbox = None
-        self.aabb = None
 
     def segment_target(self, color, depth, pos, sz):
         # pos and sz are in the image coordinates
@@ -1120,9 +1133,6 @@ class DepthSegmST(BaseTracker):
         w_ = sz[1]
         h_ = sz[0]
         bb = [tlx_.item(), tly_.item(), w_.item(), h_.item()]
-
-        ''' Song bb = new_pos + prev target_sz'''
-        # bb = self.prev_box ?????
 
         # extract patch
         patch_rgb, f_ = prutils.sample_target(color, np.array(bb), self.params.segm_search_area_factor,
@@ -1225,13 +1235,9 @@ class DepthSegmST(BaseTracker):
 
             mask = np.zeros(mask.shape, dtype=np.uint8)
             cv2.drawContours(mask, [contour], -1, 1, thickness=-1)
-            self.mask = mask # song
+            self.mask = mask       # song
+            self.polygon = polygon # Only for vis
 
-            ''' Song, only for vis, until here, polygon, prbox, aabb is correct'''
-            self.polygon = polygon
-            self.prbox = prbox_init # p0, p1, p2, p3
-            # self.aabb, _ = self.poly_to_aabbox_noscale(prbox_init[:, 0], prbox_init[:, 1]) # Song, why here is not correct
-            # self.aabb = prbox
 
             prbox_opt = np.array([])
             if self.params.segm_optimize_polygon:

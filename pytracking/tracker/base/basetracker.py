@@ -27,7 +27,7 @@ class BaseTracker:
         """Run tracker on a sequence."""
 
         # Initialize
-        image = self._read_image(sequence.frames[0], max_depth=sequence.max_depth, min_depth=sequence.min_depth)
+        image = self._read_image(sequence.frames[0]) #, max_depth=sequence.max_depth, min_depth=sequence.min_depth)
 
         times = []
         start_time = time.time()
@@ -45,7 +45,7 @@ class BaseTracker:
         tracked_conf = [1]
         idx = 1
         for frame in sequence.frames[1:]:
-            image = self._read_image(frame, max_depth=sequence.max_depth, min_depth=sequence.min_depth)
+            image = self._read_image(frame)
 
             start_time = time.time()
             state, conf = self.track(image)
@@ -57,7 +57,7 @@ class BaseTracker:
             if self.params.visualization:
                 self.visualize(image, state, idx=idx)
             idx += 1
-            
+
         return tracked_bb, times, tracked_conf
 
     def track_videofile(self, videofilepath, optional_box=None):
@@ -333,7 +333,6 @@ class BaseTracker:
                 self.ax_rgb_patches.set_title('rgb patches %.02f'%max_score)
 
                 self.ax_d_patches.cla()
-                # d_patches = np.uint8(self.d_patches *255)
                 self.ax_d_patches.imshow(self.d_patches)
                 self.ax_d_patches.set_title('d patches')
 
@@ -346,9 +345,9 @@ class BaseTracker:
             state[0] = max(state[0], 0)
             state[1] = max(state[1], 0)
             if state[0]+state[2] > im_w:
-                state[2] = im_w - state[0]
+                state[2] = im_w - state[0] - 1
             if state[1]+state[3] > im_h:
-                state[3] = im_h - state[1]
+                state[3] = im_h - state[1] - 1
             pred = patches.Rectangle((state[0], state[1]), state[2], state[3], linewidth=2, edgecolor='r', facecolor='none')
             pred_d = patches.Rectangle((state[0], state[1]), state[2], state[3], linewidth=2, edgecolor='r', facecolor='none')
         elif len(state) == 8:
@@ -372,24 +371,22 @@ class BaseTracker:
 
         self.ax.set_axis_off()
         self.ax.axis('equal')
+
+        self.ax_d.set_axis_off()
+        self.ax_d.axis('equal')
+
         plt.draw()
         plt.pause(0.001)
 
         if self.pause_mode:
             plt.waitforbuttonpress()
 
-    def _read_image(self, image_file: str, max_depth=5000, min_depth=0):
-        # return cv.cvtColor(cv.imread(image_file), cv.COLOR_BGR2RGB)
+    def _read_image(self, image_file: str):
         if isinstance(image_file, dict):
             # For CDTB and DepthTrack RGBD datasets
             color = cv.cvtColor(cv.imread(image_file['color']), cv.COLOR_BGR2RGB)
             depth = cv.imread(image_file['depth'], -1)
             depth = np.nan_to_num(depth)
-            # depth[depth > max_depth] = max_depth
-            # depth = cv.normalize(depth, None, alpha=0, beta=1, norm_type=cv.NORM_MINMAX, dtype=cv.CV_32F)
-            depth = (depth - min_depth) / (max_depth - min_depth) * 1.0
-            depth = np.clip(depth, 0, 1.0)
-            depth = np.expand_dims(np.asarray(depth), axis=-1)
             images = {'color':color, 'depth':depth}
             return images
         else:

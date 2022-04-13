@@ -204,12 +204,15 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
 
 
         if len(vis_data) == 2:
-            p_rgb, p_d = vis_data
-
-            p_rgb = p_rgb[batch_element, ...] # [H, W, 2] F + B
-            p_d = p_d[batch_element, ...]
-            p_rgb = (p_rgb.numpy().squeeze()).astype(np.float32) # [H, W, 2]
-            p_d = (p_d.numpy().squeeze()).astype(np.float32)
+            # p_rgb, p_d = vis_data
+            #
+            # p_rgb = p_rgb[batch_element, ...] # [H, W, 2] F + B
+            # p_d = p_d[batch_element, ...]
+            # p_rgb = (p_rgb.numpy().squeeze()).astype(np.float32) # [H, W, 2]
+            # p_d = (p_d.numpy().squeeze()).astype(np.float32)
+            attn_weights1, attn_weights3 = vis_data
+            attn_weights1 = attn_weights1[batch_element, 0, ...].numpy().squeeze()
+            attn_weights3 = attn_weights3[batch_element, 0, ...].numpy().squeeze()
 
         elif len(vis_data) == 3:
             attn_weights2, attn_weights1, attn_weights0 = vis_data
@@ -281,19 +284,26 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
     test_dist = data['test_dist'][0, batch_element, :, :].numpy().squeeze().astype(np.float32)
 
 
-    # softmax on the mask prediction (since this is done internaly when calculating loss)
-    mask0 = F.softmax(pred_mask[0], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
-    predicted_mask0 = (mask0 > 0.5).astype(np.float32) * mask0
+    if len(pred_mask) == 4:
+        # softmax on the mask prediction (since this is done internaly when calculating loss)
+        mask0 = F.softmax(pred_mask[0], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
+        predicted_mask0 = (mask0 > 0.5).astype(np.float32) * mask0
 
-    mask1 = F.softmax(pred_mask[1], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
-    predicted_mask1 = (mask1 > 0.5).astype(np.float32) * mask1
+        mask1 = F.softmax(pred_mask[1], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
+        predicted_mask1 = (mask1 > 0.5).astype(np.float32) * mask1
 
-    mask2 = F.softmax(pred_mask[2], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
-    predicted_mask2 = (mask2 > 0.5).astype(np.float32) * mask2
+        mask2 = F.softmax(pred_mask[2], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
+        predicted_mask2 = (mask2 > 0.5).astype(np.float32) * mask2
 
-    mask3 = F.softmax(pred_mask[3], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
-    predicted_mask3 = (mask3 > 0.5).astype(np.float32) * mask3
+        mask3 = F.softmax(pred_mask[3], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
+        predicted_mask3 = (mask3 > 0.5).astype(np.float32) * mask3
 
+    elif len(pred_mask) = 2:
+        mask1 = F.softmax(pred_mask[0], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
+        predicted_mask1 = (mask1 > 0.5).astype(np.float32) * mask1
+
+        mask3 = F.softmax(pred_mask[1], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
+        predicted_mask3 = (mask3 > 0.5).astype(np.float32) * mask3
 
     f, ((ax1, ax2, ax3, ax4), \
         (ax5, ax6, ax7, ax8), \
@@ -311,16 +321,20 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
     draw_axis(ax7, predicted_mask0, 'Prediction') # , show_minmax=True)
     draw_axis(ax8, test_dist, 'test_dist')
 
-    draw_axis(ax13, predicted_mask0, 'Layer0') #, show_minmax=True)
+
     draw_axis(ax14, predicted_mask1, 'Layer1') #, show_minmax=True)
-    draw_axis(ax15, predicted_mask2, 'Layer2') #, show_minmax=True)
     draw_axis(ax16, predicted_mask3, 'Layer3') #, show_minmax=True)
+
+    if len(pred_mask) == 4:
+        draw_axis(ax13, predicted_mask0, 'Layer0') #, show_minmax=True)
+        draw_axis(ax15, predicted_mask2, 'Layer2') #, show_minmax=True)
+
 
     if vis_data is not None:
         if len(vis_data) == 2:
-            draw_axis(ax9, test_dist, 'test_dist')
-            draw_axis(ax10, p_rgb, 'similarity rgb')
-            draw_axis(ax11, p_d, 'similarity d')
+            # draw_axis(ax9, test_dist, 'test_dist')
+            draw_axis(ax10, attn_weights1, 'attn_weights 1')
+            draw_axis(ax11, attn_weights3, 'attn_weights 3')
 
         elif len(vis_data) == 4 or len(vis_data) == 3:
             draw_axis(ax9, attn_weights0, 'attn_weights0')
