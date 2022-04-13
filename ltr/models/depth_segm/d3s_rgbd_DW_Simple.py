@@ -182,16 +182,16 @@ class SegmNet(nn.Module):
         self.segment0 = conv(segm_input_dim[3], segm_dim[0], kernel_size=1, padding=0)
         self.segment1 = conv_no_relu(segm_dim[0], segm_dim[1])
 
-        self.mixer = conv(mixer_channels, segm_inter_dim[3])
+        self.mixer = conv(mixer_channels, segm_inter_dim[2])
 
-        self.s1 = conv(segm_inter_dim[2], segm_inter_dim[1])
-        self.s3 = conv(segm_inter_dim[3], segm_inter_dim[2])
+        self.s1 = conv(segm_inter_dim[1], segm_inter_dim[1])
+        self.s3 = conv(segm_inter_dim[2], segm_inter_dim[1])
 
 
         self.f1 = conv(segm_input_dim[1], segm_inter_dim[1])
         self.m1 = conv(segm_inter_dim[1], segm_inter_dim[1])
 
-        self.post3 = conv(segm_inter_dim[2], 2)
+        self.post3 = conv(segm_inter_dim[1], 2)
         self.post1 = conv(segm_inter_dim[1], 2)
 
         self.rgbd_fusion3 = DWNet(segm_inter_dim[3], segm_inter_dim[3], segm_inter_dim[3])
@@ -233,8 +233,8 @@ class SegmNet(nn.Module):
                                  torch.unsqueeze(pred_pos, dim=1),
                                  dist), dim=1)
 
-        out3 = self.mixer(segm_layers)                       # [B, 64, 24, 24]
-        out3 = self.s3(F.upsample(out3, scale_factor=4))     # [B, 32, 96, 96]
+        out3 = self.mixer(segm_layers)                       # [B, 32, 24, 24]
+        out3 = self.s3(F.upsample(out3, scale_factor=4))     # [B, 16, 96, 96]
 
         f_test_rgbd, attn01 = self.rgbd_fusion1(self.f1(feat_test[1]), feat_test_d[1])     # [B, 16, 96, 96]
         out1 = self.post1(F.upsample(self.m1(f_test_rgbd) + self.s1(out3), scale_factor=4))
