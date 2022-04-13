@@ -318,7 +318,7 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
     draw_axis(ax4, test_depth, 'Test depth')
     draw_axis(ax5, train_mask, 'train mask')
     draw_axis(ax6, test_mask, 'Ground-truth')
-    draw_axis(ax7, predicted_mask0, 'Prediction') # , show_minmax=True)
+    # draw_axis(ax7, predicted_mask0, 'Prediction') # , show_minmax=True)
     draw_axis(ax8, test_dist, 'test_dist')
 
 
