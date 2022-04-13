@@ -55,3 +55,4 @@ from .d3s_rgbd_Attn_DW import SegmNet as D3S_Attn_DW_RGBD
 from .d3s_rgbd_Attn02_DW import SegmNet as D3S_Attn02_DW_RGBD
 
 from .d3s_rgbd_DW_Simple import SegmNet as D3S_DWSim_RGBD
+from .d3s_rgbd_DWSim02 import SegmNet as D3S_DWSim02_RGBD
