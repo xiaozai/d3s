@@ -334,7 +334,7 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
         if len(vis_data) == 2:
             # draw_axis(ax9, test_dist, 'test_dist')
             draw_axis(ax10, attn_weights1, 'attn_weights 1')
-            draw_axis(ax11, attn_weights3, 'attn_weights 3')
+            draw_axis(ax12, attn_weights3, 'attn_weights 3')
 
         elif len(vis_data) == 4 or len(vis_data) == 3:
             draw_axis(ax9, attn_weights0, 'attn_weights0')
