@@ -234,13 +234,13 @@ class SegmNet(nn.Module):
                                  dist), dim=1)
 
         out3 = self.mixer(segm_layers)                       # [B, 64, 24, 24]
-        out3 = self.s3(F.upsample(out3, scale_factor=2))     # [B, 32, 48, 48]
+        out3 = self.s3(F.upsample(out3, scale_factor=4))     # [B, 32, 96, 96]
 
         f_test_rgbd, attn01 = self.rgbd_fusion1(self.f1(feat_test[1]), feat_test_d[1])     # [B, 16, 96, 96]
         out1 = self.post1(F.upsample(self.m1(f_test_rgbd) + self.s1(out3), scale_factor=4))
 
         # for the pyramid supervision
-        out3 = self.post3(F.upsample(out3, scale_factor=8)) # [B, 2, 384, 384],
+        out3 = self.post3(F.upsample(out3, scale_factor=4)) # [B, 2, 384, 384],
 
         if not debug:
             return (out1, out3)
