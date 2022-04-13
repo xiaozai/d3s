@@ -253,12 +253,13 @@ class SegmNet(nn.Module):
             ''' F + P , segm_layers: [B,2,24,24]'''
             segm_layers = torch.cat((torch.unsqueeze(pred_sm[:, :, :, 0], dim=1), torch.unsqueeze(pred_pos, dim=1)), dim=1)
 
-        out = self.mixer(segm_layers)
-        out3 = self.s3(F.upsample(out, scale_factor=8))
 
-        f_test_rgbd2, attn02 = self.rgbd_fusion2(self.f2(feat_test[2]), feat_test_d[2])
-        f_test_rgbd1, attn01 = self.rgbd_fusion1(self.f1(feat_test[1]), feat_test_d[1])
-        f_test_rgbd0, attn00 = self.rgbd_fusion0(self.f0(feat_test[0]), feat_test_d[0])
+        out = self.mixer(segm_layers)                   # B, 3, 24, 24 -> B, 64, 24, 24
+        out3 = self.s3(F.upsample(out, scale_factor=8)) # B, 32, 192, 192
+
+        f_test_rgbd2, attn02 = self.rgbd_fusion2(self.f2(feat_test[2]), feat_test_d[2]) # B, 32, 48, 48
+        f_test_rgbd1, attn01 = self.rgbd_fusion1(self.f1(feat_test[1]), feat_test_d[1]) # B, 16, 96, 96
+        f_test_rgbd0, attn00 = self.rgbd_fusion0(self.f0(feat_test[0]), feat_test_d[0]) # B, 4, 192, 192
 
         # B, 32+16+4, 192, 192
         f_test_rgbd = torch.cat((F.upsample(self.m2(f_test_rgbd2), scale_factor=4),
@@ -266,14 +267,13 @@ class SegmNet(nn.Module):
                                  self.m0(f_test_rgbd0)),
                                  dim=1)
 
-        out0 = self.post(F.upsample(self.m(f_test_rgbd) + self.s0(out3), scale_factor=2))
+        out0 = self.post(F.upsample(self.m(f_test_rgbd) + self.s0(out3), scale_factor=2)) # -> B, 4, 192, 192 -> B, 2, 384, 384
         pred3 = self.pyramid_pred3(F.upsample(out3, scale_factor=2))
 
         if not debug:
             return (out0, pred3)
         else:
             return (out0, pred3), (attn00, attn01, attn02, attn03)
-
 
     def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg):
         '''Song's comments:

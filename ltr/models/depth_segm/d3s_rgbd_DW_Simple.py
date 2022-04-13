@@ -233,7 +233,7 @@ class SegmNet(nn.Module):
                                  torch.unsqueeze(pred_pos, dim=1),
                                  dist), dim=1)
 
-        out3 = self.mixer(segm_layers)                       # [B, 32, 24, 24]
+        out3 = self.mixer(segm_layers)                       # [B, 3, 24, 24] -> [B, 32, 24, 24]
         out3 = self.s3(F.upsample(out3, scale_factor=4))     # [B, 16, 96, 96]
 
         f_test_rgbd, attn01 = self.rgbd_fusion1(self.f1(feat_test[1]), feat_test_d[1])     # [B, 16, 96, 96]
