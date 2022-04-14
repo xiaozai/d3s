@@ -342,8 +342,8 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
 
     elif len(pred_mask) == 3:
         draw_axis(ax12, predicted_mask_d, 'DepthMask') #, show_minmax=True)
-        draw_axis(ax13, predicted_mask0, 'Layer0') #, show_minmax=True)
-        draw_axis(ax15, predicted_mask2, 'Layer2') #, show_minmax=True)
+        draw_axis(ax13, predicted_mask1, 'Pred') #, show_minmax=True)
+        draw_axis(ax15, predicted_mask3, 'Layer3') #, show_minmax=True)
 
 
     if vis_data is not None:
