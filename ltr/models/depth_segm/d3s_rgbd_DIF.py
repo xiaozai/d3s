@@ -249,7 +249,7 @@ class SegmNet(nn.Module):
                                          F.upsample(self.f1(feat_test[1]), scale_factor=2),   # B, 16, 96, 96
                                          self.f0(feat_test[0])), dim=1))                      # B, 4, 192, 192
                                                                                 # B, 64+32+16, 192, 192 -> B, 16, 192, 192
-        f_d = self.conv_d(F.unsample(feat_test_d[1], scale_factor=2))           # B, 16,  96,  96 -> B, 16, 192, 192
+        f_d = self.conv_d(F.upsample(feat_test_d[1], scale_factor=2))           # B, 16,  96,  96 -> B, 16, 192, 192
         f_rgbd, attn_f = self.rgbd_fusion_f(f_rgb, f_d)                         # B, 16, 192, 192 -> B, 16, 192, 192
 
         out_f = self.post_f(F.upsample(self.m0(f_rgbd) + self.s0(out_i), scale_factor=2)) # -> B, 4, 192, 192 -> B, 2, 384, 384
