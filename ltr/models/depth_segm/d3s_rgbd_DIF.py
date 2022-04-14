@@ -194,7 +194,7 @@ class SegmNet(nn.Module):
 
         self.post_f = conv_no_relu(segm_inter_dim[0], 2)
         self.post_i = conv_no_relu(segm_inter_dim[1], 2)
-        self.post_d = conv_no_relu(segm_inter_dim[0], 2)
+        # self.post_d = conv_no_relu(segm_inter_dim[0], 2)
 
         self.m2 = conv(segm_inter_dim[2], segm_inter_dim[2])
         self.m1 = conv(segm_inter_dim[1], segm_inter_dim[1])
@@ -203,7 +203,7 @@ class SegmNet(nn.Module):
         # Convert Stacked RGB features to a single feature map
         self.conv_rgb = conv1x1_no_relu(32+16+4, segm_inter_dim[1])
         self.conv_d = conv1x1_no_relu(segm_inter_dim[1], segm_inter_dim[1])
-        self.conv_d2 = conv1x1_no_relu(65, segm_inter_dim[0])
+        # self.conv_d2 = conv1x1_no_relu(65, segm_inter_dim[0])
 
         self.rgbd_fusion_i = DWNet(segm_inter_dim[3], segm_inter_dim[3], segm_inter_dim[3])
         self.rgbd_fusion_f = DWNet(segm_inter_dim[1], segm_inter_dim[1], segm_inter_dim[1])
@@ -254,14 +254,14 @@ class SegmNet(nn.Module):
 
         out_f = self.post_f(F.upsample(self.m0(f_rgbd) + self.s0(out_i), scale_factor=2)) # -> B, 4, 192, 192 -> B, 2, 384, 384
 
-        ''' DepthNet, weak-supervision '''
-        out_d = F.upsample(torch.cat((feat_test_d[3], dist), dim=1), scale_factor=8) # B, 65, 192, 192
-        out_d = self.post_d(F.upsample(self.conv_d2(out_d), scale_factor=2))
+        # ''' DepthNet, weak-supervision '''
+        # out_d = F.upsample(torch.cat((feat_test_d[3], dist), dim=1), scale_factor=8) # B, 65, 192, 192
+        # out_d = self.post_d(F.upsample(self.conv_d2(out_d), scale_factor=2))
 
         if not debug:
-            return (out_f, pred_i, out_d)
+            return (out_f, pred_i)
         else:
-            return (out_f, pred_i, out_d), (attn_f, attn_i)
+            return (out_f, pred_i), (attn_f, attn_i)
 
     def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg):
         '''Song's comments:
