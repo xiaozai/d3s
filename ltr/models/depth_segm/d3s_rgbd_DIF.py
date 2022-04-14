@@ -256,7 +256,7 @@ class SegmNet(nn.Module):
 
         ''' DepthNet, weak-supervision '''
         out_d = F.upsample(torch.cat((feat_test_d[3], dist), dim=1), scale_factor=8) # B, 5, 192, 192
-        out_d = self.post_d(F.upsample(self.conv_d2(out_d), scale_factor=2)))
+        out_d = self.post_d(F.upsample(self.conv_d2(out_d), scale_factor=2))
 
         if not debug:
             return (out_f, pred_i, out_d)
