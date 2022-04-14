@@ -33,13 +33,15 @@ def conv_no_relu(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dila
 def conv3x3_layer(in_planes, out_planes):
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1, bias=True)
 
-def conv1x1_layer(in_planes, out_planes):
-    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=1, padding=0, dilation=1, bias=True)
+def conv1x1_no_relu(in_planes, out_planes):
+    return nn.Sequential(
+                nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=1, padding=0, dilation=1, bias=True),
+                nn.BatchNorm2d(out_planes))
 
 def conv131_layer(input_dim, output_dim, kernel_size=3, stride=2, padding=1):
-    return nn.Sequential(conv1x1_layer(input_dim, output_dim),
+    return nn.Sequential(conv1x1_no_relu(input_dim, output_dim),
                          conv(output_dim, output_dim, kernel_size=kernel_size, stride=stride, padding=padding),
-                         conv1x1_layer(output_dim, output_dim))
+                         conv1x1_no_relu(output_dim, output_dim))
 
 
 '''In spired by ECCV2020
@@ -160,10 +162,10 @@ class DepthNet(nn.Module):
 
     def forward(self, dp):
         ''' It seems the DepthNet is too sallow and did not learn anything '''
-        feat0 = self.conv0(dp)
-        feat1 = self.conv1(feat0)
-        feat2 = self.conv2(feat1)
-        feat3 = self.conv3(feat2)
+        feat0 = self.conv0(dp)    # 192, 192
+        feat1 = self.conv1(feat0) # 96, 96
+        feat2 = self.conv2(feat1) # 48, 48
+        feat3 = self.conv3(feat2) # 24, 24
 
         return [feat0, feat1, feat2, feat3] # [4, 16, 32, 64]
 
@@ -183,19 +185,28 @@ class SegmNet(nn.Module):
         self.segment1 = conv_no_relu(segm_dim[0], segm_dim[1])
 
         self.mixer = conv(mixer_channels, segm_inter_dim[2])
-
-        self.s1 = conv(segm_inter_dim[1], segm_inter_dim[1])
         self.s3 = conv(segm_inter_dim[2], segm_inter_dim[1])
+        self.s0 = conv(segm_inter_dim[1], segm_inter_dim[0])
 
-
+        self.f2 = conv(segm_input_dim[2], segm_inter_dim[2])
         self.f1 = conv(segm_input_dim[1], segm_inter_dim[1])
+        self.f0 = conv(segm_input_dim[0], segm_inter_dim[0])
+
+        self.post_f = conv_no_relu(segm_inter_dim[0], 2)
+        self.post_i = conv_no_relu(segm_inter_dim[1], 2)
+        self.post_d = conv_no_relu(segm_inter_dim[0], 2)
+
+        self.m2 = conv(segm_inter_dim[2], segm_inter_dim[2])
         self.m1 = conv(segm_inter_dim[1], segm_inter_dim[1])
+        self.m0 = conv(segm_inter_dim[1], segm_inter_dim[0])
 
-        self.post3 = conv(segm_inter_dim[1], 2)
-        self.post1 = conv(segm_inter_dim[1], 2)
+        # Convert Stacked RGB features to a single feature map
+        self.conv_rgb = conv1x1_no_relu(32+16+4, segm_inter_dim[1])
+        self.conv_d = conv1x1_no_relu(segm_inter_dim[1], segm_inter_dim[1])
+        self.conv_d2 = conv1x1_no_relu(5, segm_inter_dim[0])
 
-        self.rgbd_fusion3 = DWNet(segm_inter_dim[3], segm_inter_dim[3], segm_inter_dim[3])
-        self.rgbd_fusion1 = DWNet(segm_inter_dim[1], segm_inter_dim[1], segm_inter_dim[1])
+        self.rgbd_fusion_i = DWNet(segm_inter_dim[3], segm_inter_dim[3], segm_inter_dim[3])
+        self.rgbd_fusion_f = DWNet(segm_inter_dim[1], segm_inter_dim[1], segm_inter_dim[1])
 
         # Init weights
         for m in self.modules():
@@ -208,45 +219,49 @@ class SegmNet(nn.Module):
         self.topk_neg = topk_neg
 
     def forward(self, feat_test, feat_test_d, feat_train, feat_train_d, mask_train, test_dist=None, debug=False):
-        ''' Only Two Phrase:
-            Initial   : F_{layer3}
-            Finetune  : F_{layer1} or cat(F_{layer1:3})
-        '''
+        # Fusion RGBD Features
         f_test = self.segment1(self.segment0(feat_test[3]))    # 1x1x64 conv + 3x3x64 conv -> [1, 1024, 24,24] -> [1, 64, 24, 24]
         f_train = self.segment1(self.segment0(feat_train[3]))  # 1x1x64 conv + 3x3x64 conv -> [1, 1024, 24,24] -> [1, 64, 24, 24]
-        # Fusion RGBD Features
-        f_test, attn03 = self.rgbd_fusion3(f_test, feat_test_d[3]) # [B, 64, 24, 24]
-        f_train, _ = self.rgbd_fusion3(f_train, feat_train_d[3])
-
-        # reshape mask to the feature size
+        #
+        f_test, attn_i = self.rgbd_fusion_i(f_test, feat_test_d[3])
+        f_train, _ = self.rgbd_fusion_i(f_train, feat_train_d[3])
+        #
         mask_pos = F.interpolate(mask_train[0], size=(f_train.shape[-2], f_train.shape[-1])) # [1,1,384, 384] -> [1,1,24,24]
         mask_neg = 1 - mask_pos
 
-        pred_pos, pred_neg = self.similarity_segmentation(f_test, f_train, mask_pos, mask_neg)
-
-        pred_ = torch.cat((torch.unsqueeze(pred_pos, -1), torch.unsqueeze(pred_neg, -1)), dim=-1)
-        pred_sm = F.softmax(pred_, dim=-1) # [1, 24, 24, 2]
-
         ''' F + P + L , segm_layers: [B,3,24,24]'''
+        pred_pos, pred_neg = self.similarity_segmentation(f_test, f_train, mask_pos, mask_neg)
+        pred_ = torch.cat((torch.unsqueeze(pred_pos, -1), torch.unsqueeze(pred_neg, -1)), dim=-1)
+        pred_sm = F.softmax(pred_, dim=-1)                                              # [1, 24, 24, 2]
+        # distance map is give - resize for mixer
         dist = F.interpolate(test_dist[0], size=(f_train.shape[-2], f_train.shape[-1])) # [1,1,24,24]
         segm_layers = torch.cat((torch.unsqueeze(pred_sm[:, :, :, 0], dim=1),
                                  torch.unsqueeze(pred_pos, dim=1),
                                  dist), dim=1)
 
-        out3 = self.mixer(segm_layers)                       # [B, 3, 24, 24] -> [B, 32, 24, 24]
-        out3 = self.s3(F.upsample(out3, scale_factor=4))     # [B, 16, 96, 96]
+        ''' Initial Segment'''
+        out_i = self.mixer(segm_layers)                         # B, 3, 24, 24    -> B, 32, 24, 24
+        out_i = self.s3(F.upsample(out_i, scale_factor=8))      # B, 32, 96, 96 -> B, 16, 192, 192
+        pred_i = self.post_i(F.upsample(out_i, scale_factor=2)) # B, 16, 192, 192 -> B, 2, 384, 384
 
-        f_test_rgbd, attn01 = self.rgbd_fusion1(self.f1(feat_test[1]), feat_test_d[1])     # [B, 16, 96, 96]
-        out1 = self.post1(F.upsample(self.m1(f_test_rgbd) + self.s1(out3), scale_factor=4))
+        ''' Finetune Segment '''
+        f_rgb = self.conv_rgb(torch.cat((F.upsample(self.f2(feat_test[2]), scale_factor=4),   # B, 32, 48, 48
+                                         F.upsample(self.f1(feat_test[1]), scale_factor=2),   # B, 16, 96, 96
+                                         self.f0(feat_test[0])), dim=1))                      # B, 4, 192, 192
+                                                                                # B, 64+32+16, 192, 192 -> B, 16, 192, 192
+        f_d = self.conv_d(F.unsample(feat_test_d[1], scale_factor=2))           # B, 16,  96,  96 -> B, 16, 192, 192
+        f_rgbd, attn_f = self.rgbd_fusion_f(f_rgb, f_d)                         # B, 16, 192, 192 -> B, 16, 192, 192
 
-        # for the pyramid supervision
-        out3 = self.post3(F.upsample(out3, scale_factor=4)) # [B, 2, 384, 384],
+        out_f = self.post_f(F.upsample(self.m0(f_rgbd) + self.s0(out_i), scale_factor=2)) # -> B, 4, 192, 192 -> B, 2, 384, 384
+
+        ''' DepthNet, weak-supervision '''
+        out_d = F.upsample(torch.cat((feat_test_d[3], dist), dim=1), scale_factor=8) # B, 5, 192, 192
+        out_d = self.post_d(F.upsample(self.conv_d2(out_d), scale_factor=2)))
 
         if not debug:
-            return (out1, out3)
+            return (out_f, pred_i, out_d)
         else:
-            return (out1, out3), (attn01, attn03)
-
+            return (out_f, pred_i, out_d), (attn_f, attn_i)
 
     def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg):
         '''Song's comments:

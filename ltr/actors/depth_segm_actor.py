@@ -305,6 +305,17 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
         mask3 = F.softmax(pred_mask[1], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
         predicted_mask3 = (mask3 > 0.5).astype(np.float32) * mask3
 
+    elif len(pred_mask) == 3:
+        mask1 = F.softmax(pred_mask[0], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
+        predicted_mask1 = (mask1 > 0.5).astype(np.float32) * mask1
+
+        mask3 = F.softmax(pred_mask[1], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
+        predicted_mask3 = (mask3 > 0.5).astype(np.float32) * mask3
+
+        mask_d = F.softmax(pred_mask[2], dim=1)[batch_element, 0, :, :].numpy().astype(np.float32)
+        predicted_mask_d = (mask_d > 0.5).astype(np.float32) * mask_d
+
+
     f, ((ax1, ax2, ax3, ax4), \
         (ax5, ax6, ax7, ax8), \
         (ax9, ax10, ax11, ax12), \
@@ -326,6 +337,11 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
     draw_axis(ax16, predicted_mask3, 'Layer3') #, show_minmax=True)
 
     if len(pred_mask) == 4:
+        draw_axis(ax13, predicted_mask0, 'Layer0') #, show_minmax=True)
+        draw_axis(ax15, predicted_mask2, 'Layer2') #, show_minmax=True)
+
+    elif len(pred_mask) == 3:
+        draw_axis(ax12, predicted_mask_d, 'DepthMask') #, show_minmax=True)
         draw_axis(ax13, predicted_mask0, 'Layer0') #, show_minmax=True)
         draw_axis(ax15, predicted_mask2, 'Layer2') #, show_minmax=True)
 
@@ -449,21 +465,23 @@ class DepthSegmActor_MultiPred(BaseActor):
             loss1 = self.objective(masks_pred[0], masks_gt_pair)
             loss3 = self.objective(masks_pred[1], masks_gt_pair)
             loss = loss1 + loss3 * 0.5
-        # loss = loss0 * 1.0 + loss1 * 1.0 + loss2 * 1.0 + loss3 * 1.0
 
             stats = {'Loss/total': loss.item(),
                      'Layer1': loss1.item(),
                      'Layer3': loss3.item(),
                      }
 
-        #
-        # stats = {'Loss/total': loss.item(),
-        #          # 'Loss/segm': loss.item(),
-        #          'Layer0': loss0.item(),
-        #          'Layer1': loss1.item(),
-        #          'Layer2': loss2.item(),
-        #          'Layer3': loss3.item(),
-        #          }
+        elif len(masks_pred) == 3:
+            loss1 = self.objective(masks_pred[0], masks_gt_pair)
+            loss3 = self.objective(masks_pred[1], masks_gt_pair)
+            loss_d = self.objective(masks_pred[2], masks_gt_pair)
+            loss = loss1 + loss3 * 0.5 + loss_d * 0.5
+
+            stats = {'Loss/total': loss.item(),
+                     'Layer1': loss1.item(),
+                     'Layer3': loss3.item(),
+                     'Loss D': loss_d.item()
+                     }
 
         if 'iter' in data and (data['iter'] - 1) % 50 == 0:
 

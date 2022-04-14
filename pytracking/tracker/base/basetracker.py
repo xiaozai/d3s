@@ -344,9 +344,9 @@ class BaseTracker:
         if len(state) == 4:
             state[0] = max(state[0], 0)
             state[1] = max(state[1], 0)
-            if state[0]+state[2] > im_w:
+            if state[0]+state[2] >= im_w:
                 state[2] = im_w - state[0] - 1
-            if state[1]+state[3] > im_h:
+            if state[1]+state[3] >= im_h:
                 state[3] = im_h - state[1] - 1
             pred = patches.Rectangle((state[0], state[1]), state[2], state[3], linewidth=2, edgecolor='r', facecolor='none')
             pred_d = patches.Rectangle((state[0], state[1]), state[2], state[3], linewidth=2, edgecolor='r', facecolor='none')
