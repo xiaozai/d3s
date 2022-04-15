@@ -232,8 +232,9 @@ class SegmNet(nn.Module):
 
         ''' Finetune Segment '''
         f_rgb_L0 = self.f0(feat_test[0])
-        f_rgb_L2 = F.interpolate(self.f2(feat_test[2]), size=(f_rgb_L0.shape[-2], f_rgb_L0.shape[-1]))
         f_rgb_L1 = F.interpolate(self.f1(feat_test[1]), size=(f_rgb_L0.shape[-2], f_rgb_L0.shape[-1]))
+        f_rgb_L2 = F.interpolate(self.f2(feat_test[2]), size=(f_rgb_L0.shape[-2], f_rgb_L0.shape[-1]))
+
         f_rgb = self.conv_rgb(torch.cat((f_rgb_L2, f_rgb_L1, f_rgb_L0), dim=1))
         f_d = self.conv_d(feat_test_d)
         f_rgbd, attn_f = self.rgbd_fusion_f(f_rgb, f_d)
