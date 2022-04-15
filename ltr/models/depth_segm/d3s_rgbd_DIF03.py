@@ -141,6 +141,7 @@ class DepthNet(nn.Module):
 
         self.conv0 = conv131_layer(input_dim, 16, stride=2)
         self.conv1 = conv131_layer(16, 32, stride=2)
+        self.conv2 = conv131_layer(32, 64, stride=1)
 
         self.initialize()
 
@@ -155,6 +156,7 @@ class DepthNet(nn.Module):
         ''' We did not need multi-level depth feature, one is enough'''
         out = self.conv0(dp)
         out = self.conv1(out) # B, 32, 96,  96
+        out = self.conv2(out)
         return out
 
 
@@ -183,16 +185,14 @@ class SegmNet(nn.Module):
         self.post_f = conv_no_relu(segm_inter_dim[0], 2)
         self.post_i = conv_no_relu(segm_inter_dim[1], 2)
 
-        # self.m2 = conv(segm_inter_dim[2], segm_inter_dim[2])
-        # self.m1 = conv(segm_inter_dim[1], segm_inter_dim[1])
         self.m0 = conv(segm_inter_dim[1], segm_inter_dim[0])
 
         # Convert Stacked RGB features to a single feature map
         self.conv_rgb = conv1x1_no_relu(32+16+4, segm_inter_dim[1])
-        self.conv_d = conv1x1_no_relu(32, segm_inter_dim[1])
+        self.conv_d = conv1x1_no_relu(64, segm_inter_dim[1])
 
-        self.rgbd_fusion_i = DWNet(segm_inter_dim[3], 32, segm_inter_dim[3])
-        self.rgbd_fusion_f = DWNet(segm_inter_dim[1], segm_inter_dim[1], segm_inter_dim[1])
+        self.rgbd_fusion_i = DWNet(segm_inter_dim[3], 64, segm_inter_dim[3])
+        self.rgbd_fusion_f = DWNet(segm_inter_dim[1], 64, segm_inter_dim[1])
 
         # Init weights
         for m in self.modules():
@@ -210,11 +210,11 @@ class SegmNet(nn.Module):
         f_train = self.segment1(self.segment0(feat_train[3]))  # 1x1x64 conv + 3x3x64 conv -> [1, 1024, 24,24] -> [1, 64, 24, 24]
         #
         # Use the same depth attention map?
-        # f_d = self.conv_d(feat_test_d)
-        # f_train_d = self.conv_d(feat_train_d)
+        f_d = self.conv_d(feat_test_d)
+        f_train_d = self.conv_d(feat_train_d)
         #
-        f_test, attn_i = self.rgbd_fusion_i(f_test, feat_test_d)
-        f_train, _ = self.rgbd_fusion_i(f_train, feat_train_d)
+        f_test, attn_i = self.rgbd_fusion_i(f_test, f_d)
+        f_train, _ = self.rgbd_fusion_i(f_train, f_train_d)
         #
         mask_pos = F.interpolate(mask_train[0], size=(f_train.shape[-2], f_train.shape[-1])) # [1,1,384, 384] -> [1,1,24,24]
         mask_neg = 1 - mask_pos
@@ -238,9 +238,8 @@ class SegmNet(nn.Module):
         f_rgb_L0 = self.f0(feat_test[0])
         f_rgb_L1 = F.interpolate(self.f1(feat_test[1]), size=(f_rgb_L0.shape[-2], f_rgb_L0.shape[-1]))
         f_rgb_L2 = F.interpolate(self.f2(feat_test[2]), size=(f_rgb_L0.shape[-2], f_rgb_L0.shape[-1]))
-
         f_rgb = self.conv_rgb(torch.cat((f_rgb_L2, f_rgb_L1, f_rgb_L0), dim=1))
-        f_d = self.conv_d(feat_test_d)
+    
         f_rgbd, attn_f = self.rgbd_fusion_f(f_rgb, f_d)
 
         out_f = self.post_f(F.upsample(self.m0(f_rgbd) + self.s0(out_i), scale_factor=2)) # -> B, 4, 192, 192 -> B, 2, 384, 384
