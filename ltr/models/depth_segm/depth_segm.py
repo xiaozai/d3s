@@ -926,7 +926,7 @@ def depth_segm_D3S_DWSim_MP_resnet50(segm_input_dim=(256,256), segm_inter_dim=(2
     segm_dim = (64, 64)  # convolutions before cosine similarity
 
     # segmentation
-    segm_predictor = segmmodels.D3S_DWSim02_RGBD()
+    segm_predictor = segmmodels.D3S_DWSim_RGBD()
 
     net = DepthSegmNet(feature_extractor=backbone_net, segm_predictor=segm_predictor,
                        segm_layers=['conv1', 'layer1', 'layer2', 'layer3'], extractor_grad=False)  # extractor_grad=False
