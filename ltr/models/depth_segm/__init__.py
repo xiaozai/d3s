@@ -56,3 +56,4 @@ from .d3s_rgbd_Attn02_DW import SegmNet as D3S_Attn02_DW_RGBD
 
 from .d3s_rgbd_DWSim import SegmNet as D3S_DWSim_RGBD
 from .d3s_rgbd_DIF import SegmNet as D3S_DIF_RGBD
+from .d3s_rgbd_DIF02 import SegmNet as D3S_DIF02_RGBD
