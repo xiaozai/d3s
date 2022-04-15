@@ -39,7 +39,7 @@ def run(settings):
     if not os.path.isdir(settings.env.workspace_dir):
         os.mkdir(settings.env.workspace_dir)
 
-    settings.env.images_dir = os.path.join(settings.env.workspace_dir, 'images_D3S_DWSim_MP')
+    settings.env.images_dir = os.path.join(settings.env.workspace_dir, 'images_D3S_DWSim02_MP')
     if not os.path.isdir(settings.env.images_dir):
         os.mkdir(settings.env.images_dir)
 
@@ -102,7 +102,7 @@ def run(settings):
 
     # Create network
     # resnet50 or resnet18
-    net = segm_models.depth_segm_D3S_DW_Simple_MP_resnet50(backbone_pretrained=True, topk_pos=settings.segm_topk_pos,
+    net = segm_models.depth_segm_D3S_DWSim_MP_resnet50(backbone_pretrained=True, topk_pos=settings.segm_topk_pos,
                                                         topk_neg=settings.segm_topk_neg, mixer_channels=mixer_channels)
 
     # Set objective
