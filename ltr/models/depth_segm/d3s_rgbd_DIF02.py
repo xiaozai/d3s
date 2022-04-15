@@ -189,10 +189,10 @@ class SegmNet(nn.Module):
 
         # Convert Stacked RGB features to a single feature map
         self.conv_rgb = conv1x1_no_relu(32+16+4, segm_inter_dim[1])
-        self.conv_d = conv1x1_no_relu(segm_inter_dim[1], segm_inter_dim[1])
+        self.conv_d = conv1x1_no_relu(32, segm_inter_dim[1])
 
         self.rgbd_fusion_i = DWNet(segm_inter_dim[3], 32, segm_inter_dim[3])
-        self.rgbd_fusion_f = DWNet(segm_inter_dim[1], 32, segm_inter_dim[1])
+        self.rgbd_fusion_f = DWNet(segm_inter_dim[1], segm_inter_dim[1], segm_inter_dim[1])
 
         # Init weights
         for m in self.modules():
