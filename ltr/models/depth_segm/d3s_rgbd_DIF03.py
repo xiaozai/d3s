@@ -189,10 +189,10 @@ class SegmNet(nn.Module):
 
         # Convert Stacked RGB features to a single feature map
         self.conv_rgb = conv1x1_no_relu(32+16+4, segm_inter_dim[1])
-        self.conv_d = conv1x1_no_relu(64, segm_inter_dim[1])
+        self.conv_d = conv1x1_no_relu(64, segm_inter_dim[1]) # 64 -> 16
 
-        self.rgbd_fusion_i = DWNet(segm_inter_dim[3], 64, segm_inter_dim[3])
-        self.rgbd_fusion_f = DWNet(segm_inter_dim[1], 64, segm_inter_dim[1])
+        self.rgbd_fusion_i = DWNet(segm_inter_dim[3], segm_inter_dim[1], segm_inter_dim[3])
+        self.rgbd_fusion_f = DWNet(segm_inter_dim[1], segm_inter_dim[1], segm_inter_dim[1])
 
         # Init weights
         for m in self.modules():
@@ -239,7 +239,7 @@ class SegmNet(nn.Module):
         f_rgb_L1 = F.interpolate(self.f1(feat_test[1]), size=(f_rgb_L0.shape[-2], f_rgb_L0.shape[-1]))
         f_rgb_L2 = F.interpolate(self.f2(feat_test[2]), size=(f_rgb_L0.shape[-2], f_rgb_L0.shape[-1]))
         f_rgb = self.conv_rgb(torch.cat((f_rgb_L2, f_rgb_L1, f_rgb_L0), dim=1))
-    
+
         f_rgbd, attn_f = self.rgbd_fusion_f(f_rgb, f_d)
 
         out_f = self.post_f(F.upsample(self.m0(f_rgbd) + self.s0(out_i), scale_factor=2)) # -> B, 4, 192, 192 -> B, 2, 384, 384
