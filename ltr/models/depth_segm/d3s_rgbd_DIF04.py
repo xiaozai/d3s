@@ -182,7 +182,7 @@ class SegmNet(nn.Module):
         self.segment0 = conv(segm_input_dim[3], segm_dim[0], kernel_size=1, padding=0)
         self.segment1 = conv_no_relu(segm_dim[0], segm_dim[1])
 
-        self.segment0_d = conv(segm_input_dim[3], segm_dim[0], kernel_size=1, padding=0)
+        self.segment0_d = conv(segm_inter_dim[3], segm_dim[0], kernel_size=1, padding=0)
         self.segment1_d = conv_no_relu(segm_dim[0], segm_dim[1])
 
         self.mixer = conv(mixer_channels, segm_inter_dim[2])
