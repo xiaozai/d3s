@@ -340,6 +340,8 @@ class SegmNet(nn.Module):
         pred_ = torch.cat((torch.unsqueeze(pos_map, -1), torch.unsqueeze(neg_map, -1)), dim=-1)
         pred_sm = F.softmax(pred_, dim=-1)                                              # [1, 24, 24, 2]
 
+        attn_test_d = F.interpolate(attn_test_d, size=(dist.shape[-2], dist.shape[-1]))
+        
         segm_layers = torch.cat((torch.unsqueeze(pred_sm[:, :, :, 0], dim=1),
                                  torch.unsqueeze(pos_map, dim=1),
                                  dist, attn_test_d), dim=1)
