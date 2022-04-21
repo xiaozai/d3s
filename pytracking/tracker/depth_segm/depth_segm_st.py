@@ -43,7 +43,7 @@ class DepthSegmST(BaseTracker):
             if len(peaks) > 0:
                 target_depth = hist_bins[peaks[0]]
             else:
-                target_depth = np.median(depth_pixles)
+                target_depth = np.median(depth_pixels)
             print('target depth:', target_depth)
 
             self.target_depth = target_depth
