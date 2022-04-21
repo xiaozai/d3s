@@ -44,6 +44,8 @@ class DepthSegmST(BaseTracker):
                 target_depth = hist_bins[peaks[0]]
             else:
                 target_depth = np.median(depth_pixels)
+
+            # Target Depth may be Nan, because of bad quality of depth image.
             print('target depth:', target_depth)
 
             self.target_depth = target_depth
