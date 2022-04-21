@@ -141,7 +141,7 @@ class AttnD(nn.Module):
                 if m.bias is not None:
                     m.bias.data.zero_()
 
-    def forward(self, f_rgb, f_d):
+    def forward(self, f_d):
         f_d = self.conv_d(f_d)
         f_d = self.channel_attn(f_d)
         attn_d = self.spatial_attn(f_d)
