@@ -128,6 +128,25 @@ class DWNet_with_attnd(nn.Module):
 
         return f_rgbd
 
+class AttnD(nn.Module):
+    def __init__(self, d_dims, output_dims):
+        super().__init__()
+        self.conv_d = conv_no_relu(d_dims, output_dims, kernel_size=1, stride=1, padding=0)
+        self.channel_attn = channel_attention(output_dims, reduction_ratio=output_dims//4) # 4, 16, 32, 64
+        self.spatial_attn = spatial_attention()
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight.data, mode='fan_in')
+                if m.bias is not None:
+                    m.bias.data.zero_()
+
+    def forward(self, f_rgb, f_d):
+        f_d = self.conv_d(f_d)
+        f_d = self.channel_attn(f_d)
+        attn_d = self.spatial_attn(f_d)
+        return attn_d
+
 class DWNet(nn.Module):
     def __init__(self, rgb_dims, d_dims, output_dims):
         super().__init__()
@@ -226,7 +245,8 @@ class SegmNet(nn.Module):
         self.m1 = conv(segm_inter_dim[1], segm_inter_dim[1])
         self.m0 = conv(segm_inter_dim[0], segm_inter_dim[0])
 
-        self.rgbd_fusion3 = DWNet(segm_inter_dim[3], segm_inter_dim[3], segm_inter_dim[3])
+        self.attn_d = AttnD(segm_inter_dim[3], segm_inter_dim[3])
+        self.rgbd_fusion3 = DWNet_with_attnd(segm_inter_dim[3], segm_inter_dim[3], segm_inter_dim[3])
         self.rgbd_fusion2 = DWNet_with_attnd(segm_inter_dim[2], segm_inter_dim[2], segm_inter_dim[2])
         self.rgbd_fusion1 = DWNet_with_attnd(segm_inter_dim[1], segm_inter_dim[1], segm_inter_dim[1])
         self.rgbd_fusion0 = DWNet_with_attnd(segm_inter_dim[0], segm_inter_dim[0], segm_inter_dim[0])
@@ -255,32 +275,35 @@ class SegmNet(nn.Module):
         f_test_d = self.segment1_d(self.segment0_d(feat_test_d))   # B, 64, 96, 96
         f_train_d = self.segment1_d(self.segment0_d(feat_train_d)) # B, 64, 96, 96
         #
-        f_test, attn_d = self.rgbd_fusion3(f_test, f_test_d)
-        f_train, _ = self.rgbd_fusion3(f_train, f_train_d)
+        attn_test_d = self.attn_d(f_test_d)
+        attn_train_d = self.attn_d(f_train_d)
+
+        f_test = self.rgbd_fusion3(f_test, attn_test_d)
+        f_train = self.rgbd_fusion3(f_train, attn_train_d)
         #
         mask_pos = F.interpolate(mask_train[0], size=(f_train.shape[-2], f_train.shape[-1]))
         mask_neg = 1 - mask_pos
         #
         dist = F.interpolate(test_dist[0], size=(f_train.shape[-2], f_train.shape[-1])) # [1,1,24,24]
         #
-        segm_layers = self.similarity_segmentation(f_test, f_train, mask_pos, mask_neg, dist, attn_d)
+        segm_layers = self.similarity_segmentation(f_test, f_train, mask_pos, mask_neg, dist, attn_test_d)
 
         ''' Teacher Group, L3 + L2 '''
         out = self.mixer(segm_layers)                         # B, 64, 24, 24
         out3 = self.s3(F.upsample(out, scale_factor=2))       # B, 32, 48, 48
 
-        f_rgbd2 = self.rgbd_fusion2(self.f2(feat_test[2]), attn_d)
+        f_rgbd2 = self.rgbd_fusion2(self.f2(feat_test[2]), attn_test_d)
         out2 = self.post2(F.upsample(self.m2(f_rgbd2) + self.s2(out3), scale_factor=2)) # B, 16, 96, 96
 
         init_segm = self.t2(self.t1(out2)) # B, 1, 96, 96
 
 
         ''' Student part, L1 + L0, use the init_segm to guide the student prediction '''
-        f_rgbd1 = self.rgbd_fusion1(self.f1(feat_test[1]), attn_d)
+        f_rgbd1 = self.rgbd_fusion1(self.f1(feat_test[1]), attn_test_d)
         f_rgbd1 = f_rgbd1 * init_segm
         out1 = self.post1(F.upsample(self.m1(f_rgbd1), scale_factor=2))
 
-        f_rgbd0 = self.rgbd_fusion0(self.f0(feat_test[0]), attn_d)
+        f_rgbd0 = self.rgbd_fusion0(self.f0(feat_test[0]), attn_test_d)
         f_rgbd0 = f_rgbd0 * F.upsample(init_segm, scale_factor=2)
         out0 = self.post0(F.upsample(self.m0(f_rgbd0) + self.s0(out1), scale_factor=2)) # B, 2, 384, 384
 
@@ -289,9 +312,9 @@ class SegmNet(nn.Module):
         if not debug:
             return (out0, init_segm)
         else:
-            return (out0, init_segm), (attn_d)
+            return (out0, init_segm), (attn_test_d)
 
-    def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg, dist, attn_d):
+    def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg, dist, attn_test_d):
         '''Song's comments:
             f_test / f_train: [1,64,24,24]
             mask_pos / mask_neg: [1,1,24,24] for each pixel, it belongs to foreground or background
@@ -319,6 +342,6 @@ class SegmNet(nn.Module):
 
         segm_layers = torch.cat((torch.unsqueeze(pred_sm[:, :, :, 0], dim=1),
                                  torch.unsqueeze(pos_map, dim=1),
-                                 dist, attn_d), dim=1)
+                                 dist, attn_test_d), dim=1)
 
         return segm_layers
