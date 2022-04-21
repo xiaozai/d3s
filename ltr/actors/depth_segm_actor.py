@@ -202,9 +202,8 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
         else:
             vis_data = vis_data.detach().clone().cpu()
 
-
-        if len(vis_data) == 1:
-            attn_d = vis_data[0]
+        if len(vis_data) == 32:
+            attn_d = vis_data[batch_element, 0, ...].numpy().squeeze()
 
         elif len(vis_data) == 2:
             attn_weights1, attn_weights3 = vis_data
@@ -344,7 +343,7 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
 
     if vis_data is not None:
         print(len(vis_data))
-        if len(vis_data) == 1:
+        if len(vis_data) == 32:
             draw_axis(ax11, attn_d, 'attn_d')
 
         elif len(vis_data) == 2:
