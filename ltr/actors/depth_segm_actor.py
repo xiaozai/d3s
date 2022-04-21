@@ -339,13 +339,14 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
 
     elif len(pred_mask) == 3:
         draw_axis(ax13, predicted_mask_d, 'DepthMask') #, show_minmax=True)
-        # draw_axis(ax13, predicted_mask1, 'Pred') #, show_minmax=True)
-        # draw_axis(ax15, predicted_mask3, 'Layer3') #, show_minmax=True)
+
 
 
     if vis_data is not None:
+        print(len(vis_data))
         if len(vis_data) == 1:
             draw_axis(ax11, attn_d, 'attn_d')
+
         elif len(vis_data) == 2:
             # draw_axis(ax9, test_dist, 'test_dist')
             draw_axis(ax11, attn_weights1, 'attn_weights 1')
