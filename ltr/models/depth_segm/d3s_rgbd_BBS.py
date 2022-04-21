@@ -126,7 +126,7 @@ class DWNet_with_attnd(nn.Module):
         attn_d = F.interpolate(attn_d, size=(f_rgb.shape[-2], f_rgb.shape[-1]))
         f_rgbd = f_rgb * (attn_rgb + attn_d)
 
-        return f_rgbd
+        return f_rgbd, attn_rgb + attn_d
 
 class AttnD(nn.Module):
     def __init__(self, d_dims, output_dims):
@@ -278,8 +278,8 @@ class SegmNet(nn.Module):
         attn_test_d = self.attn_d(f_test_d)
         attn_train_d = self.attn_d(f_train_d)
 
-        f_test = self.rgbd_fusion3(f_test, attn_test_d)
-        f_train = self.rgbd_fusion3(f_train, attn_train_d)
+        f_test, attn_rgbd3 = self.rgbd_fusion3(f_test, attn_test_d)
+        f_train, _ = self.rgbd_fusion3(f_train, attn_train_d)
         #
         mask_pos = F.interpolate(mask_train[0], size=(f_train.shape[-2], f_train.shape[-1]))
         mask_neg = 1 - mask_pos
@@ -292,18 +292,18 @@ class SegmNet(nn.Module):
         out = self.mixer(segm_layers)                         # B, 64, 24, 24
         out3 = self.s3(F.upsample(out, scale_factor=2))       # B, 32, 48, 48
 
-        f_rgbd2 = self.rgbd_fusion2(self.f2(feat_test[2]), attn_test_d)
+        f_rgbd2, attn_rgbd2 = self.rgbd_fusion2(self.f2(feat_test[2]), attn_test_d)
         out2 = self.post2(F.upsample(self.m2(f_rgbd2) + self.s2(out3), scale_factor=2)) # B, 16, 96, 96
 
         init_segm = self.t2(self.t1(out2)) # B, 1, 96, 96
 
 
         ''' Student part, L1 + L0, use the init_segm to guide the student prediction '''
-        f_rgbd1 = self.rgbd_fusion1(self.f1(feat_test[1]), attn_test_d)
+        f_rgbd1, attn_rgbd1 = self.rgbd_fusion1(self.f1(feat_test[1]), attn_test_d)
         f_rgbd1 = f_rgbd1 * init_segm
         out1 = self.post1(F.upsample(self.m1(f_rgbd1), scale_factor=2))
 
-        f_rgbd0 = self.rgbd_fusion0(self.f0(feat_test[0]), attn_test_d)
+        f_rgbd0, attn_rgbd0 = self.rgbd_fusion0(self.f0(feat_test[0]), attn_test_d)
         f_rgbd0 = f_rgbd0 * F.upsample(init_segm, scale_factor=2)
         out0 = self.post0(F.upsample(self.m0(f_rgbd0) + self.s0(out1), scale_factor=2)) # B, 2, 384, 384
 
@@ -312,7 +312,7 @@ class SegmNet(nn.Module):
         if not debug:
             return (out0, init_segm)
         else:
-            return (out0, init_segm), (attn_test_d)
+            return (out0, init_segm), (attn_test_d, attn_rgbd3, attn_rgbd2, attn_rgbd1, attn_rgbd0)
 
     def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg, dist, attn_test_d):
         '''Song's comments:
@@ -341,7 +341,7 @@ class SegmNet(nn.Module):
         pred_sm = F.softmax(pred_, dim=-1)                                              # [1, 24, 24, 2]
 
         attn_test_d = F.interpolate(attn_test_d, size=(dist.shape[-2], dist.shape[-1]))
-        
+
         segm_layers = torch.cat((torch.unsqueeze(pred_sm[:, :, :, 0], dim=1),
                                  torch.unsqueeze(pos_map, dim=1),
                                  dist, attn_test_d), dim=1)

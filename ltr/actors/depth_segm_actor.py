@@ -240,6 +240,14 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
                 attn_weights1 = attn_weights1[batch_element, 0, ...].numpy().squeeze()
                 attn_weights0 = attn_weights0[batch_element, 0, ...].numpy().squeeze()
 
+        elif len(vis_data) == 5:
+            attn_d, attn_weights3, attn_weights2, attn_weights1, attn_weights0 = vis_data
+            attn_d = attn_d[batch_element, 0, ...].numpy().squeeze()
+            attn_weights3 = attn_weights3[batch_element, 0, ...].numpy().squeeze()
+            attn_weights2 = attn_weights2[batch_element, 0, ...].numpy().squeeze()
+            attn_weights1 = attn_weights1[batch_element, 0, ...].numpy().squeeze()
+            attn_weights0 = attn_weights0[batch_element, 0, ...].numpy().squeeze()
+
         elif len(vis_data) == 8:
             weight_rgb3, weight_rgb2, weight_rgb1, weight_rgb0, weight_d3, weight_d2, weight_d1, weight_d0 = vis_data
             # feature channel attention weights , B, C, 1, 1
@@ -357,6 +365,12 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
             draw_axis(ax11, attn_weights2, 'attn_weights2')
             draw_axis(ax12, attn_weights3, 'attn_weights3')
 
+        elif len(vis_data) == 5:
+            draw_axis(ax7, attn_d, 'attn_d')
+            draw_axis(ax9, attn_weights0, 'attn_weights0')
+            draw_axis(ax10, attn_weights1, 'attn_weights1')
+            draw_axis(ax11, attn_weights2, 'attn_weights2')
+            draw_axis(ax12, attn_weights3, 'attn_weights3')
         elif len(vis_data) == 8:
             draw_axis(ax9, weight0, 'channel_weights0')
             draw_axis(ax10, weight1, 'channel_weights1')
