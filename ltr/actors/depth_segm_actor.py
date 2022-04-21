@@ -203,13 +203,10 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
             vis_data = vis_data.detach().clone().cpu()
 
 
-        if len(vis_data) == 2:
-            # p_rgb, p_d = vis_data
-            #
-            # p_rgb = p_rgb[batch_element, ...] # [H, W, 2] F + B
-            # p_d = p_d[batch_element, ...]
-            # p_rgb = (p_rgb.numpy().squeeze()).astype(np.float32) # [H, W, 2]
-            # p_d = (p_d.numpy().squeeze()).astype(np.float32)
+        if len(vis_data) == 1:
+            attn_d = vis_data[0]
+
+        elif len(vis_data) == 2:
             attn_weights1, attn_weights3 = vis_data
             attn_weights1 = attn_weights1[batch_element, 0, ...].numpy().squeeze()
             attn_weights3 = attn_weights3[batch_element, 0, ...].numpy().squeeze()
@@ -347,9 +344,11 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
 
 
     if vis_data is not None:
-        if len(vis_data) == 2:
+        if len(vis_data) == 1:
+            draw_axis(ax11, attn_d, 'attn_d')
+        elif len(vis_data) == 2:
             # draw_axis(ax9, test_dist, 'test_dist')
-            draw_axis(ax10, attn_weights1, 'attn_weights 1')
+            draw_axis(ax11, attn_weights1, 'attn_weights 1')
             draw_axis(ax12, attn_weights3, 'attn_weights 3')
 
         elif len(vis_data) == 4 or len(vis_data) == 3:
@@ -463,12 +462,12 @@ class DepthSegmActor_MultiPred(BaseActor):
 
         elif len(masks_pred) == 2:
             loss1 = self.objective(masks_pred[0], masks_gt_pair)
-            loss3 = self.objective(masks_pred[1], masks_gt_pair)
-            loss = loss1 + loss3 * 0.5
+            loss2 = self.objective(masks_pred[1], masks_gt_pair)
+            loss = loss1 + loss2
 
             stats = {'Loss/total': loss.item(),
                      'Layer1': loss1.item(),
-                     'Layer3': loss3.item(),
+                     'Layer2': loss2.item(),
                      }
 
         elif len(masks_pred) == 3:
