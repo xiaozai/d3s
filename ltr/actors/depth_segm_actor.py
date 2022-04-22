@@ -371,6 +371,7 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
             draw_axis(ax10, attn_weights1, 'attn_weights1')
             draw_axis(ax11, attn_weights2, 'attn_weights2')
             draw_axis(ax12, attn_weights3, 'attn_weights3')
+
         elif len(vis_data) == 8:
             draw_axis(ax9, weight0, 'channel_weights0')
             draw_axis(ax10, weight1, 'channel_weights1')
