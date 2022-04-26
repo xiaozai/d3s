@@ -27,7 +27,7 @@ class BaseTracker:
         """Run tracker on a sequence."""
 
         # Initialize
-        image = self._read_image(sequence.frames[0]) #, max_depth=sequence.max_depth, min_depth=sequence.min_depth)
+        image = self._read_image(sequence.frames[0])
 
         times = []
         start_time = time.time()
@@ -292,15 +292,10 @@ class BaseTracker:
             self.ax_m.imshow(self.mask)
             self.ax_m.set_title('predicted mask')
 
-            masked_img = np.uint8(self.masked_img)
+            # masked_img = np.uint8(self.masked_img)
+            masked_img = self.masked_img
             masked_img[np.all(masked_img == (0, 0, 0), axis=-1)] = (255,255,255)
-            masked_img = Image.fromarray(np.uint8(masked_img)).convert('RGBA')
-            if self.score_map is not None:
-                cm = plt.get_cmap('jet')
-                colored_image = cm(self.score_map)
-                scoremap = Image.fromarray((colored_image[:, :, :3]*255).astype(np.uint8)).convert('RGBA')
-                scoremap = scoremap.resize(masked_img.size)
-                masked_img = Image.blend(masked_img, scoremap, 0.3)
+            # masked_img = Image.fromarray(np.uint8(masked_img)).convert('RGBA')
 
 
             self.ax_mrgb.cla()
@@ -317,24 +312,24 @@ class BaseTracker:
             init_masked_img[np.all(init_masked_img == (0, 0, 0), axis=-1)] = (255,255,255)
             self.ax_initmaskimg.cla()
             self.ax_initmaskimg.imshow(init_masked_img)
-            self.ax_initmaskimg.set_title('init masked over rgb')
+            self.ax_initmaskimg.set_title('init mask over rgb')
 
             if self.rgb_patches is not None:
                 self.ax_rgb_patches.cla()
                 rgb_score = Image.fromarray(np.uint8(self.rgb_patches)).convert('RGBA')
                 if self.score_map is not None:
-                    max_score = np.max(self.score_map)
+                    cm = plt.get_cmap('jet')
+                    colored_image = cm(self.score_map)
+                    scoremap = Image.fromarray((colored_image[:, :, :3]*255).astype(np.uint8)).convert('RGBA')
                     scoremap = scoremap.resize(rgb_score.size)
                     rgb_score = Image.blend(rgb_score, scoremap, 0.3)
-                else:
-                    max_score = 0
 
                 self.ax_rgb_patches.imshow(rgb_score)
-                self.ax_rgb_patches.set_title('rgb patches %.02f'%max_score)
+                self.ax_rgb_patches.set_title('RGB patch, Conf :%.02f'%self.conf_)
 
                 self.ax_d_patches.cla()
                 self.ax_d_patches.imshow(self.d_patches)
-                self.ax_d_patches.set_title('d patches')
+                self.ax_d_patches.set_title('D patch')
 
             # Song
             if self.polygon is not None:

@@ -103,6 +103,7 @@ class MultiResolutionExtractor(ExtractorBase):
         """Extract features.
         args:
             im: Image.
+            dp: Depth
             pos: Center position for extraction.
             scales: Image scales to extract features from.
             image_sz: Size to resize the image samples to before extraction.
@@ -114,8 +115,9 @@ class MultiResolutionExtractor(ExtractorBase):
         im_patches = torch.cat([sample_patch(im, pos, s*image_sz, image_sz) for s in scales])
         if dp is not None:
             dp_patches = torch.cat([sample_patch(dp, pos, s*image_sz, image_sz) for s in scales])
+            dp_patches = TensorList([dp_patches for _ in self.features]).unroll()
+
         # Compute features
-        ''' Song, do we adddepth featuremap here ??? '''
         feature_map = TensorList([f.get_feature(im_patches) for f in self.features]).unroll()
 
         if dp is not None:
@@ -127,6 +129,7 @@ class MultiResolutionExtractor(ExtractorBase):
         """Extract features from a set of transformed image samples.
         args:
             im: Image.
+            dp: Depth
             pos: Center position for extraction.
             scale: Image scale to extract features from.
             image_sz: Size to resize the image samples to before extraction.
@@ -134,18 +137,15 @@ class MultiResolutionExtractor(ExtractorBase):
         """
 
         # Get image patche
-        im_patch = sample_patch(im, pos, scale*image_sz, image_sz)
-
+        im_patch = sample_patch(im, pos, scale*image_sz, image_sz) # [1, 3, 512, 512]
         # Apply transforms
-        im_patches = torch.cat([T(im_patch) for T in transforms])
-
-        if dp is not None:
-            dp_patch = sample_patch(dp, pos, scale*image_sz, image_sz)
-            dp_patches = torch.cat([T(dp_patch) for T in transforms])
-        else:
-            dp_patches = None
-
+        im_patches = torch.cat([T(im_patch) for T in transforms]) # [27, 3, 256, 256]
         # Compute features
         feature_map = TensorList([f.get_feature(im_patches) for f in self.features]).unroll()
 
-        return feature_map, dp_patches
+        if dp is not None:
+            dp_patch = sample_patch(dp, pos, scale*image_sz, image_sz) # [1, 1, 512, 512]
+            dp_patches = torch.cat([T(dp_patch) for T in transforms]) # [27, 1, 256, 256]
+            return feature_map, dp_patches
+        else:
+            return feature_map, None

@@ -4,7 +4,12 @@ import numpy as np
 
 
 def numpy_to_torch(a: np.ndarray):
-    return torch.from_numpy(a).float().permute(2, 0, 1).unsqueeze(0)
+    b = torch.from_numpy(a).float()
+    # for depth crops
+    if len(b.shape) == 2:
+        b = b.unsqueeze(-1)
+    return b.permute(2, 0, 1).unsqueeze(0)
+    # return torch.from_numpy(a).float().permute(2, 0, 1).unsqueeze(0)
 
 
 def torch_to_numpy(a: torch.Tensor):
