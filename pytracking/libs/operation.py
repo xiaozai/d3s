@@ -40,10 +40,10 @@ def conv2d(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor = None,
         if isinstance(input, TensorList):
             input = input[0]
         depth = F.interpolate(depth, size=(input.shape[-2], input.shape[-1]))
-        depth = depth.repeat(1, input.shape[1], 1, 1)
+        # depth = depth.repeat(1, input.shape[1], 1, 1)
         depth = depth.to(input.device)
-        depth.requires_grad = False
-        out = depth_conv(input, depth, weight, bias, stride=stride, padding=padding, dilation=dilation)
+        # out = depth_conv(input, depth, weight, bias, stride=stride, padding=padding, dilation=dilation)
+        out = depth_conv(input,depth,weight,None,stride=1,padding=padding,dilation=1)
 
     if ind is None:
         return out
