@@ -23,7 +23,7 @@ extra_objects = ['src/depthconv_cuda_kernel.cu.o']
 extra_objects = [os.path.join(this_file, fname) for fname in extra_objects]
 
 # ffi = create_extension(
-ffi = BuildExtention(
+ffi = BuildExtension(
     '_ext.depthconv',
     headers=headers,
     sources=sources,
