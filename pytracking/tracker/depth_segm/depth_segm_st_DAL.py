@@ -222,20 +222,16 @@ class DepthSegmST(BaseTracker):
 
         # Transform to get the training sample
         train_x_rgb = self.preprocess_sample(x_rgb) # x_rgb * self.feature_window
-        print('\n after i preprocess_sample: x_rgb, x_d: ', train_x_rgb[0].device, train_x_rgb[0].requires_grad, x_d[0].device, x_d[0].requires_grad)
 
         # Generate label function
         init_y = self.init_label_function(train_x_rgb) # Gaussian map
 
         # Init memory
         self.init_memory(train_x_rgb, x_d)
-        print('\n after i init_memory: x_rgb, x_d: ', train_x_rgb[0].device, train_x_rgb[0].requires_grad, x_d[0].device, x_d[0].requires_grad)
 
-        print('\n before init_optimization ... \n')
         # Init optimizer and do initial optimization for DCF
         self.init_optimization(train_x_rgb, init_y) # Song, DAL DCF, train_x_rgb is used to define self.filter
-        print('\n after init_optimization ... \n')
-
+    
         if self.params.use_segmentation:
             self.init_segmentation(color, depth, state, init_mask=init_mask)
 

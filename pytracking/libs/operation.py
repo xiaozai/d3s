@@ -5,7 +5,8 @@ from ltr.external.depthconv.functions import depth_conv
 
 
 @tensor_operation
-def conv2d(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor = None, stride=1, padding=0, dilation=1, groups=1, mode=None, depth=None):
+def conv2d(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor = None,
+            stride=1, padding=0, dilation=1, groups=1, mode=None, depth=None):
     """Standard conv2d. Returns the input if weight=None."""
 
     if weight is None:
@@ -41,8 +42,7 @@ def conv2d(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor = None,
         depth = F.interpolate(depth, size=(input.shape[-2], input.shape[-1]))
         depth = depth.repeat(1, input.shape[1], 1, 1)
         depth = depth.to(input.device)
-        # depth.requires_grad = True
-        # print(input.device, depth.device, weight.device, input.requires_grad, depth.requires_grad)
+        depth.requires_grad = False
         out = depth_conv(input, depth, weight, bias, stride=stride, padding=padding, dilation=dilation)
 
     if ind is None:
