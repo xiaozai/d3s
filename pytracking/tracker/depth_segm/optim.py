@@ -27,6 +27,7 @@ class FactorizedConvProblem(optimization.L2Problem):
         filter = x[:len(x)//2]  # w2 in paper
         P = x[len(x)//2:]       # w1 in paper
 
+        ''' self.training_samples and self.training_samples_d are all TensorList until now '''
         # Do first convolution
         compressed_samples = operation.conv1x1(self.training_samples, P).apply(self.projection_activation)
 

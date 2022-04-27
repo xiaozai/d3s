@@ -282,8 +282,6 @@ class DepthSegmST(BaseTracker):
         if self.params.update_projection_matrix:
             # Song, use depth conv
             if self.params.use_depthconv:
-                print(self.init_training_samples.shape)
-                print(self.init_training_samples_d.shape)
                 self.joint_problem = FactorizedConvProblem(self.init_training_samples, init_y, self.filter_reg,
                                                            self.fparams.attribute('projection_reg'), self.params,
                                                            self.init_sample_weights,
