@@ -1,7 +1,7 @@
 import os
 import torch
 # from torch.utils.ffi import create_extension
-from torch.utils.cpp_extention import BuildExtention
+from torch.utils.cpp_extension import BuildExtention
 
 this_file = os.path.dirname(__file__)
 
