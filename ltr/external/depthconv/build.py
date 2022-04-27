@@ -1,6 +1,7 @@
 import os
 import torch
-from torch.utils.ffi import create_extension
+# from torch.utils.ffi import create_extension
+from torch.utils.cpp_extention import BuildExtention
 
 this_file = os.path.dirname(__file__)
 
@@ -21,7 +22,8 @@ print(this_file)
 extra_objects = ['src/depthconv_cuda_kernel.cu.o']
 extra_objects = [os.path.join(this_file, fname) for fname in extra_objects]
 
-ffi = create_extension(
+# ffi = create_extension(
+ffi = BuildExtention(
     '_ext.depthconv',
     headers=headers,
     sources=sources,
