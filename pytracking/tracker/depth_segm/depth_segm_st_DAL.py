@@ -231,7 +231,7 @@ class DepthSegmST(BaseTracker):
 
         # Init optimizer and do initial optimization for DCF
         self.init_optimization(train_x_rgb, init_y) # Song, DAL DCF, train_x_rgb is used to define self.filter
-    
+
         if self.params.use_segmentation:
             self.init_segmentation(color, depth, state, init_mask=init_mask)
 
@@ -282,6 +282,8 @@ class DepthSegmST(BaseTracker):
         if self.params.update_projection_matrix:
             # Song, use depth conv
             if self.params.use_depthconv:
+                print(self.init_training_samples.shape)
+                print(self.init_training_samples_d.shape)
                 self.joint_problem = FactorizedConvProblem(self.init_training_samples, init_y, self.filter_reg,
                                                            self.fparams.attribute('projection_reg'), self.params,
                                                            self.init_sample_weights,
@@ -482,10 +484,8 @@ class DepthSegmST(BaseTracker):
 
         # Train filter
         if hard_negative:
-            print(self.frame_num, 'filter optimizer run ... hard negative')
             self.filter_optimizer.run(self.params.hard_negative_CG_iter)
         elif (self.frame_num - 1) % self.params.train_skipping == 0 and conf_ > 0.6:
-            # print(self.frame_num, 'filter optimizer run ... CG', conf_)
             self.filter_optimizer.run(self.params.CG_iter)
 
         # Update position and scale
@@ -849,7 +849,6 @@ class DepthSegmST(BaseTracker):
         self.init_training_samples = train_x
         self.init_training_samples_d = train_x_d
 
-        print('\n init memory : ', self.init_training_samples[0].device, self.init_training_samples[0].requires_grad, self.init_training_samples_d[0].device, self.init_training_samples_d[0].requires_grad,)
         # Sample counters and weights
         self.num_stored_samples = self.num_init_samples.copy()
         self.previous_replace_ind = [None] * len(self.num_stored_samples)
@@ -865,9 +864,6 @@ class DepthSegmST(BaseTracker):
         self.training_samples_d = TensorList(
             [x.new_zeros(self.params.sample_memory_size, 1, x.shape[2], x.shape[3]) for x, cdim in
              zip(train_x_d, self.compressed_dim)])
-
-        print('\n init memory 2 : ', self.training_samples[0].device, self.training_samples[0].requires_grad, self.training_samples_d[0].device, self.training_samples_d[0].requires_grad,)
-
 
     def update_memory(self, sample_x: TensorList,  sample_x_d: TensorList, sample_y: TensorList, learning_rate=None):
         replace_ind = self.update_sample_weights(self.sample_weights, self.previous_replace_ind,
