@@ -34,6 +34,8 @@ def conv2d(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor = None,
         ''' DepthConv, same as DAL
         input : RGB features, during tracking is TensorList
         depth : depth crops, is TensorList
+
+        Bug here: depthconvfunctionLegacyBackword is not differentiable twice ....!!!
          '''
         if isinstance(depth, TensorList):
             depth = depth[0]
