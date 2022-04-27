@@ -1,10 +1,11 @@
 import torch
 import torch.nn.functional as F
 from pytracking.libs.tensorlist import tensor_operation, TensorList
+from ltr.external.depthconv.functions import depth_conv
 
 
 @tensor_operation
-def conv2d(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor = None, stride=1, padding=0, dilation=1, groups=1, mode=None):
+def conv2d(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor = None, stride=1, padding=0, dilation=1, groups=1, mode=None, depth=None):
     """Standard conv2d. Returns the input if weight=None."""
 
     if weight is None:
@@ -26,7 +27,24 @@ def conv2d(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor = None,
         else:
             raise ValueError('Unknown mode for padding.')
 
-    out = F.conv2d(input, weight, bias=bias, stride=stride, padding=padding, dilation=dilation, groups=groups)
+    if depth is None:
+        out = F.conv2d(input, weight, bias=bias, stride=stride, padding=padding, dilation=dilation, groups=groups)
+    else:
+        ''' DepthConv, same as DAL
+        input : RGB features, during tracking is TensorList
+        depth : depth crops, is TensorList
+         '''
+        if isinstance(depth, TensorList):
+            depth = depth[0]
+        if isinstance(input, TensorList):
+            input = input[0]
+        depth = F.interpolate(depth, size=(input.shape[-2], input.shape[-1]))
+        depth = depth.repeat(1, input.shape[1], 1, 1)
+        depth = depth.to(input.device)
+        # depth.requires_grad = True
+        # print(input.device, depth.device, weight.device, input.requires_grad, depth.requires_grad)
+        out = depth_conv(input, depth, weight, bias, stride=stride, padding=padding, dilation=dilation)
+
     if ind is None:
         return out
     return out[:,:,ind[0],ind[1]]

@@ -5,8 +5,9 @@ import math
 
 class FactorizedConvProblem(optimization.L2Problem):
     def __init__(self, training_samples: TensorList, y: TensorList, filter_reg: torch.Tensor, projection_reg, params, sample_weights: TensorList,
-                 projection_activation, response_activation):
+                 projection_activation, response_activation, training_samples_d=None):
         self.training_samples = training_samples
+        self.training_samples_d = training_samples_d
         self.y = y
         self.filter_reg = filter_reg
         self.sample_weights = sample_weights
@@ -30,7 +31,7 @@ class FactorizedConvProblem(optimization.L2Problem):
         compressed_samples = operation.conv1x1(self.training_samples, P).apply(self.projection_activation)
 
         # Do second convolution
-        residuals = operation.conv2d(compressed_samples, filter, mode='same').apply(self.response_activation)
+        residuals = operation.conv2d(compressed_samples, filter, mode='same', depth=self.training_samples_d).apply(self.response_activation)
 
         # Compute data residuals
         residuals = residuals - self.y
@@ -69,21 +70,29 @@ class FactorizedConvProblem(optimization.L2Problem):
 
 
 class ConvProblem(optimization.L2Problem):
-    def __init__(self, training_samples: TensorList, y: TensorList, filter_reg: torch.Tensor, sample_weights: TensorList, response_activation):
+    def __init__(self, training_samples: TensorList, y: TensorList, filter_reg: torch.Tensor, sample_weights: TensorList, response_activation,
+                training_samples_d=None):
         self.training_samples = training_samples
         self.y = y
         self.filter_reg = filter_reg
         self.sample_weights = sample_weights
         self.response_activation = response_activation
 
-    def __call__(self, x: TensorList):
+        self.training_samples_d = training_samples_d
+
+    def __call__(self, x: TensorList, depth=None):
         """
         Compute residuals
         :param x: [filters]
         :return: [data_terms, filter_regularizations]
+
+        Song, add depthconv
         """
+
+        print('\n self.training_samples ... \n', self.training_samples.shape)
+
         # Do convolution and compute residuals
-        residuals = operation.conv2d(self.training_samples, x, mode='same').apply(self.response_activation)
+        residuals = operation.conv2d(self.training_samples, x, mode='same', depth=self.training_samples_d).apply(self.response_activation)
         residuals = residuals - self.y
 
         residuals = self.sample_weights.sqrt().view(-1, 1, 1, 1) * residuals

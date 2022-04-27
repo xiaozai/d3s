@@ -27,7 +27,7 @@ def depth_conv(input,
                   stride=1,
                   padding=0,
                   dilation=1):
-
+    
     if input is not None and input.dim() != 4:
         raise ValueError(
             "Expected 4D tensor as input, got {}D tensor instead.".format(
@@ -35,15 +35,15 @@ def depth_conv(input,
 
     f = DepthconvFunction(
         _pair(stride), _pair(padding), _pair(dilation))
-
+    # print bias
     if isinstance(bias, torch.nn.Parameter):
-        return f.apply(input, depth, weight, bias)
+        return f(input, depth, weight, bias)
     else:
-        return f.apply(input, depth, weight)
+        return f(input, depth, weight)
 
 
 import torch.nn as nn
-class DepthconvFunction(torch.autograd.Function):
+class DepthconvFunction(Function):
     def __init__(self, stride, padding, dilation, bias=True):
         super(DepthconvFunction, self).__init__()
         self.stride = stride
@@ -53,46 +53,12 @@ class DepthconvFunction(torch.autograd.Function):
         self.null = ffi_.NULL
         self.bias = bias
 
-    @staticmethod
     def forward(self, input, depth, weight, bias = None):
-
-        stride=_pair(1)
-        padding=_pair(1)
-        dilation=_pair(1)
-        # ffi_=cffi.FFI()
-        # self.null = ffi_.NULL
-
-        def _output_size(input, weight):
-
-            # stride=(1,1)
-            # padding=(0,0)
-            # dilation=(1,1)
-
-            channels = weight.size(0)
-
-            output_size = (input.size(0), channels)
-
-            for d in range(input.dim() - 2):
-                in_size = input.size(d + 2)
-                p = padding[d]
-                kernel = dilation[d] * (weight.size(d + 2) - 1) + 1
-                s = stride[d]
-                output_size += ((in_size + (2 * p) - kernel) // s + 1, )
-                #print(d, in_size, pad, kernel, stride, output_size)
-
-            if not all(map(lambda s: s > 0, output_size)):
-                raise ValueError(
-                    "convolution input is too small (output would be {})".format(
-                        'x'.join(map(str, output_size))))
-            #print(output_size)
-            return output_size
-
-
         # print('forward')
-        # if (not self.bias) or (bias is None):
-        if bias is None:
+
+        if (not self.bias) or (bias is None):
             # print bias, self.bias
-            # bias = self.null
+            bias = self.null
             bias = input.new(weight.size(0)).zero_()
         input=input.contiguous()
         depth=depth.contiguous()
@@ -101,12 +67,10 @@ class DepthconvFunction(torch.autograd.Function):
         self.save_for_backward(input, depth, weight, bias)
 
         #print(['input.size()', input.size()])
-        # output_size = [int((input.size()[i + 2] + 2 * self.padding[i] - weight.size()[i + 2]) / self.stride[i] + 1)
-        #                for i in range(2)]
-        output_size = [int((input.size()[i + 2] + 2 * padding[i] - weight.size()[i + 2]) / stride[i] + 1)
+        output_size = [int((input.size()[i + 2] + 2 * self.padding[i] - weight.size()[i + 2]) / self.stride[i] + 1)
                        for i in range(2)]
         #print(['output_size',output_size])
-        output = input.new(*_output_size(input, weight)).zero_()
+        output = input.new(*self._output_size(input, weight)).zero_()
         self.columns = input.new(weight.size(1) * weight.size(2) * weight.size(3), output_size[0] * output_size[1]).zero_()
         self.ones = input.new(output_size[0] * output_size[1]).zero_()
 
@@ -128,31 +92,17 @@ class DepthconvFunction(torch.autograd.Function):
             #         weight.size(3), weight.size(2), self.stride[1], self.stride[0], self.padding[1], self.padding[0], self.dilation[1], self.dilation[0])
             # #print('column', self.columns[10,:])
 
-            # depthconv.depthconv_forward_cuda(
-            #         input, depth, weight, bias, output, self.columns, self.ones,
-            #         weight.size(3), weight.size(2), self.stride[1], self.stride[0], self.padding[1], self.padding[0], self.dilation[1], self.dilation[0])
             depthconv.depthconv_forward_cuda(
                     input, depth, weight, bias, output, self.columns, self.ones,
-                    weight.size(3), weight.size(2), stride[1], stride[0], padding[1], padding[0], dilation[1], dilation[0])
+                    weight.size(3), weight.size(2), self.stride[1], self.stride[0], self.padding[1], self.padding[0], self.dilation[1], self.dilation[0])
             #print('column', self.columns[10,:])
         return output
 
-    @staticmethod
     def backward(self, grad_output):
         # print('backward')
         # print(self.needs_input_grad)
-        self.stride=_pair(1)
-        self.padding=_pair(1)
-        self.dilation=_pair(1)
-        ffi_=cffi.FFI()
-        self.null = ffi_.NULL
 
         input, depth, weight, bias = self.saved_tensors
-
-        output_size = [int((input.size()[i + 2] + 2 * self.padding[i] - weight.size()[i + 2]) / self.stride[i] + 1)
-                       for i in range(2)]
-        self.columns = input.new(weight.size(1) * weight.size(2) * weight.size(3), output_size[0] * output_size[1]).zero_()
-        self.ones = input.new(output_size[0] * output_size[1]).zero_()
 
         grad_input = grad_weight = grad_bias = None
 
@@ -204,6 +154,7 @@ class DepthconvFunction(torch.autograd.Function):
                     grad_bias = None
 
         return grad_input, None, grad_weight, grad_bias
+
 
     def _output_size(self, input, weight):
         channels = weight.size(0)

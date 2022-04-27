@@ -108,8 +108,9 @@ def parameters():
     params.use_segmentation = True
     params.use_colormap = False
     params.use_rgbd_classifier = False
+    params.use_normalized_DCF = False # dont normalize RGB and D in DCF
 
-    params.model = 'depth_segm_st'
+    params.model = 'depth_segm_st_ori'
     params.constructor_module = 'ltr.models.depth_segm.depth_segm'
     params.constructor_fun_name = 'depth_segm_D3S_BBS_MP_resnet50'
     params.segm_net_path = '/home/yan/Data2/d3s/checkpoints/ltr/depth_segm/depth_segm_D3S_BBS/DepthSegmNet_ep0040.pth.tar'

@@ -110,20 +110,19 @@ class MultiResolutionExtractor(ExtractorBase):
         """
         if isinstance(scales, (int, float)):
             scales = [scales]
-
         # Get image patches
         im_patches = torch.cat([sample_patch(im, pos, s*image_sz, image_sz) for s in scales])
-        if dp is not None:
-            dp_patches = torch.cat([sample_patch(dp, pos, s*image_sz, image_sz) for s in scales])
-            dp_patches = TensorList([dp_patches for _ in self.features]).unroll()
-
         # Compute features
         feature_map = TensorList([f.get_feature(im_patches) for f in self.features]).unroll()
 
         if dp is not None:
-            return feature_map, dp_patches, im_patches
+            dp_patches = torch.cat([sample_patch(dp, pos, s*image_sz, image_sz) for s in scales])
+            dp_patches = TensorList([dp_patches for _ in self.features]).unroll()
         else:
-            return feature_map
+            dp_patches = None
+
+        return feature_map, dp_patches, im_patches
+
 
     def extract_transformed(self, im, pos, scale, image_sz, transforms, dp=None):
         """Extract features from a set of transformed image samples.
@@ -135,7 +134,6 @@ class MultiResolutionExtractor(ExtractorBase):
             image_sz: Size to resize the image samples to before extraction.
             transforms: A set of image transforms to apply.
         """
-
         # Get image patche
         im_patch = sample_patch(im, pos, scale*image_sz, image_sz) # [1, 3, 512, 512]
         # Apply transforms
@@ -145,7 +143,9 @@ class MultiResolutionExtractor(ExtractorBase):
 
         if dp is not None:
             dp_patch = sample_patch(dp, pos, scale*image_sz, image_sz) # [1, 1, 512, 512]
-            dp_patches = torch.cat([T(dp_patch) for T in transforms]) # [27, 1, 256, 256]
-            return feature_map, dp_patches
+            dp_patches = torch.cat([T(dp_patch) for T in transforms])
+            dp_patches = TensorList([dp_patches for f in self.features]).unroll() # [27, 1, 256, 256]
         else:
-            return feature_map, None
+            dp_patches = None
+
+        return feature_map, dp_patches

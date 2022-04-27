@@ -37,7 +37,7 @@ def parameters():
 
     # Training parameters
     params.sample_memory_size = 250              # Memory size
-    params.train_skipping = 10                   # How often to run training (every n-th frame)
+    params.train_skipping = 30 # 10                   # How often to run training (every n-th frame)
 
     # Online model parameters
     deep_params.kernel_size = (4, 4)             # Kernel size of filter
@@ -108,11 +108,12 @@ def parameters():
     params.use_segmentation = True
     params.use_colormap = False
     params.use_rgbd_classifier = False
+    params.use_normalized_DCF = False
 
-    params.model = 'depth_segm_st'
+    params.model = 'depth_segm_st_ori'
     params.constructor_module = 'ltr.models.depth_segm.depth_segm'
-    params.constructor_fun_name = 'depth_segm_D3S_BBS_MP_resnet50'
-    params.segm_net_path = '/home/yan/Data2/d3s/checkpoints/ltr/depth_segm/depth_segm_D3S_BBS/DepthSegmNet_ep0040.pth.tar'
+    params.constructor_fun_name = 'depth_segm_D3S_DW_MP_resnet50'
+    params.segm_net_path = '/home/yan/Data2/d3s/checkpoints/ltr/depth_segm/depth_segm_D3S_DW_MP/DepthSegmNet_ep0040.pth.tar'
     params.segm_use_dist = True
     params.segm_normalize_mean = [0.485, 0.456, 0.406]
     params.segm_normalize_std = [0.229, 0.224, 0.225]
