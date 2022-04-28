@@ -34,9 +34,9 @@ def depth_conv(input,
             "Expected 4D tensor as input, got {}D tensor instead.".format(
                 input.dim()))
 
-    f = DepthconvFunction()
-    return f(input, weight, depth)
-    # return DepthconvFunction.apply(input, weight, depth=depth)
+    # f = DepthconvFunction()
+    # return f(input, weight, depth)
+    return DepthconvFunction.apply(input, weight, depth)
 
 
 class DepthconvFunction(Function):
@@ -44,7 +44,7 @@ class DepthconvFunction(Function):
     @staticmethod
     def forward(ctx, input, weight, depth=None):
         ''' input: RGB features, [27, 64, 16, 16]
-            weight: the DCF filter, []
+            weight: the DCF filter, [1, 64, 4, 4]
             depth: Depth crops, [27, 1, 16, 16]
 
         '''
