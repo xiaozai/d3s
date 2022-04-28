@@ -11,7 +11,7 @@ import ml_collections
 import copy
 import math
 
-from ltr.external.depthconv.functions import depth_conv
+# from ltr.external.depthconv.functions import depth_conv
 
 def conv(in_planes, out_planes, kernel_size=3, stride=1, padding=1, dilation=1):
     return nn.Sequential(

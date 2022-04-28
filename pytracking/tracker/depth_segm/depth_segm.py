@@ -460,10 +460,8 @@ class DepthSegmST(BaseTracker):
 
         # Train filter
         if hard_negative:
-            print(self.frame_num, 'filter optimizer run ... hard negative')
             self.filter_optimizer.run(self.params.hard_negative_CG_iter)
         elif (self.frame_num - 1) % self.params.train_skipping == 0 and conf_ > 0.6:
-            # print(self.frame_num, 'filter optimizer run ... CG', conf_)
             self.filter_optimizer.run(self.params.CG_iter)
 
         # Update position and scale

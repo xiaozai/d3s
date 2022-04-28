@@ -27,7 +27,6 @@ class FactorizedConvProblem(optimization.L2Problem):
         filter = x[:len(x)//2]  # w2 in paper
         P = x[len(x)//2:]       # w1 in paper
 
-        ''' self.training_samples and self.training_samples_d are all TensorList until now '''
         # Do first convolution
         compressed_samples = operation.conv1x1(self.training_samples, P).apply(self.projection_activation)
 
@@ -87,11 +86,8 @@ class ConvProblem(optimization.L2Problem):
         :param x: [filters]
         :return: [data_terms, filter_regularizations]
 
-        Song, add depthconv
+        Song, add depthconv, does not work, since it requires pytorch 0.4.0
         """
-
-        print('\n self.training_samples ... \n', self.training_samples.shape)
-
         # Do convolution and compute residuals
         residuals = operation.conv2d(self.training_samples, x, mode='same', depth=self.training_samples_d).apply(self.response_activation)
         residuals = residuals - self.y
