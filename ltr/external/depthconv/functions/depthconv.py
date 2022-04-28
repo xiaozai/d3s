@@ -48,7 +48,9 @@ class DepthconvFunction(Function):
             depth: Depth crops, [27, 1, 16, 16]
 
         '''
-        print('in DepthconvFunction:', input.shape, weight.shape, depth.shape)
+        print('in DepthconvFunction:', input.shape)
+        print(weight.shape)
+        print(depth.shape)
         def _output_size(input, weight, padding, dilation, stride):
             channels = weight.size(0)
 
