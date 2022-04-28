@@ -48,9 +48,6 @@ class DepthconvFunction(Function):
             depth: Depth crops, [27, 1, 16, 16]
 
         '''
-        print('in DepthconvFunction:', input.shape)
-        print(weight.shape)
-        print(depth.shape)
         def _output_size(input, weight, padding, dilation, stride):
             channels = weight.size(0)
 
@@ -61,12 +58,11 @@ class DepthconvFunction(Function):
                 kernel = dilation * (weight.size(d + 2) - 1) + 1
                 stride = stride
                 output_size += ((in_size + (2 * pad) - kernel) // stride + 1, )
-                print('output_size: ', output_size)
             if not all(map(lambda s: s > 0, output_size)):
                 raise ValueError(
                     "convolution input is too small (output would be {})".format(
                         'x'.join(map(str, output_size))))
-            return output_size
+            return output_size # [27, 17, 17]
 
 
         stride, padding, dilation = 1, (2, 2), 1
@@ -74,7 +70,7 @@ class DepthconvFunction(Function):
 
         output_size = [int((input.size()[i + 2] + 2 * padding[i] - weight.size()[i + 2]) / stride + 1)
                        for i in range(2)]
-
+        print('output_size:', output_size)
         output = input.new(*_output_size(input, weight,  padding, dilation, stride)).zero_()
         columns = input.new(weight.size(1) * weight.size(2) * weight.size(3), output_size[0] * output_size[1]).zero_()
         ones = input.new(output_size[0] * output_size[1]).zero_()
@@ -102,6 +98,7 @@ class DepthconvFunction(Function):
         output_size = [int((input.size()[i + 2] + 2 * padding[i] - weight.size()[i + 2]) / stride + 1)
                        for i in range(2)]
 
+        print('ctx.needs_input_grad: ', len(ctx.needs_input_grad), ctx.needs_input_grad)
         if ctx.needs_input_grad[0]:
             grad_input = input.new(*input.size()).zero_()
             depthconv.depthconv_backward_input_cuda(
