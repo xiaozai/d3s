@@ -280,7 +280,6 @@ class DepthSegmST(BaseTracker):
 
         # Setup factorized joint optimization
         if self.params.update_projection_matrix:
-            # Song, use depth conv
             if self.params.use_depthconv:
                 self.joint_problem = FactorizedConvProblem(self.init_training_samples, init_y, self.filter_reg,
                                                            self.fparams.attribute('projection_reg'), self.params,

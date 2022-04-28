@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from pytracking.libs.tensorlist import tensor_operation, TensorList
-# from ltr.external.depthconv.functions import depth_conv
+from ltr.external.depthconv.functions import depth_conv
 
 
 @tensor_operation
@@ -31,22 +31,12 @@ def conv2d(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor = None,
     if depth is None:
         out = F.conv2d(input, weight, bias=bias, stride=stride, padding=padding, dilation=dilation, groups=groups)
     else:
-        ''' DepthConv, same as DAL
-        input : RGB features, during tracking is TensorList
-        depth : depth crops, is TensorList
-
-        Bug here: depthconvfunctionLegacyBackword is not differentiable twice ....!!!
-         '''
         if isinstance(depth, TensorList):
             depth = depth[0]
-        if isinstance(input, TensorList):
-            input = input[0]
-
         depth = F.interpolate(depth, size=(input.shape[-2], input.shape[-1]))
-        # depth = depth.repeat(1, input.shape[1], 1, 1)
         depth = depth.to(input.device)
-        out = depth_conv(input, depth, weight, bias, stride=stride, padding=padding, dilation=dilation)
-
+        out = depth_conv(input, depth, weight, bias, stride, padding, dilation)
+        
     if ind is None:
         return out
     return out[:,:,ind[0],ind[1]]

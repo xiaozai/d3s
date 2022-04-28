@@ -32,6 +32,7 @@ class FactorizedConvProblem(optimization.L2Problem):
 
         # Do second convolution
         residuals = operation.conv2d(compressed_samples, filter, mode='same', depth=self.training_samples_d).apply(self.response_activation)
+        print('\n 1)residuals in optim.FactorizedConvProblem : ', len(residuals), residuals[0].shape)
 
         # Compute data residuals
         residuals = residuals - self.y
@@ -43,7 +44,7 @@ class FactorizedConvProblem(optimization.L2Problem):
 
         # Add regularization for projection matrix
         residuals.extend(self.projection_reg.apply(math.sqrt) * P)
-
+        print('len residuals in optim.FactorizedConvProblem : ', len(residuals), residuals[0] is None)
         return residuals
 
 

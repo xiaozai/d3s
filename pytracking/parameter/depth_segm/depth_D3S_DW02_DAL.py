@@ -109,7 +109,7 @@ def parameters():
     params.use_colormap = False
     params.use_rgbd_classifier = False
     params.use_normalized_DCF = False
-    params.use_depthconv = False
+    params.use_depthconv = True
 
     params.model = 'depth_segm_st_DAL'
     params.constructor_module = 'ltr.models.depth_segm.depth_segm'

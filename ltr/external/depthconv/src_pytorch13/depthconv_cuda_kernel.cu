@@ -1,4 +1,4 @@
-#include "depthconv_cuda_kernel.h"
+#include "depthconv_cuda_kernel.cuh"
 
 #include <cstdio>
 
@@ -65,7 +65,7 @@ __global__ void depthconv_im2col_gpu_kernel(
     const int pad_h, const int pad_w, const int stride_h, const int stride_w,
     const int dilation_h, const int dilation_w, const int height_col,
     const int width_col, DType *data_col) {
-  // CxHxW --> (khxkw)x(CxHxW) 
+  // CxHxW --> (khxkw)x(CxHxW)
   CUDA_KERNEL_LOOP(index, n) {
     const int w_col = index % width_col;
     const int h_col = (index / width_col) % height_col;
@@ -87,7 +87,7 @@ __global__ void depthconv_im2col_gpu_kernel(
         Di = data_depth[(h_in + dilation_h * (kernel_h - 1) / 2) * width + w_in  + dilation_w * (kernel_w - 1) / 2];
     else
         valid = false;
-    //const DType Di = data_depth[(h_in + (kernel_h - 1) / 2 + dilation_h - 1) * width + (w_in + (kernel_w - 1) / 2 + dilation_w - 1)]; 
+    //const DType Di = data_depth[(h_in + (kernel_h - 1) / 2 + dilation_h - 1) * width + (w_in + (kernel_w - 1) / 2 + dilation_w - 1)];
 
     for (int i = 0; i < kernel_h; ++i) {
       for (int j = 0; j < kernel_w; ++j) {
@@ -140,7 +140,7 @@ void depthconv_im2col(cudaStream_t stream, const DType *data_im, const DType *da
 }
 
 template void depthconv_im2col<float>(
-    cudaStream_t stream, const float *data_im, const float *data_depth, 
+    cudaStream_t stream, const float *data_im, const float *data_depth,
     const int channels, const int height, const int width, const int ksize_h,
     const int ksize_w, const int pad_h, const int pad_w, const int stride_h,
     const int stride_w, const int dilation_h, const int dilation_w, float *data_col);
@@ -192,7 +192,7 @@ __global__ void depthconv_col2im_gpu_kernel(
       //printf("%d\n",(h_in + dilation_h * (kernel_h - 1) / 2) * width + w_in  + dilation_w * (kernel_w - 1) / 2);
       //data_depth[cur_h * width + cur_w];
       // data_depth[(h_in + (kernel_h - 1) / 2 + dilation_h - 1) * width + w_in  + (kernel_w - 1) / 2 + dilation_w - 1];
-      
+
 
       int cur_bottom_grad_pos =
           (c * height + cur_h) * width + cur_w;
@@ -206,7 +206,7 @@ __global__ void depthconv_col2im_gpu_kernel(
       if (cur_h >= 0 && cur_h < height && cur_w  >= 0 &&
               cur_w  < width)
         atomicAdd(grad_im + cur_bottom_grad_pos, cur_top_grad * exp(-abs(Di - Dval)));
-      
+
     }
   }
 }

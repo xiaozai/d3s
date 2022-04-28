@@ -101,7 +101,7 @@ class ConjugateGradientBase:
             # Preconditioners
             y = self.M1(r)
             z = self.M2(y)
-
+            print('z: ', len(z))
             rho1 = self.rho
             self.rho = self.ip(r, z)
 
@@ -366,13 +366,11 @@ class GaussNewtonCG(ConjugateGradientBase):
     def run_GN_iter(self, num_cg_iter):
         """Runs a single GN iteration."""
 
-        self.x.requires_grad_(True)
-
+        self.x.requires_grad_(True) # Song, filter + projection_matrix
         # Evaluate function at current estimate
-        self.f0 = self.problem(self.x)
-
+        self.f0 = self.problem(self.x) # Song, self.f0: Input, Filter, Porjection
         # Create copy with graph detached
-        self.g = self.f0.detach()
+        self.g = self.f0.detach() # Song, Input, Filter, P
 
         if self.debug and not self.analyze_convergence:
             loss = self.problem.ip_output(self.g, self.g)
@@ -382,6 +380,8 @@ class GaussNewtonCG(ConjugateGradientBase):
 
         # Get df/dx^t @ f0
         self.dfdxt_g = TensorList(torch.autograd.grad(self.f0, self.x, self.g, create_graph=True))
+        # Song, Input / filter+P, Filter / Filter+P, P / filter+P
+
 
         # Get the right hand side
         self.b = - self.dfdxt_g.detach()
@@ -397,7 +397,19 @@ class GaussNewtonCG(ConjugateGradientBase):
 
 
     def A(self, x):
-        dfdx_x = torch.autograd.grad(self.dfdxt_g, self.g, x, retain_graph=True)
+        print('self.dfdxt_g: ', len(self.dfdxt_g), self.dfdxt_g[0].shape, self.dfdxt_g[1].shape)
+        print('self.g: ', len(self.g), self.g[0].shape, self.g[1].shape, self.g[2].shape)
+        print('x', len(x), x[0].shape, x[1].shape)
+        dfdx_x = torch.autograd.grad(self.dfdxt_g, self.g, x, retain_graph=True, allow_unused=True)
+        print('\n')
+        print('self.f0', len(self.f0),self.f0[0].shape, self.f0[1].shape, self.f0[2].shape)
+        print('self.x', len(self.x), self.x[0].shape, self.x[1].shape)
+        print('self.dfdx_x', len(dfdx_x), dfdx_x[0] is None, dfdx_x[1].shape, dfdx_x[2].shape)
+
+        '''
+        dfdx_x in RGB: [27, 1, 16, 16], [1, 64, 4, 4], [64, 1024, 1, 1]
+        dfdx_x in DAL: None !!!!!, [1, 64, 4, 4], [64, 1024, 1, 1]
+        '''
         return TensorList(torch.autograd.grad(self.f0, self.x, dfdx_x, retain_graph=True))
 
     def ip(self, a, b):
