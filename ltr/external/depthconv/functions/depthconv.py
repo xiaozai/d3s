@@ -43,7 +43,12 @@ class DepthconvFunction(Function):
 
     @staticmethod
     def forward(ctx, input, weight, depth=None):
+        ''' input: RGB features, [27, 64, 16, 16]
+            weight: the DCF filter, []
+            depth: Depth crops, [27, 1, 16, 16]
 
+        '''
+        print('in DepthconvFunction:', input.shape, weight.shape, depth.shape)
         def _output_size(input, weight, padding, dilation, stride):
             channels = weight.size(0)
 
@@ -54,6 +59,7 @@ class DepthconvFunction(Function):
                 kernel = dilation * (weight.size(d + 2) - 1) + 1
                 stride = stride
                 output_size += ((in_size + (2 * pad) - kernel) // stride + 1, )
+                print('output_size: ', output_size)
             if not all(map(lambda s: s > 0, output_size)):
                 raise ValueError(
                     "convolution input is too small (output would be {})".format(
