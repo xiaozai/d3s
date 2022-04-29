@@ -390,11 +390,13 @@ class DepthSegmProcessingRotation(BaseProcessing):
             # Song , Salt and Pepper Noises on Depth
             if random.random() < 0.4:
                 crops_depth = [self.sp_noise(x, 0.05) for x in crops_depth]
-
             # # Song : Rotation
             rotation = False
             scale = 1
-            h, w = crops_depth[0].shape
+            if len(crops_depth[0].shape) == 2:
+                h, w = crops_depth[0].shape
+            else:
+                h, w, _ = crops_depth[0].shape
             center = (w/2, h/2)
             angle = 0
             M = cv2.getRotationMatrix2D(center, angle, scale)
@@ -407,7 +409,6 @@ class DepthSegmProcessingRotation(BaseProcessing):
                 crops_img = [cv2.warpAffine(x, M, (w, h)) for x in crops_img]
                 crops_depth = [cv2.warpAffine(x, M, (w, h)) for x in crops_depth]
                 crops_mask = [cv2.warpAffine(x, M, (w, h)) for x in crops_mask]
-
 
             if s == 'test' and self.use_distance:
                 # use target center only to create distance map
@@ -430,7 +431,10 @@ class DepthSegmProcessingRotation(BaseProcessing):
             data[s + '_masks'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_mask] # 1, 1*384*384
             # data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth] # 1, 1*384*384
             # data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth if len(x.shape)==2 else self.transforms[s](x)] # 1, 1*384*384
-            data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) if len(x.shape)==2 else self.transforms[s](x) for x in crops_depth] # 1, 1*384*384
+            if len(crops_depth[0].shape) == 3 and crops_depth[0].shape[-1] == 3:
+                data[s + '_depths'] = [self.transform[s](x) for x in crops_depth] # 1, 1*384*384
+            else:
+                data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth]
 
             # if s == 'train' and random.random() < 0.005:
             if s == 'train' and random.random() < 0.01: # Song increased it
