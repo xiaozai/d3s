@@ -126,12 +126,15 @@ def save_debug(data, pred_mask, vis_data, batch_element = 0):
     train_depth = data['train_depths'][:, batch_element, :, :].permute(1, 2, 0) # .numpy().squeeze().astype(np.float32)
     test_depth = data['test_depths'][:, batch_element, :, :].permute(1, 2, 0) #.numpy().squeeze().astype(np.float32)
 
+    train_depth = train_depth.numpy().squeeze()
+    test_depth = test_depth.numpy().squeeze()
+
     if train_depth.shape[-1] == 3:
         train_depth = 255 * (train_depth * std + mu)
         test_depth = 255 * (test_depth * std + mu)
 
-    train_depth = train_depth.numpy().squeeze() #.astype(np.uint8)
-    test_depth = test_depth.numpy().squeeze() # .astype(np.uint8)
+        train_depth = train_depth.astype(np.uint8)
+        test_depth = test_depth.astype(np.uint8)
 
 
     train_mask = data['train_masks'][0, batch_element, :, :].numpy().astype(np.float32)
