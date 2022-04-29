@@ -193,7 +193,7 @@ class DepthSegmProcessing(BaseProcessing):
             ''' Song random rotated image '''
             # data[s + '_masks'] = [self.transform[s](x) for x in crops_mask]
 
-            data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth] # 1, 1*384*384
+            data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth if len(x.shape)==2 else  self.transforms[s](x)] # 1, 1*384*384
 
             ''' Song :
             Should we increase this prob ? to make Box2Mask ?instead of Mask2Mask
@@ -428,7 +428,8 @@ class DepthSegmProcessingRotation(BaseProcessing):
             data[s + '_images'] = [self.transform[s](x) for x in crops_img] # 1 * 3 * H * W
             data[s + '_anno'] = boxes # Song, boxes no rotation
             data[s + '_masks'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_mask] # 1, 1*384*384
-            data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth] # 1, 1*384*384
+            # data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth] # 1, 1*384*384
+            data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth if len(x.shape)==2 else self.transforms[s](x)] # 1, 1*384*384
 
             # if s == 'train' and random.random() < 0.005:
             if s == 'train' and random.random() < 0.01: # Song increased it

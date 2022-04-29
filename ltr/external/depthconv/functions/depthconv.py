@@ -21,32 +21,24 @@ except ImportError:
 
 __all__ = ['depth_conv']
 
-def depth_conv(input,
-                  depth,
-                  weight,
-                  bias,
-                  stride=1,
-                  padding=0,
-                  dilation=1):
+def depth_conv(input, weight,
+               depth=None, bias=None, stride=1, padding=0, dilation=1):
 
     if input is not None and input.dim() != 4:
         raise ValueError(
             "Expected 4D tensor as input, got {}D tensor instead.".format(
                 input.dim()))
 
-    # f = DepthconvFunction()
-    # return f(input, weight, depth)
-    return DepthconvFunction.apply(input, weight, depth)
+    return DepthconvFunction.apply(input, weight, bias, stride, padding, dilation, depth)
 
 
 class DepthconvFunction(Function):
 
     @staticmethod
-    def forward(ctx, input, weight, depth=None):
-        ''' input: RGB features, [27, 64, 16, 16]
-            weight: the DCF filter, [1, 64, 4, 4]
-            depth: Depth crops, [27, 1, 16, 16]
-
+    def forward(ctx, input, weight, bias=None, stride=1, padding=(2,2), dilation=1, depth=None):
+        ''' input: RGB features,    [27, 64, 16, 16]
+            weight: the DCF filter, [ 1, 64,  4,  4]
+            depth: Depth crops,     [27,  1, 16, 16]
         '''
         def _output_size(input, weight, padding, dilation, stride):
             channels = weight.size(0)
@@ -64,16 +56,24 @@ class DepthconvFunction(Function):
                         'x'.join(map(str, output_size))))
             return output_size # [27, 17, 17]
 
+        ctx.save_for_backward(input, weight)
 
-        stride, padding, dilation = 1, (2, 2), 1
-        bias = input.new(weight.size(0)).zero_()
+        if bias is None:
+            bias = input.new(weight.size(0)).zero_()
 
         output_size = [int((input.size()[i + 2] + 2 * padding[i] - weight.size()[i + 2]) / stride + 1)
                        for i in range(2)]
-        print('output_size:', output_size)
-        output = input.new(*_output_size(input, weight,  padding, dilation, stride)).zero_()
+        output = input.new(*_output_size(input, weight, padding, dilation, stride)).zero_()
         columns = input.new(weight.size(1) * weight.size(2) * weight.size(3), output_size[0] * output_size[1]).zero_()
         ones = input.new(output_size[0] * output_size[1]).zero_()
+
+        ctx.depth = depth
+        ctx.bias = bias
+        ctx.stride = stride
+        ctx.padding = padding
+        ctx.dilation = dilation
+        ctx.columns = columns
+        ctx.ones = ones
 
         if not input.is_cuda:
             raise NotImplementedError
@@ -81,40 +81,41 @@ class DepthconvFunction(Function):
             if not isinstance(input, torch.cuda.FloatTensor):
                 raise NotImplementedError
             depthconv.depthconv_forward_cuda(
-                    input, depth, weight, bias, output, columns, ones,
-                    weight.size(3), weight.size(2), stride, stride,
-                    padding[1], padding[0], dilation, dilation)
-
-        ctx.save_for_backward(input, depth, weight, bias, columns, ones)
+                    input, ctx.depth, weight, ctx.bias, output, ctx.columns, ctx.ones,
+                    weight.size(3), weight.size(2), ctx.stride, ctx.stride,
+                    ctx.padding[1], ctx.padding[0], ctx.dilation, ctx.dilation)
 
         return output
 
     @staticmethod
     def backward(ctx, grad_output):
-        input, depth, weight, bias, columns, ones = ctx.saved_tensors
+        input, weight = ctx.saved_tensors
         grad_input = grad_weight = grad_bias = None
 
-        stride, padding, dilation = 1, (2, 2), 1
-        output_size = [int((input.size()[i + 2] + 2 * padding[i] - weight.size()[i + 2]) / stride + 1)
-                       for i in range(2)]
+        output_size = [int((input.size()[i + 2] + 2 * ctx.padding[i] - weight.size()[i + 2]) / ctx.stride + 1) for i in range(2)]
 
-        print('ctx.needs_input_grad: ', len(ctx.needs_input_grad), ctx.needs_input_grad)
         if ctx.needs_input_grad[0]:
             grad_input = input.new(*input.size()).zero_()
             depthconv.depthconv_backward_input_cuda(
-                input, depth, grad_output, grad_input,
-                weight, columns,
-                weight.size(3), weight.size(2), stride, stride,
-                padding[1], padding[0], dilation, dilation)
+                input, ctx.depth, grad_output, grad_input,
+                weight, ctx.columns,
+                weight.size(3), weight.size(2), ctx.stride, ctx.stride,
+                ctx.padding[1], ctx.padding[0], ctx.dilation, ctx.dilation)
 
-        if ctx.needs_input_grad[2]:
-            grad_weight = weight.new(*weight.size()).zero_()
-            grad_bias = weight.new(*bias.size()).zero_()
+        if ctx.needs_input_grad[1]:
+            grad_weight = weight.new(*weight.size()).zero_() # [1, 64, 4, 4]
+            grad_bias = weight.new(*ctx.bias.size()).zero_() # torch.tensor([0])
 
             depthconv.depthconv_backward_parameters_cuda(
-                input, depth, grad_output, grad_weight, grad_bias, columns,
-                ones,
-                weight.size(3), weight.size(2), stride, stride,
-                padding[1], padding[0], dilation, dilation, 1)
+                input, ctx.depth, grad_output, grad_weight, grad_bias,
+                ctx.columns, ctx.ones,
+                weight.size(3), weight.size(2), ctx.stride, ctx.stride,
+                ctx.padding[1], ctx.padding[0], ctx.dilation, ctx.dilation, 1)
 
-        return grad_input, grad_weight
+            if len(ctx.needs_input_grad) >= 3:
+                if not ctx.needs_input_grad[2]:
+                    grad_bias = None
+            else:
+                grad_bias = None
+
+        return grad_input, grad_weight, grad_bias, None, None, None, None

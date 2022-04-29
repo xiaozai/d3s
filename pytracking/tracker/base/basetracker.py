@@ -278,6 +278,11 @@ class BaseTracker:
             self.ax.cla()
             self.ax.imshow(color)
             self.ax_d.cla()
+            depth[depth > self.max_depth] = self.max_depth
+            depth[depth < self.min_depth] = self.min_depth
+            depth = (depth - self.min_depth) / (self.max_depth - self.min_depth)
+            depth = np.asarray(depth*255, dtype=np.uint8)
+            depth = cv.applyColorMap(depth, cv.COLORMAP_JET)
             self.ax_d.imshow(depth)
         else:
             if isinstance(image, dict):

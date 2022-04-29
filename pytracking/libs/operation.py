@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from pytracking.libs.tensorlist import tensor_operation, TensorList
-from ltr.external.depthconv.functions import depth_conv
+from ltr.external.depthconv.functions import depth_conv, DepthconvFunction
 
 
 @tensor_operation
@@ -34,9 +34,17 @@ def conv2d(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor = None,
         if isinstance(depth, TensorList):
             depth = depth[0]
         depth = F.interpolate(depth, size=(input.shape[-2], input.shape[-1]))
+        depth = F.softmax(depth, dim=1) * 10
+        depth = depth.repeat(1, input.shape[1], 1, 1)
         depth = depth.to(input.device)
-        out = depth_conv(input, depth, weight, bias, stride, padding, dilation)
-        
+
+        ''' if we use depth as labels?? '''
+        out = F.conv2d(input+depth, weight, bias=bias, stride=stride, padding=padding, dilation=dilation, groups=groups)
+
+        ''' The gradients of DepthConv have bugs '''
+        # out = depth_conv(input, weight, depth=depth, bias=bias, stride=stride, padding=padding, dilation=dilation)
+        # out = DepthconvFunction.apply(input, weight, bias, stride, padding, dilation, depth)
+
     if ind is None:
         return out
     return out[:,:,ind[0],ind[1]]

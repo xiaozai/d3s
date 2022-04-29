@@ -17,7 +17,7 @@ class Vos_rgbd(BaseDataset):
     """ VOS dataset (Video Object Segmentation).
     """
 
-    def __init__(self, root=None, image_loader=default_image_loader, vid_ids=None, split=None):
+    def __init__(self, root=None, image_loader=default_image_loader, vid_ids=None, split=None, use_colormap=False):
         """
         args:
             root - path to the VOS dataset.
@@ -31,6 +31,7 @@ class Vos_rgbd(BaseDataset):
         root = env_settings().vos_dir if root is None else root
         super().__init__(root, image_loader)
 
+        self.use_colormap = use_colormap
         self.sequence_list = self._build_sequence_list(vid_ids, split)
         self.frame_names_dict, self.depth_names_dict, self.mask_names_dict = self._build_frames_list()
 
@@ -108,8 +109,11 @@ class Vos_rgbd(BaseDataset):
         try:
             depth = cv2.imread(depths_path[frame_id], -1)
             depth = cv2.normalize(depth, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-            depth = np.asarray(depth, dtype=np.float32)
-            return np.expand_dims(depth, axis=-1) # H*W*1
+            if self.use_colormap:
+                depth = cv2.applyColorMap(depth, cv2.COLORMAP_JET)
+                return np.asarray(depth, axis=-1)
+            else:
+                return np.expand_dims(np.asarray(depth, dtype=np.float32), axis=-1) # H*W*1
         except:
             print(depths_path[frame_id])
 

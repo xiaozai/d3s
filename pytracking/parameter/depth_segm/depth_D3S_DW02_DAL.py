@@ -17,8 +17,10 @@ def parameters():
     deep_params = TrackerParams()
 
     # Patch sampling parameters
-    params.max_image_sample_size = (16 * 16) ** 2  # (18 * 16) ** 2   # Maximum image sample size
-    params.min_image_sample_size = (16 * 16) ** 2  # (18 * 16) ** 2   # Minimum image sample size
+    # params.max_image_sample_size = (16 * 16) ** 2  # (18 * 16) ** 2   # Maximum image sample size
+    # params.min_image_sample_size = (16 * 16) ** 2  # (18 * 16) ** 2   # Minimum image sample size
+    params.max_image_sample_size = (18 * 18) ** 2  # (18 * 16) ** 2   # Maximum image sample size
+    params.min_image_sample_size = (18 * 18) ** 2  # (18 * 16) ** 2   # Minimum image sample size
     params.search_area_scale = 4.5                    # Scale relative to target size
     params.feature_size_odd = False                 # Good to use False for even-sized kernels and vice versa
 

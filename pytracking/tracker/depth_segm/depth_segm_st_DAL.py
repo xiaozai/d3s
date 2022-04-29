@@ -298,13 +298,14 @@ class DepthSegmST(BaseTracker):
             # Initialize optimizer
             analyze_convergence = getattr(self.params, 'analyze_convergence', False)
             if optimizer == 'GaussNewtonCG':
-                self.joint_optimizer = GaussNewtonCG(self.joint_problem, joint_var, plotting=(self.params.debug == 3), # SY >= 3 -> == 3
+                self.joint_optimizer = GaussNewtonCG(self.joint_problem, joint_var, plotting=(self.params.debug == 3),
                                                      analyze=analyze_convergence, fig_num=(12, 13, 14))
             elif optimizer == 'GradientDescentL2':
                 self.joint_optimizer = GradientDescentL2(self.joint_problem, joint_var,
                                                          self.params.optimizer_step_length,
                                                          self.params.optimizer_momentum,
-                                                         plotting=(self.params.debug == 3), debug=analyze_convergence, # SY >= 3 -> == 3
+                                                         plotting=(self.params.debug == 3),
+                                                         debug=analyze_convergence,
                                                          fig_num=(12, 13))
 
             # Do joint optimization
@@ -630,8 +631,8 @@ class DepthSegmST(BaseTracker):
             f_d = x_d[0].to(self.params.device)
 
             f_d = self.segm_net.segm_predictor.depth_feat_extractor(f_d)                                # B=1, C=64, 64, 64
-            f_d = self.segm_net.segm_predictor.segment1_d(self.segm_net.segm_predictor.segment0_d(f_d)) # B=1, C=64, 64, 64
-            attn_d = self.segm_net.segm_predictor.attn_d(f_d)                                           # B=1, C=1,  64, 64
+            # f_d = self.segm_net.segm_predictor.segment1_d(self.segm_net.segm_predictor.segment0_d(f_d)) # B=1, C=64, 64, 64
+            attn_d = self.segm_net.segm_predictor.depth_attn(f_d)                                           # B=1, C=1,  64, 64
 
             f_rgb = self.segm_net.segm_predictor.segment1(self.segm_net.segm_predictor.segment0(f_rgb)) # B=1, 64, 16, 16
 
@@ -752,19 +753,20 @@ class DepthSegmST(BaseTracker):
                                                                                        aug_expansion_sz, self.transforms,
                                                                                        dp=dp)
 
-        # ''' RGBD features fusion '''
-        # if self.params.use_rgbd_classifier and init_dp_patches is not None:
-        #     init_samples_d = self.segm_net.segm_predictor.depth_feat_extractor(init_dp_patches.to(self.params.device))        # B=27, C=64, 64, 64
-        #     init_samples_d = self.segm_net.segm_predictor.segment1_d(self.segm_net.segm_predictor.segment0_d(init_samples_d)) # B=27, C=64, 64, 64
-        #     init_attn_d = self.segm_net.segm_predictor.attn_d(init_samples_d)                                                 # B=27, C=1,  64, 64
-        #
-        #     init_rgb_samples = init_samples[0].to(self.params.device)                                                         # B=27, 1024, 16, 16
-        #     init_rgb_samples = self.segm_net.segm_predictor.segment1(self.segm_net.segm_predictor.segment0(init_rgb_samples)) # B=27, 64, 16, 16
-        #
-        #     _, init_attn = self.segm_net.segm_predictor.rgbd_fusion3(init_rgb_samples, init_attn_d) # B=27, 1, 16, 16
-        #
-        #     init_rgbd_samples = init_samples[0] * init_attn
-        #     init_samples = TensorList([init_rgbd_samples])
+        ''' RGBD features fusion '''
+        if self.params.use_rgbd_classifier and init_samples_d is not None:
+            f_d = init_samples_d[0]
+            f_d = self.segm_net.segm_predictor.depth_feat_extractor(f_d.to(self.params.device))        # B=27, C=64, 64, 64
+            # init_samples_d = self.segm_net.segm_predictor.segment1_d(self.segm_net.segm_predictor.segment0_d(init_samples_d)) # B=27, C=64, 64, 64
+            attn_d = self.segm_net.segm_predictor.depth_attn(f_d)                                                 # B=27, C=1,  64, 64
+
+            f_rgb = init_samples[0].to(self.params.device)                                                         # B=27, 1024, 16, 16
+            f_rgb = self.segm_net.segm_predictor.segment1(self.segm_net.segm_predictor.segment0(f_rgb)) # B=27, 64, 16, 16
+
+            _, init_attn = self.segm_net.segm_predictor.rgbd_fusion3(f_rgb, attn_d) # B=27, 1, 16, 16
+
+            f_rgbd = init_samples[0] * init_attn
+            init_samples = TensorList([f_rgbd])
 
         # Remove augmented samples for those that shall not have
         for i, use_aug in enumerate(self.fparams.attribute('use_augmentation')):
