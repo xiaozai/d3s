@@ -112,8 +112,8 @@ class Vos_rgbd(BaseDataset):
             if self.use_colormap:
                 print('convert depth to colormap')
                 depth = np.asarray(depth*255, dtype=np.uint8)
-                depth = cv.applyColorMap(depth, cv.COLORMAP_JET)
                 print('depth : ', depth.shape)
+                depth = cv.applyColorMap(depth, cv.COLORMAP_JET)
                 print('Done')
                 return np.asarray(depth, axis=-1)
             else:
