@@ -193,7 +193,7 @@ class DepthSegmProcessing(BaseProcessing):
             ''' Song random rotated image '''
             # data[s + '_masks'] = [self.transform[s](x) for x in crops_mask]
 
-            data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth if len(x.shape)==2 else  self.transforms[s](x)] # 1, 1*384*384
+            data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth if len(x.shape)==2 else self.transforms[s](x)] # 1, 1*384*384
 
             ''' Song :
             Should we increase this prob ? to make Box2Mask ?instead of Mask2Mask
