@@ -282,15 +282,15 @@ def save_debug_MP(data, pred_mask, vis_data, batch_element = 0):
     #     train_depth = 255 * (train_depth * std + mu)
     #     test_depth = 255 * (test_depth * std + mu)
 
-    train_depth = train_depth.numpy().squeeze() #.astype(np.uint8)
-    test_depth = test_depth.numpy().squeeze() # .astype(np.uint8)
-
     if train_depth.shape[-1] == 3:
         train_depth = 255 * (train_depth * std + mu)
         test_depth = 255 * (test_depth * std + mu)
 
         train_depth = train_depth.astype(np.uint8)
         test_depth = test_depth.astype(np.uint8)
+
+    train_depth = train_depth.numpy().squeeze() #.astype(np.uint8)
+    test_depth = test_depth.numpy().squeeze() # .astype(np.uint8)
 
     train_mask = data['train_masks'][0, batch_element, :, :].numpy().astype(np.float32)
     test_mask = data['test_masks'][0, batch_element, :, :].numpy().astype(np.float32)
