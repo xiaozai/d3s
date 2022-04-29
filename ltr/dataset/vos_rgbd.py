@@ -110,7 +110,9 @@ class Vos_rgbd(BaseDataset):
             depth = cv2.imread(depths_path[frame_id], -1)
             depth = cv2.normalize(depth, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
             if self.use_colormap:
-                depth = cv2.applyColorMap(depth, cv2.COLORMAP_JET)
+                print('convert depth to colormap')
+                depth = cv2.applyColorMap(depth*255, cv2.COLORMAP_JET)
+                print('Done')
                 return np.asarray(depth, axis=-1)
             else:
                 return np.expand_dims(np.asarray(depth, dtype=np.float32), axis=-1) # H*W*1
