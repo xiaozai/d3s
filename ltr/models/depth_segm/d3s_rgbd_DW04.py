@@ -95,7 +95,7 @@ class channel_attention(nn.Module):
 
         scale = F.sigmoid(channel_att_sum).unsqueeze(2).unsqueeze(3).expand_as(x)
 
-        return x, scales
+        return x, scale
 
 def logsumexp_2d(tensor):
     tensor_flatten = tensor.view(tensor.size(0), tensor.size(1), -1)
@@ -142,12 +142,13 @@ class DWNet(nn.Module):
         # Mapping the channels
         f_rgb = self.conv_rgb(f_rgb)
         f_rgb, attn_rgb = self.channel_attn_rgb(f_rgb) # f_rgb * attn_rgb
+        f_rgb = f_rgb * attn_rgb
         # Resize attn_d
-        f_d = self.conv_d(f_d)
-        attn_d = F.interpolate(attn_d, size=(f_d.shape[-2], f_d.shape[-1]))
+        f_d = self.conv_d(F.interpolate(f_d, size=(f_rgb.shape[-2], f_rgb.shape[-1])))
+        attn_d = F.interpolate(attn_d, size=(f_rgb.shape[-2], f_rgb.shape[-1]))
         f_d = f_d * attn_d
         # Intergration
-        f_rgbd = f_rgb * attn_rgb + f_d * attn_d
+        f_rgbd = f_rgb + f_d
 
         return f_rgbd, attn_rgb+attn_d
 
@@ -204,9 +205,9 @@ class SegmNet(nn.Module):
         self.f1 = conv(segm_input_dim[1], segm_inter_dim[1])
         self.f0 = conv(segm_input_dim[0], segm_inter_dim[0])
 
-        self.d2 = conv(segm_input_dim[3], segm_inter_dim[2]) # 96
-        self.d1 = conv(segm_input_dim[3], segm_inter_dim[1], stride=2) # 48,
-        self.d0 = conv(segm_input_dim[3], segm_inter_dim[0], stride=2) # 24
+        self.d2 = conv(segm_inter_dim[3], segm_inter_dim[2]) # 96
+        self.d1 = conv(segm_inter_dim[3], segm_inter_dim[1]) # 48,
+        self.d0 = conv(segm_inter_dim[3], segm_inter_dim[0]) # 24
 
         self.post2 = conv(segm_inter_dim[2], segm_inter_dim[1])
         self.post1 = conv(segm_inter_dim[1], segm_inter_dim[0])
