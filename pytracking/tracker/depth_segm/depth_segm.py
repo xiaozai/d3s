@@ -609,8 +609,9 @@ class DepthSegmST(BaseTracker):
             f_d = x_d[0].to(self.params.device)
 
             f_d = self.segm_net.segm_predictor.depth_feat_extractor(f_d)                                # B=1, C=64, 64, 64
-            f_d = self.segm_net.segm_predictor.segment1_d(self.segm_net.segm_predictor.segment0_d(f_d)) # B=1, C=64, 64, 64
-            attn_d = self.segm_net.segm_predictor.attn_d(f_d)                                           # B=1, C=1,  64, 64
+            # f_d = self.segm_net.segm_predictor.segment1_d(self.segm_net.segm_predictor.segment0_d(f_d)) # B=1, C=64, 64, 64
+            # attn_d = self.segm_net.segm_predictor.attn_d(f_d)                                           # B=1, C=1,  64, 64
+            attn_d = self.segm_net.segm_predictor.depth_attn(f_d)
 
             f_rgb = self.segm_net.segm_predictor.segment1(self.segm_net.segm_predictor.segment0(f_rgb)) # B=1, 64, 16, 16
 
@@ -732,10 +733,11 @@ class DepthSegmST(BaseTracker):
                                                                                        dp=dp)
         ''' RGBD features fusion '''
         if self.params.use_rgbd_classifier and init_dp_patches is not None:
-            init_samples_d = self.segm_net.segm_predictor.depth_feat_extractor(init_dp_patches.to(self.params.device))        # B=27, C=64, 64, 64
-            init_samples_d = self.segm_net.segm_predictor.segment1_d(self.segm_net.segm_predictor.segment0_d(init_samples_d)) # B=27, C=64, 64, 64
-            init_attn_d = self.segm_net.segm_predictor.attn_d(init_samples_d)                                                 # B=27, C=1,  64, 64
-
+            init_samples_d = self.segm_net.segm_predictor.depth_feat_extractor(init_dp_patches[0].to(self.params.device))        # B=27, C=64, 64, 64
+            # init_samples_d = self.segm_net.segm_predictor.segment1_d(self.segm_net.segm_predictor.segment0_d(init_samples_d)) # B=27, C=64, 64, 64
+            # init_attn_d = self.segm_net.segm_predictor.attn_d(init_samples_d)                                                 # B=27, C=1,  64, 64
+            init_attn_d = self.segm_net.segm_predictor.depth_attn(init_samples_d)
+            
             init_rgb_samples = init_samples[0].to(self.params.device)                                                         # B=27, 1024, 16, 16
             init_rgb_samples = self.segm_net.segm_predictor.segment1(self.segm_net.segm_predictor.segment0(init_rgb_samples)) # B=27, 64, 16, 16
 

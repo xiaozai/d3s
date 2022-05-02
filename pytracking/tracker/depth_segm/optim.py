@@ -5,9 +5,8 @@ import math
 
 class FactorizedConvProblem(optimization.L2Problem):
     def __init__(self, training_samples: TensorList, y: TensorList, filter_reg: torch.Tensor, projection_reg, params, sample_weights: TensorList,
-                 projection_activation, response_activation, training_samples_d=None):
+                 projection_activation, response_activation, training_samples_d=None, compression=True):
         self.training_samples = training_samples
-        self.training_samples_d = training_samples_d
         self.y = y
         self.filter_reg = filter_reg
         self.sample_weights = sample_weights
@@ -17,6 +16,10 @@ class FactorizedConvProblem(optimization.L2Problem):
         self.response_activation = response_activation
 
         self.diag_M = self.filter_reg.concat(projection_reg)
+
+        # Song ,
+        self.training_samples_d = training_samples_d # Song
+        self.compression = compression
 
     def __call__(self, x: TensorList):
         """
@@ -28,7 +31,10 @@ class FactorizedConvProblem(optimization.L2Problem):
         P = x[len(x)//2:]       # w1 in paper
 
         # Do first convolution
-        compressed_samples = operation.conv1x1(self.training_samples, P).apply(self.projection_activation)
+        if self.compression:
+            compressed_samples = operation.conv1x1(self.training_samples, P).apply(self.projection_activation)
+        else:
+            compressed_samples = self.training_samples
 
         # Do second convolution,
         residuals = operation.conv2d(compressed_samples, filter, mode='same', depth=self.training_samples_d).apply(self.response_activation)
