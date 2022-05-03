@@ -603,22 +603,21 @@ class DepthSegmST(BaseTracker):
         '''
         x_rgb, x_d, rgb_patches = self.extract_sample(color, depth, pos, scales, sz)
 
-        # Song: fuse RGBD features
+        ''' Song: fuse RGBD features '''
         if self.params.use_rgbd_classifier:
-            f_rgb = x_rgb[0].to(self.params.device) # B=1, 1024, 16, 16
-            f_d = x_d[0].to(self.params.device)
-
-            f_d = self.segm_net.segm_predictor.depth_feat_extractor(f_d)                                # B=1, C=64, 64, 64
+            # f_rgb = x_rgb[0].to(self.params.device) # B=1, 1024, 16, 16
+            x_d = self.segm_net.segm_predictor.depth_feat_extractor(x_d[0].to(self.params.device))
+            print('in tracking : x_rgb: ', x_rgb[0].shape, x_d.shape)                               # B=1, C=64, 64, 64
             # f_d = self.segm_net.segm_predictor.segment1_d(self.segm_net.segm_predictor.segment0_d(f_d)) # B=1, C=64, 64, 64
             # attn_d = self.segm_net.segm_predictor.attn_d(f_d)                                           # B=1, C=1,  64, 64
-            attn_d = self.segm_net.segm_predictor.depth_attn(f_d)
+            # attn_d = self.segm_net.segm_predictor.depth_attn(f_d)
 
-            f_rgb = self.segm_net.segm_predictor.segment1(self.segm_net.segm_predictor.segment0(f_rgb)) # B=1, 64, 16, 16
+            # f_rgb = self.segm_net.segm_predictor.segment1(self.segm_net.segm_predictor.segment0(f_rgb)) # B=1, 64, 16, 16
 
-            _, attn_rgbd = self.segm_net.segm_predictor.rgbd_fusion3(f_rgb, attn_d)                     # B=1, 1, 16, 16
+            # _, attn_rgbd = self.segm_net.segm_predictor.rgbd_fusion3(f_rgb, attn_d)                     # B=1, 1, 16, 16
 
-            x_rgbd = x_rgb[0] * attn_rgbd
-            x_rgb = TensorList([x_rgbd])
+            # x_rgbd = x_rgb[0] * attn_rgbd
+            # x_rgb = TensorList([x_rgbd])
 
         # Song, for vis only
         self.rgb_patches = rgb_patches.clone().detach().cpu().numpy().squeeze()
@@ -731,18 +730,19 @@ class DepthSegmST(BaseTracker):
         init_samples, init_dp_patches = self.params.features_filter.extract_transformed(im, self.pos.round(), self.target_scale,
                                                                                        aug_expansion_sz, self.transforms,
                                                                                        dp=dp)
-        ''' RGBD features fusion '''
+        ''' RGBD features fusion
+        Song, how to fusion RGBD features forn DCF???
+        '''
         if self.params.use_rgbd_classifier and init_dp_patches is not None:
             init_samples_d = self.segm_net.segm_predictor.depth_feat_extractor(init_dp_patches[0].to(self.params.device))        # B=27, C=64, 64, 64
-            init_attn_d = self.segm_net.segm_predictor.depth_attn(init_samples_d)
+            # init_attn_d = self.segm_net.segm_predictor.depth_attn(init_samples_d)
+            # init_rgb_samples = init_samples[0].to(self.params.device)                                                         # B=27, 1024, 16, 16
+            # init_rgb_samples = self.segm_net.segm_predictor.segment1(self.segm_net.segm_predictor.segment0(init_rgb_samples)) # B=27, 64, 16, 16
+            # _, init_attn = self.segm_net.segm_predictor.rgbd_fusion3(init_rgb_samples, init_attn_d) # B=27, 1, 16, 16
 
-            init_rgb_samples = init_samples[0].to(self.params.device)                                                         # B=27, 1024, 16, 16
-            init_rgb_samples = self.segm_net.segm_predictor.segment1(self.segm_net.segm_predictor.segment0(init_rgb_samples)) # B=27, 64, 16, 16
-
-            _, init_attn = self.segm_net.segm_predictor.rgbd_fusion3(init_rgb_samples, init_attn_d) # B=27, 1, 16, 16
-
-            init_rgbd_samples = init_samples[0] * init_attn
-            init_samples = TensorList([init_rgbd_samples])
+            # init_rgbd_samples = init_samples[0] * init_attn
+            # init_samples = TensorList([init_rgbd_samples])
+            print('init_samples RGB : ', init_samples[0].shape, init_samples_d.shape)
 
         # Remove augmented samples for those that shall not have
         for i, use_aug in enumerate(self.fparams.attribute('use_augmentation')):
