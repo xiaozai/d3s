@@ -214,20 +214,20 @@ class DepthSegmST(BaseTracker):
         self.load_segmnet()
 
         # Extract and transform sample
-        x_rgb = self.generate_init_samples(im, dp=dp) #
-
+        x_rgb, x_d = self.generate_init_samples(im, dp) #
+        print('x_rgb 1 : ', x_rgb[0].shape)
         # Initialize projection matrix
         self.init_projection_matrix(x_rgb)
-
+        print('x_rgb 2 : ', x_rgb[0].shape)
         # Transform to get the training sample
         train_x_rgb = self.preprocess_sample(x_rgb) # x_rgb * self.feature_window
-
+        print('x_rgb 3 : ', x_rgb[0].shape)
         # Generate label function
         init_y = self.init_label_function(train_x_rgb) # Gaussian map
 
         # Init memory
         self.init_memory(train_x_rgb) # No need for depth
-
+        print('x_rgb 4 , self.init_training_samples:', self.init_training_samples[0].shape)
         # Init optimizer and do initial optimization for DCF
         self.init_optimization(train_x_rgb, init_y) # Song, but Depth is not used for filter optimize
 
@@ -275,7 +275,7 @@ class DepthSegmST(BaseTracker):
         self.params.update_projection_matrix = getattr(self.params, 'update_projection_matrix',
                                                        True) and self.params.use_projection_matrix
         optimizer = getattr(self.params, 'optimizer', 'GaussNewtonCG')
-
+        print('self.init_optimization: self.init_training_samples:', self.init_training_samples[0].shape)
         # Setup factorized joint optimization
         if self.params.update_projection_matrix:
             self.joint_problem = FactorizedConvProblem(self.init_training_samples, init_y, self.filter_reg,
@@ -685,7 +685,7 @@ class DepthSegmST(BaseTracker):
         else:
             raise ValueError('Unknown activation')
 
-    def generate_init_samples(self, im: torch.Tensor, dp=None) -> TensorList:
+    def generate_init_samples(self, im: torch.Tensor, dp: torch.Tensor) -> TensorList:
         """Generate augmented initial samples."""
 
         # Compute augmentation size
@@ -731,18 +731,12 @@ class DepthSegmST(BaseTracker):
                                                                                        aug_expansion_sz, self.transforms,
                                                                                        dp=dp)
         ''' RGBD features fusion
-        Song, how to fusion RGBD features forn DCF???
+            init_samples : TensorList([27, 1024, 16, 16]), needs to be compressed
+            init_samples_d : [27, 64, 128, 128]
         '''
+        init_samples_d = None
         if self.params.use_rgbd_classifier and init_dp_patches is not None:
             init_samples_d = self.segm_net.segm_predictor.depth_feat_extractor(init_dp_patches[0].to(self.params.device))        # B=27, C=64, 64, 64
-            # init_attn_d = self.segm_net.segm_predictor.depth_attn(init_samples_d)
-            # init_rgb_samples = init_samples[0].to(self.params.device)                                                         # B=27, 1024, 16, 16
-            # init_rgb_samples = self.segm_net.segm_predictor.segment1(self.segm_net.segm_predictor.segment0(init_rgb_samples)) # B=27, 64, 16, 16
-            # _, init_attn = self.segm_net.segm_predictor.rgbd_fusion3(init_rgb_samples, init_attn_d) # B=27, 1, 16, 16
-
-            # init_rgbd_samples = init_samples[0] * init_attn
-            # init_samples = TensorList([init_rgbd_samples])
-            print('init_samples RGB : ', init_samples[0].shape, init_samples_d.shape)
 
         # Remove augmented samples for those that shall not have
         for i, use_aug in enumerate(self.fparams.attribute('use_augmentation')):
@@ -759,7 +753,7 @@ class DepthSegmST(BaseTracker):
                                                  F.dropout2d(init_samples[i][0:1, ...].expand(num, -1, -1, -1), p=prob,
                                                              training=True)])
 
-        return init_samples
+        return init_samples, init_samples_d
 
     def init_projection_matrix(self, x):
         # Set if using projection matrix
