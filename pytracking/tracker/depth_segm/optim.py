@@ -27,8 +27,8 @@ class FactorizedConvProblem(optimization.L2Problem):
         :param x: [filters, projection_matrices]
         :return: [data_terms, filter_regularizations, proj_mat_regularizations]
         """
-        filter = x[:len(x)//2]  # w2 in paper
-        P = x[len(x)//2:]       # w1 in paper
+        filter = x[:len(x)//2]  # w2 in paper, x[0]
+        P = x[len(x)//2:]       # w1 in paper, x[1]
 
         # Do first convolution
         if self.compression:
@@ -36,6 +36,7 @@ class FactorizedConvProblem(optimization.L2Problem):
         else:
             compressed_samples = self.training_samples
 
+        print('Song : in FactorizedConvProblem: compressed_samples:', compressed_samples.shape)
         # Do second convolution,
         residuals = operation.conv2d(compressed_samples, filter, mode='same', depth=self.training_samples_d).apply(self.response_activation)
 
@@ -95,6 +96,7 @@ class ConvProblem(optimization.L2Problem):
         Song, add depthconv, does not work, since it requires pytorch 0.4.0
         """
         # Do convolution and compute residuals
+        print('self.training_samples in ConvProblem: ', self.training_samples.shape)
         residuals = operation.conv2d(self.training_samples, x, mode='same', depth=self.training_samples_d).apply(self.response_activation)
         residuals = residuals - self.y
 

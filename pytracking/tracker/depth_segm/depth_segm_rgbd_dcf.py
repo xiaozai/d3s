@@ -374,8 +374,9 @@ class DepthSegmST(BaseTracker):
         # Get sample
         sample_pos = copy.deepcopy(self.pos)
         sample_scales = self.target_scale * self.params.scale_factors
-        test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
-
+        test_x_rgb, test_x_d = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
+        print('test_x_rgb: ', test_x_rgb[0].shape, test_x_d.shape)
+        ''' Song, should we fuse RGBD features here??? '''
         # Compute scores
         scores_raw = self.apply_filter(test_x_rgb)
 
@@ -601,23 +602,12 @@ class DepthSegmST(BaseTracker):
             x_d  : depth image crops
             rgb_patches : rgb image crops
         '''
-        x_rgb, x_d, rgb_patches = self.extract_sample(color, depth, pos, scales, sz)
+        x_rgb, d_patches, rgb_patches = self.extract_sample(color, depth, pos, scales, sz)
 
         ''' Song: fuse RGBD features '''
-        if self.params.use_rgbd_classifier:
-            # f_rgb = x_rgb[0].to(self.params.device) # B=1, 1024, 16, 16
-            x_d = self.segm_net.segm_predictor.depth_feat_extractor(x_d[0].to(self.params.device))
-            print('in tracking : x_rgb: ', x_rgb[0].shape, x_d.shape)                               # B=1, C=64, 64, 64
-            # f_d = self.segm_net.segm_predictor.segment1_d(self.segm_net.segm_predictor.segment0_d(f_d)) # B=1, C=64, 64, 64
-            # attn_d = self.segm_net.segm_predictor.attn_d(f_d)                                           # B=1, C=1,  64, 64
-            # attn_d = self.segm_net.segm_predictor.depth_attn(f_d)
-
-            # f_rgb = self.segm_net.segm_predictor.segment1(self.segm_net.segm_predictor.segment0(f_rgb)) # B=1, 64, 16, 16
-
-            # _, attn_rgbd = self.segm_net.segm_predictor.rgbd_fusion3(f_rgb, attn_d)                     # B=1, 1, 16, 16
-
-            # x_rgbd = x_rgb[0] * attn_rgbd
-            # x_rgb = TensorList([x_rgbd])
+        # if self.params.use_rgbd_classifier:
+        x_d = self.segm_net.segm_predictor.depth_feat_extractor(d_patches[0].to(self.params.device))
+        print('in tracking : x_rgb: ', x_rgb[0].shape, x_d.shape)                               # B=1, C=64, 64, 64
 
         # Song, for vis only
         self.rgb_patches = rgb_patches.clone().detach().cpu().numpy().squeeze()
@@ -626,14 +616,14 @@ class DepthSegmST(BaseTracker):
             self.rgb_patches = (self.rgb_patches * self.params.segm_normalize_std + self.params.segm_normalize_mean)*255
         self.rgb_patches = self.rgb_patches.astype(int)
 
-        self.d_patches = x_d[0].clone().detach().cpu().numpy().squeeze()
+        self.d_patches = d_patches[0].clone().detach().cpu().numpy().squeeze()
         if self.params.use_colormap:
             self.d_patches = np.swapaxes(np.swapaxes(self.d_patches, 0, 1), 1, 2)
             if self.params.use_normalized_DCF:
                 self.d_patches = (self.d_patches * self.params.segm_normalize_std + self.params.segm_normalize_mean)*255
             self.d_patches = self.d_patches.astype(int)
 
-        return self.preprocess_sample(self.project_sample(x_rgb))
+        return self.preprocess_sample(self.project_sample(x_rgb)), x_d
 
     def preprocess_sample(self, x: TensorList) -> (TensorList, TensorList):
         if getattr(self.params, '_feature_window', False):
@@ -641,6 +631,7 @@ class DepthSegmST(BaseTracker):
         return x
 
     def project_sample(self, x: TensorList, proj_matrix=None):
+        ''' Song, this will compress features from [1, 1024, 16, 16] to [1, compressed_dim=64, 16, 16]'''
         # Apply projection matrix
         if proj_matrix is None:
             proj_matrix = self.projection_matrix
