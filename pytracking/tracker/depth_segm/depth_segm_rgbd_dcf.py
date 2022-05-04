@@ -214,22 +214,20 @@ class DepthSegmST(BaseTracker):
         self.load_segmnet()
 
         # Extract and transform sample
-        x_rgb, x_d = self.generate_init_samples(im, dp) #
-        print('x_rgb 1 : ', x_rgb[0].shape)
+        x_rgb, x_d = self.generate_init_samples(im, dp) # x_d is None if not using rgbd_classifier
+
         # Initialize projection matrix
         self.init_projection_matrix(x_rgb)
-        print('x_rgb 2 : ', x_rgb[0].shape)
         # Transform to get the training sample
         train_x_rgb = self.preprocess_sample(x_rgb) # x_rgb * self.feature_window
-        print('x_rgb 3 : ', x_rgb[0].shape)
         # Generate label function
         init_y = self.init_label_function(train_x_rgb) # Gaussian map
 
         # Init memory
-        self.init_memory(train_x_rgb) # No need for depth
-        print('x_rgb 4 , self.init_training_samples:', self.init_training_samples[0].shape)
+        self.init_memory(train_x_rgb, x_d)
+
         # Init optimizer and do initial optimization for DCF
-        self.init_optimization(train_x_rgb, init_y) # Song, but Depth is not used for filter optimize
+        self.init_optimization(train_x_rgb, init_y)
 
         if self.params.use_segmentation:
             self.init_segmentation(color, depth, state, init_mask=init_mask)
@@ -275,13 +273,14 @@ class DepthSegmST(BaseTracker):
         self.params.update_projection_matrix = getattr(self.params, 'update_projection_matrix',
                                                        True) and self.params.use_projection_matrix
         optimizer = getattr(self.params, 'optimizer', 'GaussNewtonCG')
-        print('self.init_optimization: self.init_training_samples:', self.init_training_samples[0].shape)
+
         # Setup factorized joint optimization
         if self.params.update_projection_matrix:
             self.joint_problem = FactorizedConvProblem(self.init_training_samples, init_y, self.filter_reg,
                                                        self.fparams.attribute('projection_reg'), self.params,
                                                        self.init_sample_weights,
-                                                       self.projection_activation, self.response_activation)
+                                                       self.projection_activation, self.response_activation,
+                                                       training_samples_d=self.init_training_samples_d)
 
             # Variable containing both filter and projection matrix
             joint_var = self.filter.concat(self.projection_matrix)
@@ -717,14 +716,12 @@ class DepthSegmST(BaseTracker):
             self.transforms.extend([augmentation.Rotate(angle, aug_output_sz, get_rand_shift()) for angle in
                                     self.params.augmentation['rotate']])
 
-
+        ''' init_samples : TensorList([27, 1024, 16, 16]), needs to be compressed
+            init_samples_d : [27, 64, 128, 128]
+        '''
         init_samples, init_dp_patches = self.params.features_filter.extract_transformed(im, self.pos.round(), self.target_scale,
                                                                                        aug_expansion_sz, self.transforms,
                                                                                        dp=dp)
-        ''' RGBD features fusion
-            init_samples : TensorList([27, 1024, 16, 16]), needs to be compressed
-            init_samples_d : [27, 64, 128, 128]
-        '''
         init_samples_d = None
         if self.params.use_rgbd_classifier and init_dp_patches is not None:
             init_samples_d = self.segm_net.segm_predictor.depth_feat_extractor(init_dp_patches[0].to(self.params.device))        # B=27, C=64, 64, 64
@@ -733,6 +730,9 @@ class DepthSegmST(BaseTracker):
         for i, use_aug in enumerate(self.fparams.attribute('use_augmentation')):
             if not use_aug:
                 init_samples[i] = init_samples[i][0:1, ...]
+
+                if init_samples_d is not None:
+                    init_samples_d[i] = init_samples_d[i][0:1, ...]
 
         # Add dropout samples
         if 'dropout' in self.params.augmentation:
@@ -743,6 +743,10 @@ class DepthSegmST(BaseTracker):
                     init_samples[i] = torch.cat([init_samples[i],
                                                  F.dropout2d(init_samples[i][0:1, ...].expand(num, -1, -1, -1), p=prob,
                                                              training=True)])
+                    if init_samples_d is not None:
+                        init_samples_d[i] = torch.cat([init_samples_d[i],
+                                                     F.dropout2d(init_samples_d[i][0:1, ...].expand(num, -1, -1, -1), p=prob,
+                                                                 training=True)])
 
         return init_samples, init_samples_d
 
@@ -795,11 +799,12 @@ class DepthSegmST(BaseTracker):
         # Return only the ones to use for initial training
         return TensorList([y[:x.shape[0], ...] for y, x in zip(self.y, train_x)])
 
-    def init_memory(self, train_x):
+    def init_memory(self, train_x, train_x_d):
         # Initialize first-frame training samples
         self.num_init_samples = train_x.size(0)
         self.init_sample_weights = TensorList([x.new_ones(1) / x.shape[0] for x in train_x])
         self.init_training_samples = train_x
+        self.init_training_samples_d = train_x_d
 
         # Sample counters and weights
         self.num_stored_samples = self.num_init_samples.copy()
@@ -812,14 +817,23 @@ class DepthSegmST(BaseTracker):
         self.training_samples = TensorList(
             [x.new_zeros(self.params.sample_memory_size, cdim, x.shape[2], x.shape[3]) for x, cdim in
              zip(train_x, self.compressed_dim)])
+        # Song added for RGBD DCF
+        self.training_samples_d = None
+        if train_x_d is not None:
+            self.training_samples_d = TensorList(
+                [x.new_zeros(self.params.sample_memory_size, x.shape[1], x.shape[2], x.shape[3]) for x, cdim in
+                 zip(train_x, self.compressed_dim)])
 
-    def update_memory(self, sample_x: TensorList, sample_y: TensorList, learning_rate=None):
+    def update_memory(self, sample_x: TensorList, sample_y: TensorList, learning_rate=None, sample_x_d=None):
         replace_ind = self.update_sample_weights(self.sample_weights, self.previous_replace_ind,
                                                  self.num_stored_samples, self.num_init_samples, self.fparams,
                                                  learning_rate)
         self.previous_replace_ind = replace_ind
         for train_samp, x, ind in zip(self.training_samples, sample_x, replace_ind):
             train_samp[ind:ind + 1, ...] = x
+        if self.training_samples_d is not None and sample_x_d is not None:
+            for train_samp, x, ind in zip(self.training_samples_d, sample_x_d, replace_ind):
+                train_samp[ind:ind + 1, ...] = x
         for y_memory, y, ind in zip(self.y, sample_y, replace_ind):
             y_memory[ind:ind + 1, ...] = y
         if self.hinge_mask is not None:
