@@ -302,10 +302,16 @@ class BaseTracker:
             masked_img[np.all(masked_img == (0, 0, 0), axis=-1)] = (255,255,255)
             # masked_img = Image.fromarray(np.uint8(masked_img)).convert('RGBA')
 
+            if self.attn_dcf is not None:
+                attn_dcf = self.attn_dcf.clone().detach().cpu().numpy().squeeze()
 
-            self.ax_mrgb.cla()
-            self.ax_mrgb.imshow(masked_img)
-            self.ax_mrgb.set_title('predicted mask over rgb')
+                self.ax_mrgb.cla()
+                self.ax_mrgb.imshow(attn_dcf)
+                self.ax_mrgb.set_title('dcf RGBD attn')
+
+            # self.ax_mrgb.cla()
+            # self.ax_mrgb.imshow(masked_img)
+            # self.ax_mrgb.set_title('predicted mask over rgb')
 
 
             self.ax_initmask.cla()
@@ -334,7 +340,7 @@ class BaseTracker:
 
                 self.ax_d_patches.cla()
                 self.ax_d_patches.imshow(self.d_patches)
-                self.ax_d_patches.set_title('D patch')
+                self.ax_d_patches.set_title('D patch : %d'%self.prev_target_depth)
 
             # Song
             if self.polygon is not None:

@@ -110,6 +110,8 @@ def parameters():
     params.use_rgbd_classifier = True
 
     params.use_normalized_DCF = False
+    params.use_normalized_depth = True
+    
     params.use_dal = False
 
     params.model = 'depth_segm_rgbd_dcf'

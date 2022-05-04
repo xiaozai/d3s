@@ -1,7 +1,7 @@
 import torch
 from pytracking import optimization, TensorList, operation
 import math
-
+import torch.nn.functional as F
 
 class FactorizedConvProblem(optimization.L2Problem):
     def __init__(self, training_samples: TensorList, y: TensorList, filter_reg: torch.Tensor, projection_reg, params, sample_weights: TensorList,
@@ -32,15 +32,13 @@ class FactorizedConvProblem(optimization.L2Problem):
         # Do first convolution
         compressed_samples = operation.conv1x1(self.training_samples, P).apply(self.projection_activation)
 
-        print('Song : in FactorizedConvProblem: compressed_samples:', compressed_samples[0].shape)
-
-        ''' RGBD fusion if training_samples_d exsits'''
         if self.training_samples_d is not None:
-            compressed_samples_d = F.interpolate(self.training_samples_d, size=(compressed_samples.shape[-2], compressed_samples.shape[-1]))
-            compressed_samples = compressed_samples + compressed_samples_d
-
+            for x_rgb, x_d in zip(compressed_samples, self.training_samples_d):
+                x_d = F.interpolate(x_d, size=(x_rgb.shape[-2], x_rgb.shape[-1]))
+                x_rgb = x_rgb * x_d + x_rgb
+            
         # Do second convolution,
-        residuals = operation.conv2d(compressed_samples, filter, mode='same', depth=self.training_samples_d).apply(self.response_activation)
+        residuals = operation.conv2d(compressed_samples, filter, mode='same').apply(self.response_activation)
 
         # Compute data residuals
         residuals = residuals - self.y
@@ -79,27 +77,24 @@ class FactorizedConvProblem(optimization.L2Problem):
 
 
 class ConvProblem(optimization.L2Problem):
-    def __init__(self, training_samples: TensorList, y: TensorList, filter_reg: torch.Tensor, sample_weights: TensorList, response_activation,
-                training_samples_d=None):
+    def __init__(self, training_samples: TensorList, y: TensorList, filter_reg: torch.Tensor, sample_weights: TensorList, response_activation):
         self.training_samples = training_samples
         self.y = y
         self.filter_reg = filter_reg
         self.sample_weights = sample_weights
         self.response_activation = response_activation
 
-        self.training_samples_d = training_samples_d
-
-    def __call__(self, x: TensorList, depth=None):
+    def __call__(self, x: TensorList):
         """
         Compute residuals
         :param x: [filters]
         :return: [data_terms, filter_regularizations]
 
-        Song, add depthconv, does not work, since it requires pytorch 0.4.0
+        Song, try to add depthconv, does not work, since it requires pytorch 0.4.0   :)
+        now, add depth features into training_samples before optim.ConvProblem
         """
         # Do convolution and compute residuals
-        print('self.training_samples in ConvProblem: ', self.training_samples.shape, self.training_samples_d.shape)
-        residuals = operation.conv2d(self.training_samples, x, mode='same', depth=self.training_samples_d).apply(self.response_activation)
+        residuals = operation.conv2d(self.training_samples, x, mode='same').apply(self.response_activation)
         residuals = residuals - self.y
 
         residuals = self.sample_weights.sqrt().view(-1, 1, 1, 1) * residuals

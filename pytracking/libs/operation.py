@@ -6,7 +6,7 @@ from ltr.external.depthconv.functions import depth_conv, DepthconvFunction
 
 @tensor_operation
 def conv2d(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor = None,
-            stride=1, padding=0, dilation=1, groups=1, mode=None, depth=None):
+            stride=1, padding=0, dilation=1, groups=1, mode=None):
     """Standard conv2d. Returns the input if weight=None."""
 
     if weight is None:
@@ -28,22 +28,7 @@ def conv2d(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor = None,
         else:
             raise ValueError('Unknown mode for padding.')
 
-    if depth is None:
-        out = F.conv2d(input, weight, bias=bias, stride=stride, padding=padding, dilation=dilation, groups=groups)
-    else:
-        if isinstance(depth, TensorList):
-            depth = depth[0]
-        depth = F.interpolate(depth, size=(input.shape[-2], input.shape[-1]))
-        depth = F.softmax(depth, dim=1) * 10
-        depth = depth.repeat(1, input.shape[1], 1, 1)
-        depth = depth.to(input.device)
-
-        ''' if we use depth as labels?? '''
-        out = F.conv2d(input+depth, weight, bias=bias, stride=stride, padding=padding, dilation=dilation, groups=groups)
-
-        ''' The gradients of DepthConv have bugs '''
-        # out = depth_conv(input, weight, depth=depth, bias=bias, stride=stride, padding=padding, dilation=dilation)
-        # out = DepthconvFunction.apply(input, weight, bias, stride, padding, dilation, depth)
+    out = F.conv2d(input, weight, bias=bias, stride=stride, padding=padding, dilation=dilation, groups=groups)
 
     if ind is None:
         return out
