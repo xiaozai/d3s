@@ -108,12 +108,12 @@ class DepthSegmST(BaseTracker):
 
             f_rgb = F.interpolate(f_rgb, size=(f_d.shape[-2], f_d.shape[-1]))
             f_rgb = f_rgb *a_d + f_rgb
-            f_rgb = torch.cat((f_d, f_rgb), dim=1)
+            # f_rgb = torch.cat((f_d, f_rgb), dim=1)
 
             x_rgb[i] = F.interpolate(f_rgb, size=(x_rgb[i].shape[-2], x_rgb[i].shape[-1]))
 
             self.attn_dcf = a_d[0, 0, ...].detach().clone().cpu().numpy().squeeze()
-        
+
         return x_rgb
 
     def initialize(self, image, state, init_mask=None, *args, **kwargs):
