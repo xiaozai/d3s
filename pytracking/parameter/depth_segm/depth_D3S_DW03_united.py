@@ -108,10 +108,11 @@ def parameters():
 
     params.use_colormap = True
     params.use_rgbd_classifier = True
+
     params.use_normalized_DCF = True # False
     params.use_normalized_depth = False # True
 
-    params.model = 'depth_segm_rgbd_feat_dcf'
+    params.model = 'depth_segm_united'
     params.constructor_module = 'ltr.models.depth_segm.depth_segm'
     params.constructor_fun_name = 'depth_segm_D3S_DW03_MP_resnet50'
     params.segm_net_path = '/home/yan/Data2/d3s/checkpoints/ltr/depth_segm/depth_segm_D3S_DW03/DepthSegmNet_ep0040.pth.tar'
@@ -119,7 +120,7 @@ def parameters():
     params.segm_normalize_mean = [0.485, 0.456, 0.406]
     params.segm_normalize_std = [0.229, 0.224, 0.225]
     params.segm_search_area_factor = 4.0
-    params.segm_feature_sz = 24
+    params.segm_feature_sz = 16 # 24
     params.segm_output_sz = params.segm_feature_sz * 16
     params.segm_scale_estimation = True
     params.segm_optimize_polygon = True
@@ -136,7 +137,7 @@ def parameters():
     params.opt_poly_overlap_thr = 0.3
     params.poly_cost_a = 1.2
     params.poly_cost_b = 1
-    params.segm_dist_map_type = 'center'  # center | bbox
+    params.segm_dist_map_type = 'bbox'  # center | bbox
     params.min_scale_change_factor = 0.95
     params.max_scale_change_factor = 1.05
     params.init_segm_mask_thr = 0.5

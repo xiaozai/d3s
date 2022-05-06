@@ -91,29 +91,44 @@ class DepthSegmST(BaseTracker):
 
         return color, depth
 
-    def rgbd_fusion(self, x_rgb, d_patches):
+    def rgbd_fusion(self, x_rgb, x_d):
         ''' Song, simply fuse RGBD features for DCF
                 x_rgb : Tensorlist([27, 1024, 16, 16]) or Tensorlist([1, 1024, 16, 16])
                 d_patches : depth image crops, Tensorlist([27, 3, 256, 256]) or Tensorlist([1, 3, 256, 256])
 
                 Accuracy gets improved, but Robustness gets decreased !!
         '''
-        x_d = TensorList([self.segm_net.segm_predictor.depth_feat_extractor(dp.to(self.params.device)) for dp in d_patches]) # [1, 64, 128, 128]
-        attn_d = TensorList([self.segm_net.segm_predictor.depth_attn(xd) for xd in x_d]) # [1, 1, 128, 128]
+        # x_d = TensorList([self.segm_net.segm_predictor.depth_feat_extractor(dp.to(self.params.device)) for dp in d_patches]) # [1, 64, 128, 128]
 
-        for i in range(len(x_rgb)):
-            f_rgb = x_rgb[i] # [1, 1024, 16, 16] -> 16 * [1, 64, 16, 16] ???
-            f_d = x_d[i]     # [1, 64, 128, 128]
-            a_d = attn_d[i]  # [1, 1, 128, 128]
+        attn_d = self.segm_net.segm_predictor.depth_attn(x_d) # [1, 1, 128, 128]
 
-            f_rgb = F.interpolate(f_rgb, size=(f_d.shape[-2], f_d.shape[-1]))
-            f_rgb = f_rgb *a_d + f_rgb
+        # for i in range(len(x_rgb)):
+        f_rgb = x_rgb # [1, 1024, 16, 16] -> 16 * [1, 64, 16, 16] ???
+        f_d = x_d     # [1, 64, 128, 128]
+        a_d = attn_d  # [1, 1, 128, 128]
+        #
+        # f_rgb = F.interpolate(f_rgb, size=(f_d.shape[-2], f_d.shape[-1]))
+        # f_rgb = f_rgb *a_d + f_rgb
+        #
+        # x_rgb[i] = F.interpolate(f_rgb, size=(x_rgb[i].shape[-2], x_rgb[i].shape[-1]))
+        #
+        # self.attn_dcf = a_d[0, 0, ...].detach().clone().cpu().numpy().squeeze()
+        #
+        ''' same as in the DW03
+        f_test = segment1(segment0(f_rgb))
+        f_test, attn = rgbd_fusion3(f_test, attn_d)
+        '''
 
-            x_rgb[i] = F.interpolate(f_rgb, size=(x_rgb[i].shape[-2], x_rgb[i].shape[-1]))
+        groups = f_rgb.shape[1] // f_d.shape[1] # 16
 
-            self.attn_dcf = a_d[0, 0, ...].detach().clone().cpu().numpy().squeeze()
+        f_rgb = F.interpolate(f_rgb, size=(f_d.shape[-2], f_d.shape[-1]))
+        # same as the compression and the reprojection_matrix
+        f_rgb = self.segm_net.segm_predictor.segment1(self.segm_net.segm_predictor.segment0(f_rgb))
+        f_rgbd, (attn_rgb, attn_d) = self.segm_net.segm_predictor.rgbd_fusion3(f_rgb, a_d) # [1, 1, 128, 128]
+        f_rgbd = F.interpolate(f_rgbd, size=(x_rgb.shape[-2], x_rgb.shape[-1]))      # [1, 64, 16, 16]
+        self.attn_dcf = attn_d.detach().clone().cpu().numpy().squeeze()
 
-        return x_rgb
+        return f_rgbd
 
     def initialize(self, image, state, init_mask=None, *args, **kwargs):
         # Initialize some stuff
@@ -404,14 +419,14 @@ class DepthSegmST(BaseTracker):
         raw_depth = copy.deepcopy(depth) # use to check target depth
         depth = self.depth_processing(depth, use_colormap=self.params.use_colormap)
 
-        if self.params.use_normalized_DCF:
-            norm_color, norm_depth = self.normalize_rgbd(color, depth)
-            im, dp = numpy_to_torch(norm_color), numpy_to_torch(norm_depth)
-        elif self.params.use_normalized_depth:
-            _, norm_depth = self.normalize_rgbd(color, depth)
-            im, dp = numpy_to_torch(color), numpy_to_torch(norm_depth)
-        else:
-            im, dp = numpy_to_torch(color), numpy_to_torch(depth)
+        # if self.params.use_normalized_DCF:
+        norm_color, norm_depth = self.normalize_rgbd(color, depth)
+        im, dp = numpy_to_torch(norm_color), numpy_to_torch(norm_depth)
+        # elif self.params.use_normalized_depth:
+        #     _, norm_depth = self.normalize_rgbd(color, depth)
+        #     im, dp = numpy_to_torch(color), numpy_to_torch(norm_depth)
+        # else:
+        #     im, dp = numpy_to_torch(color), numpy_to_torch(depth)
 
         # For debugging only
         self.im, self.dp = im, dp
@@ -420,15 +435,31 @@ class DepthSegmST(BaseTracker):
         # Get sample
         sample_pos = copy.deepcopy(self.pos)
         sample_scales = self.target_scale * self.params.scale_factors
-
+        print('self.img_sample_sz: ', self.img_sample_sz)
         ''' test_x_rgb is fused rgbd features if use_rgbd_classifier '''
-        test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
+        test_x_rgb, feat_rgb, feat_d = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
 
         # Compute scores
         scores_raw = self.apply_filter(test_x_rgb)
 
         translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
         new_pos = sample_pos + translation_vec
+
+        trans_in_sample = translation_vec * sample_scales[0]
+        trans_in_sample = [trans_in_sample[0].item(), trans_in_sample[1].item()]
+        print('new sample_pos : ', trans_in_sample)
+
+        ''' Song, we need to re-create the Dist map by new pos '''
+        # if self.params.segm_use_dist:
+        #     if self.params.segm_dist_map_type == 'center':
+        #         # center-based distance map
+        #         test_dist_map = [self.dist_map]
+        #     elif self.params.segm_dist_map_type == 'bbox':
+        #         # bbox-based distance map
+        #         D = self.create_dist_gauss(self.params.segm_output_sz, w_.item() * f_, h_.item() * f_)
+        #         test_dist_map = [torch.unsqueeze(torch.unsqueeze(torch.Tensor(D).to(self.params.device), dim=0), dim=0)]
+        # else:
+        #     test_dist_map = None
 
         # Localization uncertainty
         max_score = torch.max(s).item()
@@ -456,7 +487,8 @@ class DepthSegmST(BaseTracker):
         if self.segmentation_task or (
             self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
 
-            pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
+            # pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
+            pred_segm_region = self.segment_target(feat_rgb, feat_d, new_pos, self.target_sz, 1.0 / sample_scales[0].item(), trans_in_sample)
             pred_segm_region = pred_segm_region[0] if isinstance(pred_segm_region, tuple) else pred_segm_region
 
             if pred_segm_region is None:
@@ -643,10 +675,15 @@ class DepthSegmST(BaseTracker):
             x_d  : depth image crops
             rgb_patches : rgb image crops
         '''
-        x_rgb, d_patches, rgb_patches = self.extract_sample(color, depth, pos, scales, sz)
+        _, d_patches, rgb_patches = self.extract_sample(color, depth, pos, scales, sz)
+        feat_rgb = self.segm_net.extract_backbone_features(rgb_patches.to(self.params.device))
+        feat_rgb = [feat for feat in feat_rgb.values()]
+        feat_d = self.segm_net.segm_predictor.depth_feat_extractor(d_patches.to(self.params.device))
 
+        x_rgb = feat_rgb[3]
         if self.params.use_rgbd_classifier:
-            x_rgb = self.rgbd_fusion(x_rgb, d_patches)
+            x_rgb = self.rgbd_fusion(x_rgb, feat_d)
+        x_rgb = TensorList([x_rgb])
 
         # Song, for vis only
         self.rgb_patches = rgb_patches.clone().detach().cpu().numpy().squeeze()
@@ -662,7 +699,14 @@ class DepthSegmST(BaseTracker):
                 self.d_patches = (self.d_patches * self.params.segm_normalize_std + self.params.segm_normalize_mean)*255
             self.d_patches = self.d_patches.astype(int)
 
-        return self.preprocess_sample(self.project_sample(x_rgb))
+        # self.mask = mask # predicted segmentation
+        self.masked_img = rgb_patches.clone().detach().cpu().numpy().squeeze()
+        self.masked_img = np.swapaxes(np.swapaxes(self.masked_img, 0, 1), 1, 2)
+        if self.params.use_normalized_DCF:
+            self.masked_img = (self.masked_img * self.params.segm_normalize_std + self.params.segm_normalize_mean)*255
+
+
+        return self.preprocess_sample(self.project_sample(x_rgb)), feat_rgb, feat_d
 
     def preprocess_sample(self, x: TensorList) -> (TensorList, TensorList):
         if getattr(self.params, '_feature_window', False):
@@ -717,7 +761,7 @@ class DepthSegmST(BaseTracker):
 
     def generate_init_samples(self, im: torch.Tensor, dp: torch.Tensor) -> TensorList:
         """Generate augmented initial samples."""
-
+        print('self.img_sample_sz in generate_init_samples:', self.img_sample_sz)
         # Compute augmentation size
         aug_expansion_factor = getattr(self.params, 'augmentation_expansion_factor', None)
         aug_expansion_sz = self.img_sample_sz.clone()
@@ -758,12 +802,27 @@ class DepthSegmST(BaseTracker):
 
         ''' init_samples : TensorList([27, 1024, 16, 16]), needs to be compressed
             init_samples_d : [27, 64, 128, 128]
+
+
+            Song, we use the same feature extractor in DCF and segment_target, no need to extract features twice
         '''
-        init_samples, init_im_patches, init_dp_patches = self.params.features_filter.extract_transformed(im, self.pos.round(), self.target_scale,
-                                                                                       aug_expansion_sz, self.transforms,
-                                                                                       dp=dp)
+        print('aug_expansion_sz : ', aug_expansion_sz)
+        _, init_im_patches, init_dp_patches = self.params.features_filter.extract_transformed(im, self.pos.round(), self.target_scale,
+                                                                                              aug_expansion_sz, self.transforms,
+                                                                                              dp=dp)
+        print('init_im_patches: ', init_im_patches.shape)
+        init_samples = self.segm_net.extract_backbone_features(init_im_patches.to(self.params.device)) # [layer0 - layer 3]
+        init_samples = [feat for feat in init_samples.values()]
+        init_samples_d = self.segm_net.segm_predictor.depth_feat_extractor(init_dp_patches.to(self.params.device))
+
+        init_samples = init_samples[3] # layer3, [27, 1024, 16, 16]
+        print('init_samples : ', init_samples.shape)
+        # init_samples = TensorList([init_samples])
+        # init_samples_d = TensorList([init_samples_d])
+
         if self.params.use_rgbd_classifier and init_dp_patches is not None:
-            init_samples = self.rgbd_fusion(init_samples, init_dp_patches)
+            init_samples = self.rgbd_fusion(init_samples, init_samples_d)
+        init_samples = TensorList([init_samples])
 
         # Remove augmented samples for those that shall not have
         for i, use_aug in enumerate(self.fparams.attribute('use_augmentation')):
@@ -971,7 +1030,7 @@ class DepthSegmST(BaseTracker):
 
         return np.sqrt(np.square(X) + np.square(Y)).astype(np.float32)
 
-    def create_dist_gauss(self, map_sz, w, h, cx=None, cy=None, p=4, sz_weight=0.7):
+    def create_dist_gauss(self, map_sz, w, h, cx=None, cy=None, p=4, sz_weight=0.7, center_trans=None):
         # create a square-shaped distance map with a Gaussian function which can be interpreted as a distance
         # to the given bounding box (center [cx, cy], width w, height h)
         # p is power of a Gaussian function
@@ -980,10 +1039,14 @@ class DepthSegmST(BaseTracker):
             cx = map_sz / 2
         if cy is None:
             cy = map_sz / 2
+        if center_trans is not None:
+            cx = cx + center_trans[1]
+            cy = cy + center_trans[0]
 
         x_ = np.linspace(1, map_sz, map_sz) - 1 - cx
         y_ = np.linspace(1, map_sz, map_sz) - 1 - cy
         X, Y = np.meshgrid(x_, y_)
+
         # 1 - is needed since we need distance-like map (not Gaussian function)
         return 1 - np.exp(-((np.power(X, p) / (sz_weight * w ** p)) + (np.power(Y, p) / (sz_weight * h ** p))))
 
@@ -991,7 +1054,7 @@ class DepthSegmST(BaseTracker):
 
         init_patch_crop_rgb, f_ = prutils.sample_target(color, np.array(bb), self.params.segm_search_area_factor,
                                                     output_sz=self.params.segm_output_sz, pad_val=0)
-
+        print('init_patch_crop_rgb.shape : ', init_patch_crop_rgb.shape)
         init_patch_crop_d, _ = prutils.sample_target(depth, np.array(bb), self.params.segm_search_area_factor,
                                                     output_sz=self.params.segm_output_sz, pad_val=0)
         if not self.params.use_colormap:
@@ -1075,9 +1138,12 @@ class DepthSegmST(BaseTracker):
         test_feat_segm_rgb = [feat for feat in train_feat_rgb.values()]
         train_masks = [init_mask_patch]
 
+        print('train_feat_rgb: ')
+        for feat in train_feat_segm_rgb:
+            print(feat.shape)
+
         # Song : extract depth features
         train_feat_segm_d = self.segm_net.segm_predictor.depth_feat_extractor(init_patch_d)
-        # test_feat_segm_d = train_feat_segm_d.clone().detach()
 
         if init_mask is None:
             iters = 0
@@ -1155,7 +1221,8 @@ class DepthSegmST(BaseTracker):
 
         self.polygon = None
 
-    def segment_target(self, color, depth, pos, sz):
+    # def segment_target(self, color, depth, pos, sz):
+    def segment_target(self, test_feat_rgb, test_feat_d, pos, sz, f_, center_trans):
         # pos and sz are in the image coordinates
         # construct new bounding box first
         ''' Song, bb increase according to target sz and target scales !!!!!'''
@@ -1163,45 +1230,45 @@ class DepthSegmST(BaseTracker):
         tly_ = pos[0] - sz[0] / 2
         w_ = sz[1]
         h_ = sz[0]
-        bb = [tlx_.item(), tly_.item(), w_.item(), h_.item()]
+        # bb = [tlx_.item(), tly_.item(), w_.item(), h_.item()]
 
-        # extract patch
-        patch_rgb, f_ = prutils.sample_target(color, np.array(bb), self.params.segm_search_area_factor,
-                                          output_sz=self.params.segm_output_sz, pad_val=0)
-        patch_d, _ = prutils.sample_target(depth, np.array(bb), self.params.segm_search_area_factor,
-                                          output_sz=self.params.segm_output_sz, pad_val=0)
-        if not self.params.use_colormap:
-            patch_d = np.expand_dims(patch_d, axis=-1)
-
-        segm_crop_sz = math.ceil(math.sqrt(bb[2] * bb[3]) * self.params.segm_search_area_factor)
-
-        # normalize input image
-        patch_norm_rgb, patch_norm_d = self.normalize_rgbd(patch_rgb, patch_d)
-
-        # put image patch and mask to GPU
-        patch_gpu_rgb = torch.Tensor(patch_norm_rgb)
-        patch_gpu_d = torch.Tensor(patch_norm_d)
-
-        if self.params.use_gpu:
-            patch_gpu_rgb = patch_gpu_rgb.to(self.params.device)
-            patch_gpu_d = patch_gpu_d.to(self.params.device)
-
-            # reshape image for the feature extractor
-            patch_gpu_rgb = torch.unsqueeze(patch_gpu_rgb, dim=0).permute(0, 3, 1, 2)
-            patch_gpu_d = torch.unsqueeze(patch_gpu_d, dim=0).permute(0, 3, 1, 2)
-
-        # extract features (extracting twice on the same patch - not necessary)
-        test_feat_rgb = self.segm_net.extract_backbone_features(patch_gpu_rgb)
-        test_feat_d = self.segm_net.segm_predictor.depth_feat_extractor(patch_gpu_d)
-
-        ''' In the Localization, the feat_rgb is [1, 3, 256, 256] -> [1, 1024, 16, 16]
-            Here in the track, the feat_rgb is [1, 3, 384, 384] -> [1, 1024, 24, 24]
-        '''
-        # for feat in test_feat_rgb.values():
-        #     print('test_feat_rgb in track: ', feat.shape) # in Localization, x_rgb is [27, 1024, 16, 16]
-
-        # prepare features in the list (format for the network)
-        test_feat_segm_rgb = [feat for feat in test_feat_rgb.values()]
+        # # extract patch
+        # patch_rgb, f_ = prutils.sample_target(color, np.array(bb), self.params.segm_search_area_factor,
+        #                                   output_sz=self.params.segm_output_sz, pad_val=0)
+        # patch_d, _ = prutils.sample_target(depth, np.array(bb), self.params.segm_search_area_factor,
+        #                                   output_sz=self.params.segm_output_sz, pad_val=0)
+        # if not self.params.use_colormap:
+        #     patch_d = np.expand_dims(patch_d, axis=-1)
+        #
+        # segm_crop_sz = math.ceil(math.sqrt(bb[2] * bb[3]) * self.params.segm_search_area_factor)
+        #
+        # # normalize input image
+        # patch_norm_rgb, patch_norm_d = self.normalize_rgbd(patch_rgb, patch_d)
+        #
+        # # put image patch and mask to GPU
+        # patch_gpu_rgb = torch.Tensor(patch_norm_rgb)
+        # patch_gpu_d = torch.Tensor(patch_norm_d)
+        #
+        # if self.params.use_gpu:
+        #     patch_gpu_rgb = patch_gpu_rgb.to(self.params.device)
+        #     patch_gpu_d = patch_gpu_d.to(self.params.device)
+        #
+        #     # reshape image for the feature extractor
+        #     patch_gpu_rgb = torch.unsqueeze(patch_gpu_rgb, dim=0).permute(0, 3, 1, 2)
+        #     patch_gpu_d = torch.unsqueeze(patch_gpu_d, dim=0).permute(0, 3, 1, 2)
+        #
+        # # extract features (extracting twice on the same patch - not necessary)
+        # test_feat_rgb = self.segm_net.extract_backbone_features(patch_gpu_rgb)
+        # test_feat_d = self.segm_net.segm_predictor.depth_feat_extractor(patch_gpu_d)
+        #
+        # ''' In the Localization, the feat_rgb is [1, 3, 256, 256] -> [1, 1024, 16, 16]
+        #     Here in the track, the feat_rgb is [1, 3, 384, 384] -> [1, 1024, 24, 24]
+        # '''
+        # # for feat in test_feat_rgb.values():
+        # #     print('test_feat_rgb in track: ', feat.shape) # in Localization, x_rgb is [27, 1024, 16, 16]
+        #
+        # # prepare features in the list (format for the network)
+        # test_feat_segm_rgb = [feat for feat in test_feat_rgb.values()]
         train_masks = [self.init_mask_patch]
         if self.params.segm_use_dist:
             if self.params.segm_dist_map_type == 'center':
@@ -1209,13 +1276,20 @@ class DepthSegmST(BaseTracker):
                 test_dist_map = [self.dist_map]
             elif self.params.segm_dist_map_type == 'bbox':
                 # bbox-based distance map
-                D = self.create_dist_gauss(self.params.segm_output_sz, w_.item() * f_, h_.item() * f_)
+                D = self.create_dist_gauss(self.params.segm_output_sz, w_.item() * f_, h_.item() * f_,
+                                            center_trans=center_trans)
                 test_dist_map = [torch.unsqueeze(torch.unsqueeze(torch.Tensor(D).to(self.params.device), dim=0), dim=0)]
         else:
             test_dist_map = None
 
         # Obtain segmentation prediction
-        segm_pred = self.segm_net.segm_predictor(test_feat_segm_rgb, test_feat_d,
+        for t_rgb in test_feat_rgb:
+            print(t_rgb.shape)
+        print(test_feat_d.shape)
+        for t_rgb in self.train_feat_segm_rgb:
+            print(t_rgb.shape)
+        print(self.train_feat_segm_d.shape)
+        segm_pred = self.segm_net.segm_predictor(test_feat_rgb, test_feat_d,
                                                  self.train_feat_segm_rgb, self.train_feat_segm_d,
                                                  train_masks, test_dist_map)
         segm_pred = segm_pred[0] if isinstance(segm_pred, tuple) else segm_pred
@@ -1227,12 +1301,7 @@ class DepthSegmST(BaseTracker):
             mask_real = copy.copy(mask)
         mask = (mask > self.params.segm_mask_thr).astype(np.uint8)
 
-        # self.mask = mask # predicted segmentation
-        self.masked_img = patch_rgb
-        if self.params.use_normalized_DCF:
-            self.masked_img = (self.masked_img * self.params.segm_normalize_std + self.params.segm_normalize_mean)*255
         self.masked_img = self.masked_img.astype(int) * np.expand_dims(mask, axis=-1)
-
 
         if cv2.__version__[-5] == '4':
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
@@ -1277,11 +1346,11 @@ class DepthSegmST(BaseTracker):
                     cv2.drawContours(mask, [contour], -1, 1, thickness=-1)
                     self.mask = mask # song
 
-                    # save mask to disk
-                    # Note: move this below if evaluating on VOT
-                    if self.params.save_mask:
-                        save_mask(mask, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
-                                  self.params.masks_save_path, self.sequence_name, self.frame_name)
+                    # # save mask to disk
+                    # # Note: move this below if evaluating on VOT
+                    # if self.params.save_mask:
+                    #     save_mask(mask, mask_real, segm_crop_sz, bb, color.shape[1], color.shape[0],
+                    #               self.params.masks_save_path, self.sequence_name, self.frame_name)
 
                 t_opt_start_ = time.time()
                 prbox_opt_ = fit_bbox_to_mask(mask.astype(np.int32), rotated=self.rotated_bbox)

@@ -95,7 +95,7 @@ class channel_attention(nn.Module):
 
         scale = F.sigmoid(channel_att_sum).unsqueeze(2).unsqueeze(3).expand_as(x)
 
-        return x * scale
+        return x * scale, scale
 
 def logsumexp_2d(tensor):
     tensor_flatten = tensor.view(tensor.size(0), tensor.size(1), -1)
@@ -120,7 +120,7 @@ class DepthAttn(nn.Module):
     def forward(self, f_d):
         # get spatial attn from D feature
         f_d = self.conv(f_d)
-        f_d = self.channel_attn(f_d)
+        f_d, _ = self.channel_attn(f_d)
         attn_d = self.spatial_attn(f_d)
         return attn_d
 
@@ -139,13 +139,13 @@ class DWNet(nn.Module):
     def forward(self, f_rgb, attn_d):
         # Mapping the channels
         f_rgb = self.conv_rgb(f_rgb)
-        f_rgb = self.channel_attn_rgb(f_rgb)
+        f_rgb, attn_rgb = self.channel_attn_rgb(f_rgb)
         # Resize attn_d
         attn_d = F.interpolate(attn_d, size=(f_rgb.shape[-2], f_rgb.shape[-1]))
         # Intergration
         f_rgbd = f_rgb * attn_d + f_rgb
 
-        return f_rgbd, attn_d
+        return f_rgbd, (attn_rgb, attn_d)
 
 class DepthNet(nn.Module):
     def __init__(self, input_dim=1, inter_dim=(4, 16, 32, 64)):
@@ -240,7 +240,7 @@ class SegmNet(nn.Module):
         attn_d_test = self.depth_attn(feat_test_d)
         attn_d_train = self.depth_attn(feat_train_d)
         # Fusion RGBD Features
-        f_test, attn03 = self.rgbd_fusion3(f_test, attn_d_test)
+        f_test, (attn03_rgb, attn03) = self.rgbd_fusion3(f_test, attn_d_test)
         f_train, _ = self.rgbd_fusion3(f_train, attn_d_train)
 
         # reshape mask to the feature size
@@ -267,13 +267,13 @@ class SegmNet(nn.Module):
         out = self.mixer(segm_layers)
         out3 = self.s3(F.upsample(out, scale_factor=2))
 
-        f_test_rgbd2, attn02 = self.rgbd_fusion2(self.f2(feat_test[2]), attn_d_test)
+        f_test_rgbd2, (attn02_rgb, attn02) = self.rgbd_fusion2(self.f2(feat_test[2]), attn_d_test)
         out2 = self.post2(F.upsample(self.m2(f_test_rgbd2) + self.s2(out3), scale_factor=2))
 
-        f_test_rgbd1, attn01 = self.rgbd_fusion1(self.f1(feat_test[1]), attn_d_test)
+        f_test_rgbd1, (attn01_rgb, attn01) = self.rgbd_fusion1(self.f1(feat_test[1]), attn_d_test)
         out1 = self.post1(F.upsample(self.m1(f_test_rgbd1) + self.s1(out2), scale_factor=2))
 
-        f_test_rgbd0, attn00 = self.rgbd_fusion0(self.f0(feat_test[0]), attn_d_test)
+        f_test_rgbd0, (atnn00_rgb, attn00) = self.rgbd_fusion0(self.f0(feat_test[0]), attn_d_test)
         out0 = self.post0(F.upsample(self.m0(f_test_rgbd0) + self.s0(out1), scale_factor=2))
 
         pred3 = self.pyramid_pred3(F.upsample(out3, scale_factor=8))

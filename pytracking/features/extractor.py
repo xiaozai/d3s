@@ -148,4 +148,4 @@ class MultiResolutionExtractor(ExtractorBase):
         else:
             dp_patches = None
 
-        return feature_map, dp_patches
+        return feature_map, im_patches, dp_patches
