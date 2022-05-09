@@ -1302,7 +1302,7 @@ class DepthSegmST(BaseTracker):
 
                 mask = masked_depth
                 mask[mask>0] = 1
-            except Exception e:
+            except Exception as e:
                 print(e)
 
             # self.ax_md.cla()
