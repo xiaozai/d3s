@@ -1275,32 +1275,35 @@ class DepthSegmST(BaseTracker):
             cv2.drawContours(mask, [contour], -1, 1, thickness=-1)
 
             ''' Song, post processing to remove outliers in mask '''
-            from scipy.stats import norm
-
-            masked_depth = mask * patch_raw_d
-            depth_pixels = masked_depth.flatten()
-            depth_pixels = depth_pixels[depth_pixels>self.min_depth]
-            depth_pixels = depth_pixels[depth_pixels<self.max_depth]
-            num_pixels = len(depth_pixels)
-            depth_hist, depth_edges = np.histogram(depth_pixels, bins=20)
-            hist_bins = (depth_edges[:-1] + depth_edges[1:]) / 2.0
-            peaks, _ = find_peaks(depth_hist, height=num_pixels/20)
-            p_widths = peak_widths(depth_hist, peaks)
-            p_widths = p_widths[0]
-            # print('num peaks : ', len(peaks))
-            if len(peaks) > 1:
+            try:
+                masked_depth = mask * patch_raw_d
+                depth_pixels = masked_depth.flatten()
+                depth_pixels = depth_pixels[depth_pixels>self.min_depth]
+                depth_pixels = depth_pixels[depth_pixels<self.max_depth]
+                num_pixels = len(depth_pixels)
+                depth_hist, depth_edges = np.histogram(depth_pixels, bins=20)
+                hist_bins = (depth_edges[:-1] + depth_edges[1:]) / 2.0
+                peaks, _ = find_peaks(depth_hist, height=num_pixels/20)
+                p_widths = peak_widths(depth_hist, peaks)
                 p_widths = p_widths[0]
-                peaks = peaks[0]
-            # p_widths = math.ceil(p_widths / 2)
-            p_widths = math.ceil(p_widths)
-            # print(p_widths)
-            left_ips = max(0, peaks-p_widths)
-            right_ips = min(len(depth_edges)-1, peaks+p_widths)
 
-            min_depth = depth_edges[left_ips]
-            max_depth = depth_edges[right_ips]
-            masked_depth[masked_depth > max_depth] = 0
-            masked_depth[masked_depth < min_depth] = 0
+                if len(peaks) > 1:
+                    p_widths = p_widths[0]
+                    peaks = peaks[0]
+                p_widths = math.ceil(p_widths)
+
+                left_ips = max(0, peaks-p_widths)
+                right_ips = min(len(depth_edges)-1, peaks+p_widths)
+
+                min_depth = depth_edges[left_ips]
+                max_depth = depth_edges[right_ips]
+                masked_depth[masked_depth > max_depth] = 0
+                masked_depth[masked_depth < min_depth] = 0
+
+                mask = masked_depth
+                mask[mask>0] = 1
+            except Exception e:
+                print(e)
 
             # self.ax_md.cla()
             # self.ax_md.imshow(masked_depth)
@@ -1313,8 +1316,7 @@ class DepthSegmST(BaseTracker):
             # self.ax_mm.vlines(depth_edges[right_ips], 0, max(depth_hist), colors='r')
             # plt.show(block=False)
 
-            mask = masked_depth
-            mask[mask>0] = 1
+
 
             self.mask = mask       # song
             self.polygon = polygon # Only for vis
