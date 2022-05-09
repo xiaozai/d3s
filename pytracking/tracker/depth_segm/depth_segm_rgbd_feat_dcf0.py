@@ -124,7 +124,7 @@ class DepthSegmST(BaseTracker):
         self.max_depth = 10000
         self.min_depth = 0
 
-        fig, (self.ax_md, self.ax_raw_d, self.ax_mm) = plt.subplots(1, 3)
+        # fig, (self.ax_md, self.ax_raw_d, self.ax_mm) = plt.subplots(1, 3)
 
         if not hasattr(self.params, 'device'):
             self.params.device = 'cuda' if self.params.use_gpu else 'cpu'
@@ -993,7 +993,7 @@ class DepthSegmST(BaseTracker):
         return 1 - np.exp(-((np.power(X, p) / (sz_weight * w ** p)) + (np.power(Y, p) / (sz_weight * h ** p))))
 
     def init_segmentation(self, color, depth, bb, init_mask=None):
-        print('in init_segmentation : segm_search_area_factor : ', self.params.segm_search_area_factor, self.params.segm_output_sz)
+        # print('in init_segmentation : segm_search_area_factor : ', self.params.segm_search_area_factor, self.params.segm_output_sz)
         init_patch_crop_rgb, f_ = prutils.sample_target(color, np.array(bb), self.params.segm_search_area_factor,
                                                     output_sz=self.params.segm_output_sz, pad_val=0)
 
@@ -1178,7 +1178,7 @@ class DepthSegmST(BaseTracker):
 
         patch_raw_d, _ = prutils.sample_target(raw_depth, np.array(bb), self.params.segm_search_area_factor,
                                           output_sz=self.params.segm_output_sz, pad_val=0)
-        print('patch_raw_d: ', patch_raw_d.shape)
+        # print('patch_raw_d: ', patch_raw_d.shape)
 
         if not self.params.use_colormap:
             patch_d = np.expand_dims(patch_d, axis=-1)
@@ -1287,13 +1287,13 @@ class DepthSegmST(BaseTracker):
             peaks, _ = find_peaks(depth_hist, height=num_pixels/20)
             p_widths = peak_widths(depth_hist, peaks)
             p_widths = p_widths[0]
-            print('num peaks : ', len(peaks))
+            # print('num peaks : ', len(peaks))
             if len(peaks) > 1:
                 p_widths = p_widths[0]
                 peaks = peaks[0]
             # p_widths = math.ceil(p_widths / 2)
             p_widths = math.ceil(p_widths)
-            print(p_widths)
+            # print(p_widths)
             left_ips = max(0, peaks-p_widths)
             right_ips = min(len(depth_edges)-1, peaks+p_widths)
 
@@ -1302,16 +1302,16 @@ class DepthSegmST(BaseTracker):
             masked_depth[masked_depth > max_depth] = 0
             masked_depth[masked_depth < min_depth] = 0
 
-            self.ax_md.cla()
-            self.ax_md.imshow(masked_depth)
-            self.ax_raw_d.cla()
-            self.ax_raw_d.imshow(patch_raw_d)
-            self.ax_mm.cla()
-            self.ax_mm.hist(depth_pixels, bins=20)
-            self.ax_mm.plot(hist_bins[peaks], depth_hist[peaks], 'x')
-            self.ax_mm.vlines(depth_edges[left_ips], 0, max(depth_hist), colors='r')
-            self.ax_mm.vlines(depth_edges[right_ips], 0, max(depth_hist), colors='r')
-            plt.show(block=False)
+            # self.ax_md.cla()
+            # self.ax_md.imshow(masked_depth)
+            # self.ax_raw_d.cla()
+            # self.ax_raw_d.imshow(patch_raw_d)
+            # self.ax_mm.cla()
+            # self.ax_mm.hist(depth_pixels, bins=20)
+            # self.ax_mm.plot(hist_bins[peaks], depth_hist[peaks], 'x')
+            # self.ax_mm.vlines(depth_edges[left_ips], 0, max(depth_hist), colors='r')
+            # self.ax_mm.vlines(depth_edges[right_ips], 0, max(depth_hist), colors='r')
+            # plt.show(block=False)
 
             mask = masked_depth
             mask[mask>0] = 1
@@ -1356,7 +1356,6 @@ class DepthSegmST(BaseTracker):
             displacement = np.mean(prbox, axis=0) - np.array([mask.shape[0] / 2, mask.shape[1] / 2])
             prbox = (prbox - np.mean(prbox, axis=0) + displacement) / f_ + np.array([pos[1].item(), pos[0].item()])
             # prbox = (prbox - np.array([mask.shape[0]/2, mask.shape[1]/2])) / f_ + np.array([pos[1].item(), pos[0].item()])
-            print('self.mask : ', self.mask.shape, f_)
 
             # self.prbox = prbox
             ''' Song, target_scale is usef for localization target , and update self.pos '''
