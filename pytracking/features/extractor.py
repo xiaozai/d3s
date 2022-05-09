@@ -3,7 +3,7 @@ from pytracking.features.preprocessing import sample_patch
 from pytracking import TensorList
 
 import cv2
-
+import torch.nn.functional as F
 
 class ExtractorBase:
     """Base feature extractor class.
