@@ -11,6 +11,10 @@ import ml_collections
 import copy
 import math
 
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+
 # from torch.nn import Flatten
 ''' Torch 1.1.0, can not from torch.nn import Flatten '''
 class Flatten(nn.Module):
@@ -61,7 +65,8 @@ class spatial_attention(nn.Module):
     def forward(self, x):
         x_compress = self.compress(x)
         x_out = self.spatial(x_compress)
-        scale = F.sigmoid(x_out)
+        # scale = F.sigmoid(x_out)
+        scale = torch.sigmoid(x_out)
         return scale
 
 class channel_attention(nn.Module):
@@ -93,7 +98,8 @@ class channel_attention(nn.Module):
             else:
                 channel_att_sum += channel_att_raw
 
-        scale = F.sigmoid(channel_att_sum).unsqueeze(2).unsqueeze(3).expand_as(x)
+        # scale = F.sigmoid(channel_att_sum).unsqueeze(2).unsqueeze(3).expand_as(x)
+        scale = torch.sigmoid(channel_att_sum).unsqueeze(2).unsqueeze(3).expand_as(x)
 
         return x * scale, scale
 
@@ -265,20 +271,29 @@ class SegmNet(nn.Module):
             segm_layers = torch.cat((torch.unsqueeze(pred_sm[:, :, :, 0], dim=1), torch.unsqueeze(pred_pos, dim=1)), dim=1)
 
         out = self.mixer(segm_layers)
-        out3 = self.s3(F.upsample(out, scale_factor=2))
 
         f_test_rgbd2, (attn02_rgb, attn02) = self.rgbd_fusion2(self.f2(feat_test[2]), attn_d_test)
-        out2 = self.post2(F.upsample(self.m2(f_test_rgbd2) + self.s2(out3), scale_factor=2))
-
         f_test_rgbd1, (attn01_rgb, attn01) = self.rgbd_fusion1(self.f1(feat_test[1]), attn_d_test)
-        out1 = self.post1(F.upsample(self.m1(f_test_rgbd1) + self.s1(out2), scale_factor=2))
-
         f_test_rgbd0, (atnn00_rgb, attn00) = self.rgbd_fusion0(self.f0(feat_test[0]), attn_d_test)
-        out0 = self.post0(F.upsample(self.m0(f_test_rgbd0) + self.s0(out1), scale_factor=2))
 
-        pred3 = self.pyramid_pred3(F.upsample(out3, scale_factor=8))
-        pred2 = self.pyramid_pred2(F.upsample(out2, scale_factor=4))
-        pred1 = self.pyramid_pred1(F.upsample(out1, scale_factor=2))
+
+        # out3 = self.s3(F.upsample(out, scale_factor=2))
+        out3 = self.s3(F.interpolate(out, size=(f_test_rgbd2.shape[-2], f_test_rgbd2.shape[-1])))
+        out2 = self.post2(F.interpolate(self.m2(f_test_rgbd2) + self.s2(out3), size=(f_test_rgbd1.shape[-2], f_test_rgbd1.shape[-1])))
+        out1 = self.post1(F.interpolate(self.m1(f_test_rgbd1) + self.s1(out2), size=(f_test_rgbd0.shape[-2], f_test_rgbd0.shape[-1])))
+        out0 = self.post0(F.interpolate(self.m0(f_test_rgbd0) + self.s0(out1), size=(f_test_rgbd0.shape[-2]*2, f_test_rgbd0.shape[-1]*2)))
+
+        pred3 = self.pyramid_pred3(F.interpolate(out3, size=(out0.shape[-2], out0.shape[-1])))
+        pred2 = self.pyramid_pred2(F.interpolate(out2, size=(out0.shape[-2], out0.shape[-1])))
+        pred1 = self.pyramid_pred1(F.interpolate(out1, size=(out0.shape[-2], out0.shape[-1])))
+
+        # out2 = self.post2(F.upsample(self.m2(f_test_rgbd2) + self.s2(out3), scale_factor=2))
+        # out1 = self.post1(F.upsample(self.m1(f_test_rgbd1) + self.s1(out2), scale_factor=2))
+        # out0 = self.post0(F.upsample(self.m0(f_test_rgbd0) + self.s0(out1), scale_factor=2))
+
+        # pred3 = self.pyramid_pred3(F.upsample(out3, scale_factor=8))
+        # pred2 = self.pyramid_pred2(F.upsample(out2, scale_factor=4))
+        # pred1 = self.pyramid_pred1(F.upsample(out1, scale_factor=2))
 
         if not debug:
             return (out0, pred1, pred2, pred3)

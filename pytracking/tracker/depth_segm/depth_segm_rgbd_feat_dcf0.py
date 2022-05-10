@@ -23,6 +23,9 @@ from scipy.signal import find_peaks, peak_widths
 
 import matplotlib.pyplot as plt
 
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 class DepthSegmST(BaseTracker):
 
@@ -52,6 +55,79 @@ class DepthSegmST(BaseTracker):
             target_depth = 10
 
         return target_depth
+
+    def mask_post_processing(self, mask, raw_depth, num_bins=30):
+        ''' Depth Histogram based Outliers Removal '''
+        num_mask_pixels = np.sum(mask)
+        masked_depth = mask * raw_depth
+        depth_pixels = masked_depth.flatten()
+        depth_pixels = depth_pixels[depth_pixels>self.min_depth]
+        depth_pixels = depth_pixels[depth_pixels<self.max_depth]
+        num_pixels = len(depth_pixels)
+
+        if num_mask_pixels == 0 or (num_mask_pixels > 0 and num_pixels / num_mask_pixels < 0.3):
+            # print('depth pixels missing too much .. ', num_mask_pixels, num_pixels)
+            return mask, 10
+
+        target_depth = np.median(depth_pixels)
+
+        if target_depth is None or target_depth == 0:
+            target_depth = 10
+
+        try:
+            depth_hist, depth_edges = np.histogram(depth_pixels, bins=num_bins)
+            hist_bins = (depth_edges[:-1] + depth_edges[1:]) / 2.0
+            peaks, peak_properties = find_peaks(depth_hist, height=num_pixels/num_bins)
+            p_widths = peak_widths(depth_hist, peaks)
+            p_widths = p_widths[0]
+            num_peaks = len(peaks)
+
+            if num_peaks > 0:
+                # We choose the highest peak as the target
+                peak_heights = peak_properties['peak_heights']
+                target_idx = np.where(peak_heights == max(peak_heights))[0][0]
+                p_widths = p_widths[target_idx]
+                peaks = peaks[target_idx]
+
+                # Target Depth Range
+                p_widths = math.ceil(p_widths)
+                left_ips = max(0, peaks-p_widths+1)
+                right_ips = min(len(depth_edges)-1, peaks+p_widths+1)
+
+                # Remove outliers
+                min_depth = depth_edges[left_ips]
+                max_depth = depth_edges[right_ips]
+                masked_depth[masked_depth > max_depth] = 0
+                masked_depth[masked_depth < min_depth] = 0
+
+                mask = masked_depth
+                mask[mask>0] = 1
+
+                target_depth = hist_bins[peaks]
+
+                if self.params.debug == 5:
+                    self.ax_mrgb.cla()
+                    self.ax_mrgb.set_title('Depth Histogram in Segmentation : %d'%target_depth)
+                    shift = hist_bins[peaks]
+                    hist_bins = hist_bins - shift
+                    left = depth_edges[left_ips] -  shift
+                    right = depth_edges[right_ips] -  shift
+                    self.ax_mrgb.set_xlim([-1000, 1000])
+                    self.ax_mrgb.plot(hist_bins, depth_hist, 'b')
+                    # self.ax_mrgb.hist(depth_pixels, bins=num_bins, align='mid')
+                    self.ax_mrgb.plot(hist_bins[peaks], depth_hist[peaks], 'rx')
+                    self.ax_mrgb.vlines(left, 0, max(depth_hist), colors='r')
+                    self.ax_mrgb.vlines(right, 0, max(depth_hist), colors='r')
+            else:
+                ''' no peak found '''
+                target_depth = np.median(depth_pixels)
+                if target_depth is None:
+                    target_depth = 10
+
+        except Exception as e:
+            print(e)
+
+        return mask, target_depth
 
     def depth_processing(self, depth, bbox=None, use_colormap=False):
         ''' Get the depth range for the sequence, [min, max] '''
@@ -124,8 +200,6 @@ class DepthSegmST(BaseTracker):
         self.max_depth = 10000
         self.min_depth = 0
 
-        # fig, (self.ax_md, self.ax_raw_d, self.ax_mm) = plt.subplots(1, 3)
-
         if not hasattr(self.params, 'device'):
             self.params.device = 'cuda' if self.params.use_gpu else 'cpu'
 
@@ -176,6 +250,7 @@ class DepthSegmST(BaseTracker):
 
         # Check if image is color
         color, depth = image['color'], image['depth']
+        raw_depth = copy.deepcopy(depth)
         depth = self.depth_processing(depth, bbox=state, use_colormap=self.params.use_colormap)
         self.params.features_filter.set_is_color(color.shape[2] == 3)
 
@@ -254,7 +329,7 @@ class DepthSegmST(BaseTracker):
         # Song, we need the depthnet in segmnet
         self.load_segmnet()
         # if self.params.use_segmentation:
-        self.init_segmentation(color, depth, state, init_mask=init_mask)
+        self.init_segmentation(color, depth, state, init_mask=init_mask, raw_depth=raw_depth)
 
         ''' x_rgb = cat([x_rgb, x_d]) if use_rgbd_classifier '''
         # Extract and transform sample
@@ -458,22 +533,24 @@ class DepthSegmST(BaseTracker):
         if self.segmentation_task or (
             self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
 
-            pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz, raw_depth=raw_depth)
+            pred_segm_region, pred_target_depth = self.segment_target(color, depth, new_pos, self.target_sz, raw_depth=raw_depth)
             pred_segm_region = pred_segm_region[0] if isinstance(pred_segm_region, tuple) else pred_segm_region
-
+            # print('1 self.prev_target_depth: ', self.prev_target_depth)
             if pred_segm_region is None:
                 print(self.frame_num, ' segmentation failed ...')
                 self.pos = new_pos.clone()
                 conf_ = conf_ / 2.0
             else:
-                new_target_depth = self.get_target_depth(raw_depth, pred_segm_region)
-                target_depth_flag = abs(self.prev_target_depth - new_target_depth) / self.prev_target_depth
-                if target_depth_flag > 0.5:
-                    print(self.frame_num, 'target depth changes too much : ', self.prev_target_depth, new_target_depth)
-                    pred_segm_region = None
-                    conf_ = 0
-                else:
-                    self.prev_target_depth = new_target_depth
+                if pred_target_depth is not None:
+                    target_depth_flag = abs(self.prev_target_depth - pred_target_depth) / self.prev_target_depth
+                    if target_depth_flag > 0.5:
+                        # print(self.frame_num, 'target depth changes too much : ', self.prev_target_depth, pred_target_depth)
+                        pred_segm_region = None
+                        conf_ = 0
+                    else:
+                        self.prev_target_depth = pred_target_depth
+                        # print(self.prev_target_depth)
+            # print('2 self.prev_target_depth: ', self.prev_target_depth)
         # else:
         #     print('update self.pos using localize_target, because of uncert_score: ', uncert_score)
         #
@@ -485,9 +562,11 @@ class DepthSegmST(BaseTracker):
                     torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]])).tolist()
         # just a sanity check so that it does not get out of image
         new_state = self.sanity_check(new_state, color.shape)
+        conf_ = min(1.0, conf_)
         self.conf_ = conf_ # for vis only
 
         # ------- UPDATE ------- #
+        ''' Song, it did not update self.train_feat_segm_rgb for segm_predictor '''
 
         # Check flags and set learning rate if hard negative
         update_flag = flag not in ['not_found', 'uncertain']
@@ -509,7 +588,7 @@ class DepthSegmST(BaseTracker):
             self.filter_optimizer.run(self.params.CG_iter)
 
         # Update position and scale
-        if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.7:
+        if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.6:
             if getattr(self.params, 'use_classifier', True):
                 self.update_state(new_pos, sample_scales[scale_ind], new_state)
 
@@ -940,10 +1019,10 @@ class DepthSegmST(BaseTracker):
                 self.target_sz = self.base_target_sz * self.target_scale
 
         # Update pos
-        inside_ratio = 0.2
-        inside_offset = (inside_ratio - 0.5) * self.target_sz
-        self.pos = torch.max(torch.min(new_pos, self.image_sz - inside_offset), inside_offset)
-
+        # inside_ratio = 0.2
+        # inside_offset = (inside_ratio - 0.5) * self.target_sz
+        # self.pos = torch.max(torch.min(new_pos, self.image_sz - inside_offset), inside_offset)
+        self.pos = torch.Tensor([new_state[1]+new_state[3]/2, new_state[0]+new_state[2]/2])
         # Song, update target depth range
         self.min_depth = max(0, self.prev_target_depth-1500)
         self.max_depth = self.prev_target_depth + 1500
@@ -992,13 +1071,18 @@ class DepthSegmST(BaseTracker):
         # 1 - is needed since we need distance-like map (not Gaussian function)
         return 1 - np.exp(-((np.power(X, p) / (sz_weight * w ** p)) + (np.power(Y, p) / (sz_weight * h ** p))))
 
-    def init_segmentation(self, color, depth, bb, init_mask=None):
-        # print('in init_segmentation : segm_search_area_factor : ', self.params.segm_search_area_factor, self.params.segm_output_sz)
+    def init_segmentation(self, color, depth, bb, init_mask=None, raw_depth=None):
         init_patch_crop_rgb, f_ = prutils.sample_target(color, np.array(bb), self.params.segm_search_area_factor,
                                                     output_sz=self.params.segm_output_sz, pad_val=0)
 
         init_patch_crop_d, _ = prutils.sample_target(depth, np.array(bb), self.params.segm_search_area_factor,
                                                     output_sz=self.params.segm_output_sz, pad_val=0)
+        if raw_depth is not None:
+            init_patch_crop_raw_d, _ = prutils.sample_target(raw_depth, np.array(bb), self.params.segm_search_area_factor,
+                                                        output_sz=self.params.segm_output_sz, pad_val=0)
+        else:
+            init_patch_crop_raw_d = None
+
         if not self.params.use_colormap:
             init_patch_crop_d = np.expand_dims(init_patch_crop_d, axis=-1)
 
@@ -1039,8 +1123,6 @@ class DepthSegmST(BaseTracker):
                 dist_map = self.create_dist(init_patch_crop_rgb.shape[0], init_patch_crop_rgb.shape[1])
             elif self.params.segm_dist_map_type == 'bbox':
                 # bbox-based dist map
-                ''' Song, if we want to use the same feat_rgb for localization and segment_target,
-                we need to porvide cx and cy for create_dist_gauss'''
                 dist_map = self.create_dist_gauss(self.params.segm_output_sz, bb[2] * patch_factor_init,
                                                   bb[3] * patch_factor_init)
             else:
@@ -1098,6 +1180,9 @@ class DepthSegmST(BaseTracker):
                 # take only the positive channel as predicted segmentation mask
                 mask = F.softmax(segm_pred, dim=1)[0, 0, :, :].cpu().numpy()
                 mask = (mask > self.params.init_segm_mask_thr).astype(np.float32)
+
+                # if init_patch_crop_raw_d is not None:
+                #     mask, target_depth = self.mask_post_processing(mask, init_patch_crop_raw_d)
 
                 if hasattr(self, 'gt_poly'):
                     # dilate polygon-based mask
@@ -1176,9 +1261,11 @@ class DepthSegmST(BaseTracker):
         patch_d, _ = prutils.sample_target(depth, np.array(bb), self.params.segm_search_area_factor,
                                           output_sz=self.params.segm_output_sz, pad_val=0)
 
-        patch_raw_d, _ = prutils.sample_target(raw_depth, np.array(bb), self.params.segm_search_area_factor,
-                                          output_sz=self.params.segm_output_sz, pad_val=0)
-        # print('patch_raw_d: ', patch_raw_d.shape)
+        if raw_depth is not None:
+            patch_raw_d, _ = prutils.sample_target(raw_depth, np.array(bb), self.params.segm_search_area_factor,
+                                              output_sz=self.params.segm_output_sz, pad_val=0)
+        else:
+            patch_raw_d = None
 
         if not self.params.use_colormap:
             patch_d = np.expand_dims(patch_d, axis=-1)
@@ -1203,12 +1290,6 @@ class DepthSegmST(BaseTracker):
         # extract features (extracting twice on the same patch - not necessary)
         test_feat_rgb = self.segm_net.extract_backbone_features(patch_gpu_rgb)
         test_feat_d = self.segm_net.segm_predictor.depth_feat_extractor(patch_gpu_d)
-
-        ''' In the Localization, the feat_rgb is [1, 3, 256, 256] -> [1, 1024, 16, 16]
-            Here in the track, the feat_rgb is [1, 3, 384, 384] -> [1, 1024, 24, 24]
-        '''
-        # for feat in test_feat_rgb.values():
-        #     print('test_feat_rgb in track: ', feat.shape) # in Localization, x_rgb is [27, 1024, 16, 16]
 
         # prepare features in the list (format for the network)
         test_feat_segm_rgb = [feat for feat in test_feat_rgb.values()]
@@ -1275,52 +1356,14 @@ class DepthSegmST(BaseTracker):
             cv2.drawContours(mask, [contour], -1, 1, thickness=-1)
 
             ''' Song, post processing to remove outliers in mask '''
-            try:
-                masked_depth = mask * patch_raw_d
-                depth_pixels = masked_depth.flatten()
-                depth_pixels = depth_pixels[depth_pixels>self.min_depth]
-                depth_pixels = depth_pixels[depth_pixels<self.max_depth]
-                num_pixels = len(depth_pixels)
-                depth_hist, depth_edges = np.histogram(depth_pixels, bins=20)
-                hist_bins = (depth_edges[:-1] + depth_edges[1:]) / 2.0
-                peaks, _ = find_peaks(depth_hist, height=num_pixels/20)
-                p_widths = peak_widths(depth_hist, peaks)
-                p_widths = p_widths[0]
+            pred_target_depth = None
+            if patch_raw_d is not None:
+                mask, pred_target_depth = self.mask_post_processing(mask, patch_raw_d)
 
-                if len(peaks) > 1:
-                    p_widths = p_widths[0]
-                    peaks = peaks[0]
-                p_widths = math.ceil(p_widths)
-
-                left_ips = max(0, peaks-p_widths)
-                right_ips = min(len(depth_edges)-1, peaks+p_widths)
-
-                min_depth = depth_edges[left_ips]
-                max_depth = depth_edges[right_ips]
-                masked_depth[masked_depth > max_depth] = 0
-                masked_depth[masked_depth < min_depth] = 0
-
-                mask = masked_depth
-                mask[mask>0] = 1
-            except Exception as e:
-                print(e)
-
-            # self.ax_md.cla()
-            # self.ax_md.imshow(masked_depth)
-            # self.ax_raw_d.cla()
-            # self.ax_raw_d.imshow(patch_raw_d)
-            # self.ax_mm.cla()
-            # self.ax_mm.hist(depth_pixels, bins=20)
-            # self.ax_mm.plot(hist_bins[peaks], depth_hist[peaks], 'x')
-            # self.ax_mm.vlines(depth_edges[left_ips], 0, max(depth_hist), colors='r')
-            # self.ax_mm.vlines(depth_edges[right_ips], 0, max(depth_hist), colors='r')
-            # plt.show(block=False)
-
-
-
-            self.mask = mask       # song
-            self.polygon = polygon # Only for vis
-
+            # Only for vis
+            self.mask = mask
+            self.polygon = polygon
+            # self.target_depth = pred_target_depth
 
             prbox_opt = np.array([])
             if self.params.segm_optimize_polygon:
@@ -1419,9 +1462,9 @@ class DepthSegmST(BaseTracker):
                                    np.max(prbox[:, 0]) - np.min(prbox[:, 0]) + 1,
                                    np.max(prbox[:, 1]) - np.min(prbox[:, 1]) + 1]
 
-                return pred_region
+                return pred_region, pred_target_depth
 
-        return None
+        return None, 10 # when pred_target_depth is None
 
     def poly_to_prbox(self, polygon):
         ''' Song, get axis aligned bbox from polygon , return 4 points'''
