@@ -261,7 +261,7 @@ class SegmNet(nn.Module):
             mask_pos = F.interpolate(mask_train[0], size=(height, width)) # [B, 1, 384, 384]
             train_depth_pixels = train_raw_d * mask_pos                   # [B, 1, 384, 384] * [B, 1, 384, 384]
             # k = torch.max(torch.sum(mask_pos.view(batch, -1), dim=1))     # number of pixels we use
-            k = torch.min(torch.sum(mask_pos.view(batch, -1), dim=1)).values     # number of pixels we use
+            k = torch.min(torch.sum(mask_pos.view(batch, -1), dim=1))     # number of pixels we use
             train_depth_pixels = torch.topk(train_depth_pixels.view(batch, -1), int(k.item()), dim=-1).values # [B, K]
             train_mean = torch.mean(train_depth_pixels, dim=1)                  # [B, ]
             train_std = torch.std(train_depth_pixels, dim=1, unbiased=False)    # [B, ]
