@@ -261,14 +261,16 @@ class SegmNet(nn.Module):
             mask_pos = F.interpolate(mask_train[0], size=(height, width)) # [B, 1, 384, 384]
             train_depth_pixels = train_raw_d * mask_pos                   # [B, 1, 384, 384] * [B, 1, 384, 384]
             k = torch.max(torch.sum(mask_pos.view(batch, -1), dim=1))
-            train_depth_pixels = torch.topk(train_depth_pixels.view(batch, -1), k, dim=-1).values # [B, K]
-            train_mean = torch.median(train_depth_pixels, dim=1)                  # [B, ]
+            train_depth_pixels = torch.topk(train_depth_pixels.view(batch, -1), int(k.item()), dim=-1).values # [B, K]
+            train_mean = torch.mean(train_depth_pixels, dim=1)                  # [B, ]
             train_std = torch.std(train_depth_pixels, dim=1, unbiased=False)      # [B, ]
             # Gaussian probability
             std2 = train_std * train_std
-            alpha = 1.0 / (math.sqrt(2*math.pi) * train_std)
-            test_dg = alpha * torch.exp(-0.5 * (test_raw_d.view(batch, -1) - train_mean)**2 / std2)
-            test_dg = test_dg / torch.max(test_dg, dim=1)
+
+            alpha = 1.0 / (math.sqrt(2*math.pi) * train_std.view(batch, -1))
+            test_dg = alpha * torch.exp(-0.5 * (test_raw_d.view(batch, -1) - train_mean.view(batch,-1))**2 / std2.view(batch,-1))
+            norm = torch.max(test_dg, dim=1).values
+            test_dg = test_dg / norm.view(batch, -1)
             test_dg = test_dg.view(batch, 1, height, width) # [B, 1, 384, 384]
             test_dg = F.interpolate(test_dg, size=(pred_pos.shape[-2], pred_pos.shape[-1])) # [B, 1, 24, 24]
 
@@ -286,7 +288,7 @@ class SegmNet(nn.Module):
 
         f_test_rgbd2, (attn02_rgb, attn02_d) = self.rgbd_fusion2(self.f2(feat_test[2]), attn_d_test)
         f_test_rgbd1, (attn01_rgb, attn01_d) = self.rgbd_fusion1(self.f1(feat_test[1]), attn_d_test)
-        f_test_rgbd0, (atnn00_rgb, attn00_d) = self.rgbd_fusion0(self.f0(feat_test[0]), attn_d_test)
+        f_test_rgbd0, (attn00_rgb, attn00_d) = self.rgbd_fusion0(self.f0(feat_test[0]), attn_d_test)
 
 
         out3 = self.s3(F.interpolate(out, size=(f_test_rgbd2.shape[-2], f_test_rgbd2.shape[-1])))

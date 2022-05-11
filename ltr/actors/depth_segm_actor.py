@@ -528,7 +528,7 @@ class DepthSegmActor_DepthGaussian(BaseActor):
         test_dist = None
         if 'test_dist' in data:
             test_dist = data['test_dist'].permute(1, 0, 2, 3)
-
+            
         masks_pred, vis_data = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
                                         data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
                                         data['test_images'].permute(1, 0, 2, 3),

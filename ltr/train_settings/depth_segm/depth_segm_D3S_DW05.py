@@ -44,10 +44,10 @@ def run(settings):
         os.mkdir(settings.env.images_dir)
 
     # Train datasets
-    vos_train = Vos_rgbd(split='train', use_colormap=True)
+    vos_train = Vos_rgbd(split='train', use_colormap=False)
 
     # Validation datasets
-    vos_val = Vos_rgbd(split='val', use_colormap=True)
+    vos_val = Vos_rgbd(split='val', use_colormap=False)
 
     # The joint augmentation transform, that is applied to the pairs jointly
     # No need for grayscale transformation since we are doing color segmentation
@@ -64,7 +64,7 @@ def run(settings):
                                                                                      std=settings.normalize_std)])
 
     # Data processing to do on the training pairs
-    data_processing_train = depth_segm_processing.DepthSegmProcessingRotation(search_area_factor=settings.search_area_factor,
+    data_processing_train = depth_segm_processing.DepthSegmProcessingRotationDColormap(search_area_factor=settings.search_area_factor,
                                                                       output_sz=settings.output_sz,
                                                                       center_jitter_factor=settings.center_jitter_factor,
                                                                       scale_jitter_factor=settings.scale_jitter_factor,
@@ -73,7 +73,7 @@ def run(settings):
                                                                       use_distance=settings.segm_use_distance)
 
     # Data processing to do on the validation pairs
-    data_processing_val = depth_segm_processing.DepthSegmProcessingRotation(search_area_factor=settings.search_area_factor,
+    data_processing_val = depth_segm_processing.DepthSegmProcessingRotationDColormap(search_area_factor=settings.search_area_factor,
                                                                     output_sz=settings.output_sz,
                                                                     center_jitter_factor=settings.center_jitter_factor,
                                                                     scale_jitter_factor=settings.scale_jitter_factor,
