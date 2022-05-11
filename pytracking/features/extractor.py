@@ -99,7 +99,7 @@ class MultiResolutionExtractor(ExtractorBase):
     def set_is_color(self, is_color: bool):
         self.is_color = is_color
 
-    def extract(self, im, pos, scales, image_sz, dp=None):
+    def extract(self, im, pos, scales, image_sz, dp=None, raw_depth=None):
         """Extract features.
         args:
             im: Image.
@@ -115,16 +115,25 @@ class MultiResolutionExtractor(ExtractorBase):
         # Compute features
         feature_map = TensorList([f.get_feature(im_patches) for f in self.features]).unroll()
 
+        dp_patches = None
         if dp is not None:
             dp_patches = torch.cat([sample_patch(dp, pos, s*image_sz, image_sz) for s in scales])
             dp_patches = TensorList([dp_patches for _ in self.features]).unroll()
-        else:
-            dp_patches = None
 
-        return feature_map, dp_patches, im_patches
+        raw_dp_patches = None
+        if raw_depth is not None:
+            raw_dp_patches = torch.cat([sample_patch(raw_depth, pos, s*image_sz, image_sz) for s in scales])
+            raw_dp_patches = TensorList([raw_dp_patches for _ in self.features]).unroll()
+
+        if dp is not None and raw_depth is not None:
+            return feature_map, dp_patches, im_patches, raw_dp_patches
+        elif dp is not None and raw_depth is None:
+            return feature_map, dp_patches, im_patches
+        elif dp is None and raw_depth is not None:
+            return feature_map, raw_dp_patches
 
 
-    def extract_transformed(self, im, pos, scale, image_sz, transforms, dp=None):
+    def extract_transformed(self, im, pos, scale, image_sz, transforms, dp=None, raw_depth=None):
         """Extract features from a set of transformed image samples.
         args:
             im: Image.
@@ -141,11 +150,21 @@ class MultiResolutionExtractor(ExtractorBase):
         # Compute features
         feature_map = TensorList([f.get_feature(im_patches) for f in self.features]).unroll()
 
+        dp_patches = None
         if dp is not None:
             dp_patch = sample_patch(dp, pos, scale*image_sz, image_sz) # [1, 1, 512, 512]
             dp_patches = torch.cat([T(dp_patch) for T in transforms])
             dp_patches = TensorList([dp_patches for f in self.features]).unroll() # [27, 1, 256, 256]
-        else:
-            dp_patches = None
 
-        return feature_map, im_patches, dp_patches
+        raw_d_patches = None
+        if raw_depth is not None:
+            raw_d_patch = sample_patch(raw_depth, pos, scale*image_sz, image_sz)
+            raw_d_patches = torch.cat([T(raw_d_patch) for T in transforms])
+            raw_d_patches = TensorList([raw_d_patches for f in self.features]).unroll()
+
+        if dp is not None and raw_depth is not None:
+            return feature_map, im_patches, dp_patches, raw_d_patches
+        elif dp is not None and raw_depth is None:
+            return feature_map, im_patches, dp_patches
+        elif dp is None and raw_depth is not None:
+            return feature_map, raw_d_patches
