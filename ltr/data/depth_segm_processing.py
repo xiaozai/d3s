@@ -429,7 +429,7 @@ class DepthSegmProcessingRotation(BaseProcessing):
             data[s + '_images'] = [self.transform[s](x) for x in crops_img] # 1 * 3 * H * W
             data[s + '_anno'] = boxes # Song, boxes no rotation
             data[s + '_masks'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_mask] # 1, 1*384*384
-            # data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth] # 1, 1*384*384
+            data[s + '_raw_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth] # 1, 1*384*384
             # data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth if len(x.shape)==2 else self.transforms[s](x)] # 1, 1*384*384
             if len(crops_depth[0].shape) == 3 and crops_depth[0].shape[-1] == 3:
                 data[s + '_depths'] = [self.transform[s](x) for x in crops_depth] # 1, 1*384*384
@@ -441,6 +441,7 @@ class DepthSegmProcessingRotation(BaseProcessing):
                 # on random use binary mask generated from axis-aligned bbox
                 data['test_images'] = copy.deepcopy(data['train_images'])
                 data['test_depths'] = copy.deepcopy(data['train_depths'])
+                data['test_raw_depths'] = copy.deepcopy(data['train_raw_depths'])
                 data['test_masks'] = copy.deepcopy(data['train_masks'])
                 data['test_anno'] = copy.deepcopy(data['train_anno'])
 
@@ -677,15 +678,17 @@ class DepthSegmProcessingRotationDColormap(BaseProcessing):
             data[s + '_masks'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_mask] # 1, 1*384*384
             # data[s + '_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth] # 1, 1*384*384
 
+            data[s + '_raw_depths'] = [torch.from_numpy(np.expand_dims(x, axis=0)) for x in crops_depth] # 1, 1*384*384
+
             crops_depth = [np.array(x*255, dtype=np.uint8) for x in crops_depth]
             crops_depth = [cv2.applyColorMap(x, cv2.COLORMAP_JET) for x in crops_depth] # 1, 384*384*3
             data[s + '_depths'] = [self.transform[s](x) for x in crops_depth] # 1, 3*384*384, toTensor and normalize
 
-            # if s == 'train' and random.random() < 0.005:
             if s == 'train' and random.random() < 0.02: # Song increased it
                 # on random use binary mask generated from axis-aligned bbox
                 data['test_images'] = copy.deepcopy(data['train_images'])
                 data['test_depths'] = copy.deepcopy(data['train_depths'])
+                data['test_raw_depths'] = copy.deepcopy(data['train_raw_depths'])
                 data['test_masks'] = copy.deepcopy(data['train_masks'])
                 data['test_anno'] = copy.deepcopy(data['train_anno'])
 

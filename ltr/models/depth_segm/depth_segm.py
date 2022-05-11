@@ -24,7 +24,8 @@ class DepthSegmNet(nn.Module):
             for p in self.feature_extractor.parameters():
                 p.requires_grad_(False)
 
-    def forward(self, train_colors, train_depths, test_colors, test_depths, train_masks, test_dist=None, debug=False):
+    def forward(self, train_colors, train_depths, test_colors, test_depths, train_masks,
+                    test_dist=None, debug=False, test_raw_d=None, train_raw_d=None):
         """ Forward pass
         Note: If the training is done in sequence mode, that is, test_imgs.dim() == 5, then the batch dimension
         corresponds to the first dimensions. test_imgs is thus of the form [sequence, batch, feature, row, col]
@@ -44,9 +45,17 @@ class DepthSegmNet(nn.Module):
             test_dist = [test_dist]
 
         #
-        segm_pred = self.segm_predictor(test_feat_rgb, test_feat_d,
-                                        train_feat_rgb, train_feat_d,
-                                        train_masks, test_dist, debug=debug)
+        if test_raw_d is not None and train_raw_d is not None:
+            segm_pred = self.segm_predictor(test_feat_rgb, test_feat_d,
+                                            train_feat_rgb, train_feat_d,
+                                            train_masks, test_dist,
+                                            test_raw_d=test_raw_d,
+                                            train_raw_d=train_raw_d,
+                                            debug=debug)
+        else:
+            segm_pred = self.segm_predictor(test_feat_rgb, test_feat_d,
+                                            train_feat_rgb, train_feat_d,
+                                            train_masks, test_dist, debug=debug)
         return segm_pred
 
     def extract_backbone_features(self, im, layers=None):
@@ -929,6 +938,26 @@ def depth_segm_D3S_DW04_MP_resnet50(segm_input_dim=(256,256), segm_inter_dim=(25
 
     # segmentation
     segm_predictor = segmmodels.D3S_DW04_RGBD()
+
+    net = DepthSegmNet(feature_extractor=backbone_net, segm_predictor=segm_predictor,
+                       segm_layers=['conv1', 'layer1', 'layer2', 'layer3'], extractor_grad=False)  # extractor_grad=False
+
+    return net
+
+
+@model_constructor
+def depth_segm_D3S_DW05_MP_resnet50(segm_input_dim=(256,256), segm_inter_dim=(256,256),
+                        backbone_pretrained=True, topk_pos=3, topk_neg=3, mixer_channels=2):
+    # backbone
+    backbone_net = backbones.resnet50(pretrained=backbone_pretrained)
+
+    # segmentation dimensions
+    segm_input_dim = (64, 256, 512, 1024)
+    segm_inter_dim = (4, 16, 32, 64)
+    segm_dim = (64, 64)  # convolutions before cosine similarity
+
+    # segmentation
+    segm_predictor = segmmodels.D3S_DW05_RGBD()
 
     net = DepthSegmNet(feature_extractor=backbone_net, segm_predictor=segm_predictor,
                        segm_layers=['conv1', 'layer1', 'layer2', 'layer3'], extractor_grad=False)  # extractor_grad=False

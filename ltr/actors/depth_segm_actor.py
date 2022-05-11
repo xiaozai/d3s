@@ -511,3 +511,80 @@ class DepthSegmActor_MultiPred(BaseActor):
             save_debug_MP(data, masks_pred, vis_data)
 
         return loss, stats
+
+class DepthSegmActor_DepthGaussian(BaseActor):
+    """ Actor for training the Segmentation in ATOM"""
+    def __call__(self, data):
+        """
+        args:
+            data - The input data, should contain the fields 'train_images', 'test_images', 'train_anno',
+                    'test_proposals' and 'proposal_iou'.
+
+        returns:
+            loss    - the training loss
+            states  -  dict containing detailed losses
+        """
+
+        test_dist = None
+        if 'test_dist' in data:
+            test_dist = data['test_dist'].permute(1, 0, 2, 3)
+
+        masks_pred, vis_data = self.net(data['train_images'].permute(1, 0, 2, 3), # batch*3*384*384
+                                        data['train_depths'].permute(1, 0, 2, 3), # batch*1*384*384
+                                        data['test_images'].permute(1, 0, 2, 3),
+                                        data['test_depths'].permute(1, 0, 2, 3),
+                                        data['train_masks'].permute(1, 0, 2, 3),
+                                        test_dist=test_dist,
+                                        test_raw_d = data['test_raw_depths'].permute(1, 0, 2, 3),
+                                        train_raw_d = data['train_raw_depths'].permute(1, 0, 2, 3),
+                                        debug=True) # Song :  vis pos and neg maps
+
+
+        masks_gt = data['test_masks'].permute(1, 0, 2, 3) # C, B, H, W -> # B * 1 * H * W
+        masks_gt_pair = torch.cat((masks_gt, 1 - masks_gt), dim=1)   # B * 2 * H * W
+
+        if len(masks_pred) == 4:
+            loss0 = self.objective(masks_pred[0], masks_gt_pair)
+            loss1 = self.objective(masks_pred[1], masks_gt_pair)
+            loss2 = self.objective(masks_pred[2], masks_gt_pair)
+            loss3 = self.objective(masks_pred[3], masks_gt_pair)
+
+            if self.loss_weights is None:
+                self.loss_weights = [1, 0.1, 0.1, 0.1]
+            loss = loss0 * self.loss_weights[0] + loss1 * self.loss_weights[1] + loss2 * self.loss_weights[2] + loss3 * self.loss_weights[3]
+
+            stats = {'Loss/total': loss.item(),
+                     # 'Loss/segm': loss.item(),
+                     'Layer0': loss0.item(),
+                     'Layer1': loss1.item(),
+                     'Layer2': loss2.item(),
+                     'Layer3': loss3.item(),
+                     }
+
+        elif len(masks_pred) == 2:
+            loss1 = self.objective(masks_pred[0], masks_gt_pair)
+            loss2 = self.objective(masks_pred[1], masks_gt_pair)
+            loss = loss1 + loss2
+
+            stats = {'Loss/total': loss.item(),
+                     'Layer1': loss1.item(),
+                     'Layer2': loss2.item(),
+                     }
+
+        elif len(masks_pred) == 3:
+            loss1 = self.objective(masks_pred[0], masks_gt_pair)
+            loss3 = self.objective(masks_pred[1], masks_gt_pair)
+            loss_d = self.objective(masks_pred[2], masks_gt_pair)
+            loss = loss1 + loss3 * 0.5 + loss_d * 0.5
+
+            stats = {'Loss/total': loss.item(),
+                     'Layer1': loss1.item(),
+                     'Layer3': loss3.item(),
+                     'Loss D': loss_d.item()
+                     }
+
+        if 'iter' in data and (data['iter'] - 1) % 50 == 0:
+
+            save_debug_MP(data, masks_pred, vis_data)
+
+        return loss, stats
