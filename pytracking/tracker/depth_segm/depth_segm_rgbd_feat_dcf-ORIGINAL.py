@@ -21,36 +21,49 @@ from pytracking.mask_to_disk import save_mask
 
 from scipy.signal import find_peaks
 
+import matplotlib.pyplot as plt
+
+
 class DepthSegmST(BaseTracker):
+
     def initialize_features(self):
         if not getattr(self, 'features_initialized', False):
             self.params.features_filter.initialize()
         self.features_initialized = True
 
+    def get_target_depth(self, depth, bbox):
+        bbox = [int(b) for b in bbox]
+        num_pixels = bbox[2]*bbox[3]
+        depth_crop = depth[bbox[1]:bbox[1]+bbox[3], bbox[0]:bbox[0]+bbox[2]]
+        depth_pixels = depth_crop.flatten()
+        depth_pixels = depth_pixels[depth_pixels>0]
+
+        depth_hist, depth_edges = np.histogram(depth_pixels, bins=20)
+        hist_bins = (depth_edges[:-1] + depth_edges[1:]) / 2.0
+        peaks, _ = find_peaks(depth_hist, height=num_pixels/10)
+
+        if len(peaks) > 0:
+            target_depth = hist_bins[peaks[0]]
+        else:
+            target_depth = np.median(depth_pixels)
+
+        # Target Depth may be Nan, because of bad quality of depth image.
+        if target_depth is None:
+            target_depth = 10
+
+        return target_depth
+
     def depth_processing(self, depth, bbox=None, use_colormap=False):
         ''' Get the depth range for the sequence, [min, max] '''
         if bbox is not None:
-            bbox = [int(b) for b in bbox]
-            num_pixels = bbox[2]*bbox[3]
-            depth_crop = depth[bbox[1]:bbox[1]+bbox[3], bbox[0]:bbox[0]+bbox[2]]
-            depth_pixels = depth_crop.flatten()
-            depth_pixels = depth_pixels[depth_pixels>0]
-
-            depth_hist, depth_edges = np.histogram(depth_pixels, bins=20)
-            hist_bins = (depth_edges[:-1] + depth_edges[1:]) / 2.0
-            peaks, _ = find_peaks(depth_hist, height=num_pixels/10)
-
-            if len(peaks) > 0:
-                target_depth = hist_bins[peaks[0]]
-            else:
-                target_depth = np.median(depth_pixels)
-
-            # Target Depth may be Nan, because of bad quality of depth image.
+            target_depth = self.get_target_depth(depth, bbox)
             print('target depth:', target_depth)
 
             self.target_depth = target_depth
-            self.min_depth = max(0, target_depth-1000)
-            self.max_depth = target_depth + 2000
+            self.prev_target_depth = target_depth
+
+            self.min_depth = max(0, target_depth-1500)
+            self.max_depth = target_depth + 1500
 
         depth = (depth - self.min_depth) / (self.max_depth - self.min_depth) * 1.0
         depth = np.clip(depth, 0, 1.0)
@@ -77,6 +90,30 @@ class DepthSegmST(BaseTracker):
             depth = depth.astype(np.float32)
 
         return color, depth
+
+    def rgbd_fusion(self, x_rgb, d_patches):
+        ''' Song, simply fuse RGBD features for DCF
+                x_rgb : Tensorlist([27, 1024, 16, 16]) or Tensorlist([1, 1024, 16, 16])
+                d_patches : depth image crops, Tensorlist([27, 3, 256, 256]) or Tensorlist([1, 3, 256, 256])
+
+                Accuracy gets improved, but Robustness gets decreased !!
+        '''
+        x_d = TensorList([self.segm_net.segm_predictor.depth_feat_extractor(dp.to(self.params.device)) for dp in d_patches]) # [1, 64, 128, 128]
+        attn_d = TensorList([self.segm_net.segm_predictor.depth_attn(xd) for xd in x_d]) # [1, 1, 128, 128]
+
+        for i in range(len(x_rgb)):
+            f_rgb = x_rgb[i] # [1, 1024, 16, 16] -> 16 * [1, 64, 16, 16] ???
+            f_d = x_d[i]     # [1, 64, 128, 128]
+            a_d = attn_d[i]  # [1, 1, 128, 128]
+
+            f_rgb = F.interpolate(f_rgb, size=(f_d.shape[-2], f_d.shape[-1]))
+            f_rgb = f_rgb *a_d + f_rgb
+
+            x_rgb[i] = F.interpolate(f_rgb, size=(x_rgb[i].shape[-2], x_rgb[i].shape[-1]))
+
+            self.attn_dcf = a_d[0, 0, ...].detach().clone().cpu().numpy().squeeze()
+
+        return x_rgb
 
     def initialize(self, image, state, init_mask=None, *args, **kwargs):
         # Initialize some stuff
@@ -107,7 +144,6 @@ class DepthSegmST(BaseTracker):
             y_ = np.array(state[1::2])
 
             self.pos = torch.Tensor([np.mean(y_), np.mean(x_)])
-            # self.target_sz = torch.Tensor([np.max(y_) - np.min(y_), np.max(x_) - np.min(x_)])
 
             # overwrite state - needed for segmentation
             if self.params.vot_anno_conversion_type == 'preserve_area':
@@ -125,6 +161,7 @@ class DepthSegmST(BaseTracker):
             state[1] -= 1
             # Get position and size
             self.pos = torch.Tensor([state[1] + state[3] / 2, state[0] + state[2] / 2])
+            # self.pos_prev = [state[1] + state[3] / 2, state[0] + state[2] / 2]
             self.target_sz = torch.Tensor([state[3], state[2]]) # H, W
             self.gt_poly = np.array([state[0], state[1],
                                      state[0] + state[2] - 1, state[1],
@@ -199,6 +236,9 @@ class DepthSegmST(BaseTracker):
             norm_color, norm_depth = self.normalize_rgbd(color, depth)
             # Convert image
             im, dp = numpy_to_torch(norm_color), numpy_to_torch(norm_depth)
+        elif self.params.use_normalized_depth:
+            _, norm_depth = self.normalize_rgbd(color, depth)
+            im, dp = numpy_to_torch(color), numpy_to_torch(norm_depth)
         else:
             im, dp = numpy_to_torch(color), numpy_to_torch(depth)
 
@@ -212,23 +252,24 @@ class DepthSegmST(BaseTracker):
         # Song, we need the depthnet in segmnet
         self.load_segmnet()
 
+        ''' x_rgb = cat([x_rgb, x_d]) if use_rgbd_classifier '''
         # Extract and transform sample
-        x_rgb, x_d = self.generate_init_samples(im, dp)
+        x_rgb = self.generate_init_samples(im, dp)
 
         # Initialize projection matrix
         self.init_projection_matrix(x_rgb)
 
         # Transform to get the training sample
-        train_x_rgb, train_x_d = self.preprocess_sample(x_rgb, x_d)
+        train_x_rgb = self.preprocess_sample(x_rgb)
 
         # Generate label function
         init_y = self.init_label_function(train_x_rgb) # Gaussian map
 
         # Init memory
-        self.init_memory(train_x_rgb, train_x_d)
+        self.init_memory(train_x_rgb)
 
         # Init optimizer and do initial optimization for DCF
-        self.init_optimization(train_x_rgb, train_x_d, init_y) # Song, but Depth is not used for filter optimize
+        self.init_optimization(train_x_rgb, init_y)
 
         if self.params.use_segmentation:
             self.init_segmentation(color, depth, state, init_mask=init_mask)
@@ -241,7 +282,7 @@ class DepthSegmST(BaseTracker):
 
         self.rgb_patches = None
         self.d_patches = None
-
+        self.attn_dcf = None
 
     def load_segmnet(self):
         # network was renamed therefore we need to specify constructor_module and constructor_fun_name
@@ -257,25 +298,16 @@ class DepthSegmST(BaseTracker):
 
         self.segm_net = segm_net
 
-    def init_optimization(self, train_x, train_x_d, init_y):
+    def init_optimization(self, train_x, init_y):
         # Initialize filter for DCF RGB based
         filter_init_method = getattr(self.params, 'filter_init_method', 'zeros')
         self.filter = TensorList(
             [x.new_zeros(1, cdim, sz[0], sz[1]) for x, cdim, sz in zip(train_x, self.compressed_dim, self.kernel_size)])
-
-        if self.params.use_dual_dcf:
-            self.filter_d = TensorList(
-                [x.new_zeros(1, x.shape[1], sz[0], sz[1]) for x, cdim, sz in zip(train_x_d, self.compressed_dim, self.kernel_size)])
-
         if filter_init_method == 'zeros':
             pass
         elif filter_init_method == 'randn':
             for f in self.filter:
                 f.normal_(0, 1 / f.numel())
-
-            if self.params.use_dual_dcf:
-                for f in self.filter_d:
-                    f.normal_(0, 1 / f.numel())
         else:
             raise ValueError('Unknown "filter_init_method"')
 
@@ -283,8 +315,6 @@ class DepthSegmST(BaseTracker):
         self.params.update_projection_matrix = getattr(self.params, 'update_projection_matrix',
                                                        True) and self.params.use_projection_matrix
         optimizer = getattr(self.params, 'optimizer', 'GaussNewtonCG')
-        if self.params.use_dual_dcf:
-            optimizer_d = getattr(self.params, 'optimizer', 'GaussNewtonCG')
 
         # Setup factorized joint optimization
         if self.params.update_projection_matrix:
@@ -324,53 +354,9 @@ class DepthSegmST(BaseTracker):
                         f.write(val_str + '\n')
                 raise RuntimeError('Exiting')
 
-            # print('\nself.init_training_samples_d : ', self.init_training_samples[0].shape, self.init_training_samples_d[0].shape)
-            ''' Depth DCF '''
-            if self.params.use_dual_dcf:
-                self.joint_problem_d = FactorizedConvProblem(self.init_training_samples_d, init_y, self.filter_reg_d,
-                                                             self.fparams.attribute('projection_reg'),
-                                                             self.params,
-                                                             self.init_sample_d_weights,
-                                                             self.projection_activation,
-                                                             self.response_activation,
-                                                             compression=False)
-
-                # Variable containing both filter and projection matrix
-                joint_var_d = self.filter_d.concat(self.projection_matrix_d)
-
-                # Initialize optimizer
-                analyze_convergence = getattr(self.params, 'analyze_convergence', False)
-                if optimizer == 'GaussNewtonCG':
-                    self.joint_optimizer_d = GaussNewtonCG(self.joint_problem_d, joint_var_d,
-                                                           plotting=(self.params.debug == 3), # SY >= 3 -> == 3
-                                                           analyze=analyze_convergence,
-                                                           fig_num=(12, 13, 14))
-                elif optimizer == 'GradientDescentL2':
-                    self.joint_optimizer_d = GradientDescentL2(self.joint_problem_d, joint_var_d,
-                                                             self.params.optimizer_step_length,
-                                                             self.params.optimizer_momentum,
-                                                             plotting=(self.params.debug == 3), # SY >= 3 -> == 3
-                                                             debug=analyze_convergence,
-                                                             fig_num=(12, 13))
-
-                # Do joint optimization
-                if isinstance(self.params.init_CG_iter, (list, tuple)):
-                    self.joint_optimizer_d.run(self.params.init_CG_iter)
-                else:
-                    self.joint_optimizer_d.run(self.params.init_CG_iter // self.params.init_GN_iter, self.params.init_GN_iter)
-
-                if analyze_convergence:
-                    opt_name = 'CG' if getattr(self.params, 'CG_optimizer', True) else 'GD'
-                    for val_name, values in zip(['loss', 'gradient'],
-                                                [self.joint_optimizer_d.losses, self.joint_optimizer_d.gradient_mags]):
-                        val_str = ' '.join(['{:.8e}'.format(v.item()) for v in values])
-                        file_name = '{}_{}.txt'.format(opt_name, val_name)
-                        with open(file_name, 'a') as f:
-                            f.write(val_str + '\n')
-                    raise RuntimeError('Exiting')
-
         # Re-project samples with the new projection matrix
         compressed_samples = self.project_sample(self.init_training_samples, self.projection_matrix)
+
         for train_samp, init_samp in zip(self.training_samples, compressed_samples):
             train_samp[:init_samp.shape[0], ...] = init_samp
 
@@ -406,47 +392,6 @@ class DepthSegmST(BaseTracker):
         if self.params.use_projection_matrix:
             del self.joint_problem, self.joint_optimizer
 
-        ''' Depth DCF '''
-        if self.params.use_dual_dcf:
-            # Re-project samples with the new projection matrix
-            # compressed_samples_d = self.project_sample(self.init_training_samples_d, self.projection_matrix_d)
-            # for train_samp, init_samp in zip(self.training_samples_d, compressed_samples_d):
-            #     train_samp[:init_samp.shape[0], ...] = init_samp
-
-            self.hinge_mask_d = None
-
-            # Initialize optimizer
-            self.conv_problem_d = ConvProblem(self.training_samples_d, self.y, self.filter_reg_d, self.sample_d_weights,
-                                            self.response_activation)
-
-            if optimizer == 'GaussNewtonCG':
-                self.filter_optimizer_d = ConjugateGradient(self.conv_problem_d, self.filter_d,
-                                                          fletcher_reeves=self.params.fletcher_reeves,
-                                                          direction_forget_factor=self.params.direction_forget_factor,
-                                                          debug=(self.params.debug == 3),
-                                                          fig_num=(12, 13))
-            elif optimizer == 'GradientDescentL2':
-                self.filter_optimizer_d = GradientDescentL2(self.conv_problem_d, self.filter_d,
-                                                            self.params.optimizer_step_length,
-                                                            self.params.optimizer_momentum,
-                                                            debug=(self.params.debug == 3),
-                                                            fig_num=12)
-
-            # Transfer losses from previous optimization
-            if self.params.update_projection_matrix:
-                self.filter_optimizer_d.residuals = self.joint_optimizer_d.residuals
-                self.filter_optimizer_d.losses = self.joint_optimizer_d.losses
-
-            if not self.params.update_projection_matrix:
-                self.filter_optimizer_d.run(self.params.init_CG_iter)
-
-            # Post optimization
-            self.filter_optimizer_d.run(self.params.post_init_CG_iter)
-
-            # Free memory
-            del self.init_training_samples_d
-            if self.params.use_projection_matrix:
-                del self.joint_problem_d, self.joint_optimizer_d
 
     def track(self, image):
         self.frame_num += 1
@@ -456,11 +401,15 @@ class DepthSegmST(BaseTracker):
 
         # Convert image
         color, depth = image['color'], image['depth']
+        raw_depth = copy.deepcopy(depth) # use to check target depth
         depth = self.depth_processing(depth, use_colormap=self.params.use_colormap)
 
         if self.params.use_normalized_DCF:
             norm_color, norm_depth = self.normalize_rgbd(color, depth)
             im, dp = numpy_to_torch(norm_color), numpy_to_torch(norm_depth)
+        elif self.params.use_normalized_depth:
+            _, norm_depth = self.normalize_rgbd(color, depth)
+            im, dp = numpy_to_torch(color), numpy_to_torch(norm_depth)
         else:
             im, dp = numpy_to_torch(color), numpy_to_torch(depth)
 
@@ -471,10 +420,12 @@ class DepthSegmST(BaseTracker):
         # Get sample
         sample_pos = copy.deepcopy(self.pos)
         sample_scales = self.target_scale * self.params.scale_factors
-        test_x_rgb, test_x_d = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
+
+        ''' test_x_rgb is fused rgbd features if use_rgbd_classifier '''
+        test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
 
         # Compute scores
-        scores_raw = self.apply_filter(test_x_rgb, test_x_d)
+        scores_raw = self.apply_filter(test_x_rgb)
 
         translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
         new_pos = sample_pos + translation_vec
@@ -501,7 +452,6 @@ class DepthSegmST(BaseTracker):
 
         self.uncert_score = uncert_score
 
-
         pred_segm_region = None
         if self.segmentation_task or (
             self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
@@ -512,12 +462,22 @@ class DepthSegmST(BaseTracker):
             if pred_segm_region is None:
                 print(self.frame_num, ' segmentation failed ...')
                 self.pos = new_pos.clone()
-
-            ''' Song, how to make sure that pred_segm_region is reliable ???
-                1) segmentation pixels ?
-                2) depth histograms ?
-                2) target depth ?
-            '''
+                conf_ = conf_ / 2.0
+            else:
+                new_target_depth = self.get_target_depth(raw_depth, pred_segm_region)
+                target_depth_flag = abs(self.prev_target_depth - new_target_depth) / self.prev_target_depth
+                if target_depth_flag > 0.5:
+                    print(self.frame_num, 'target depth changes too much : ', self.prev_target_depth, new_target_depth)
+                    pred_segm_region = None
+                    conf_ = 0
+                else:
+                    self.prev_target_depth = new_target_depth
+        # else:
+        #     print('update self.pos using localize_target, because of uncert_score: ', uncert_score)
+        #
+        #     ''' if uncertainty > threshold, it may be "not found", should not update self.pos with new_pos '''
+        #     self.pos = new_pos.clone()
+        #     # self.pos = self.prev_pos
 
         new_state = pred_segm_region if (self.params.use_segmentation and pred_segm_region is not None) else \
                     torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]])).tolist()
@@ -533,25 +493,18 @@ class DepthSegmST(BaseTracker):
         learning_rate = self.params.hard_negative_learning_rate if hard_negative else None
 
         if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.6 and update_flag:
-        # if uncert_score < self.params.tracking_uncertainty_thr and update_flag:
-
             # Get train sample
             train_x_rgb = TensorList([x[scale_ind:scale_ind + 1, ...] for x in test_x_rgb])
-            train_x_d =  TensorList([x[scale_ind:scale_ind + 1, ...] for x in test_x_d])
             # Create label for sample
             train_y = self.get_label_function(sample_pos, sample_scales[scale_ind])
             # Update memory
-            self.update_memory(train_x_rgb, train_x_d, train_y, learning_rate)
+            self.update_memory(train_x_rgb, train_y, learning_rate)
 
         # Train filter
         if hard_negative:
             self.filter_optimizer.run(self.params.hard_negative_CG_iter)
-            if self.params.use_dual_dcf:
-                self.filter_optimizer_d.run(self.params.hard_negative_CG_iter)
         elif (self.frame_num - 1) % self.params.train_skipping == 0 and conf_ > 0.6:
             self.filter_optimizer.run(self.params.CG_iter)
-            if self.params.use_dual_dcf:
-                self.filter_optimizer_d.run(self.params.CG_iter)
 
         # Update position and scale
         if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.7:
@@ -571,13 +524,8 @@ class DepthSegmST(BaseTracker):
         return [px, py, pw, ph]
 
 
-    def apply_filter(self, sample_x: TensorList, sample_x_d: TensorList):
-        if self.params.use_dual_dcf:
-            scores_raw = operation.conv2d(sample_x, self.filter, mode='same')
-            scores_raw_d = operation.conv2d(sample_x_d, self.filter_d, mode='same')
-            return (scores_raw + scores_raw_d) / 2
-        else:
-            return operation.conv2d(sample_x, self.filter, mode='same')
+    def apply_filter(self, sample_x: TensorList):
+        return operation.conv2d(sample_x, self.filter, mode='same')
 
     def localize_target(self, scores_raw):
         # Weighted sum (if multiple features) with interpolation in fourier domain
@@ -695,7 +643,10 @@ class DepthSegmST(BaseTracker):
             x_d  : depth image crops
             rgb_patches : rgb image crops
         '''
-        x_rgb, x_d, rgb_patches = self.extract_sample(color, depth, pos, scales, sz)
+        x_rgb, d_patches, rgb_patches = self.extract_sample(color, depth, pos, scales, sz)
+
+        if self.params.use_rgbd_classifier:
+            x_rgb = self.rgbd_fusion(x_rgb, d_patches)
 
         # Song, for vis only
         self.rgb_patches = rgb_patches.clone().detach().cpu().numpy().squeeze()
@@ -704,41 +655,22 @@ class DepthSegmST(BaseTracker):
             self.rgb_patches = (self.rgb_patches * self.params.segm_normalize_std + self.params.segm_normalize_mean)*255
         self.rgb_patches = self.rgb_patches.astype(int)
 
-        self.d_patches = x_d[0].clone().detach().cpu().numpy().squeeze()
+        self.d_patches = d_patches[0].clone().detach().cpu().numpy().squeeze()
         if self.params.use_colormap:
             self.d_patches = np.swapaxes(np.swapaxes(self.d_patches, 0, 1), 1, 2)
-            if self.params.use_normalized_DCF:
+            if self.params.use_normalized_DCF or self.params.use_normalized_depth:
                 self.d_patches = (self.d_patches * self.params.segm_normalize_std + self.params.segm_normalize_mean)*255
             self.d_patches = self.d_patches.astype(int)
 
+        return self.preprocess_sample(self.project_sample(x_rgb))
 
-
-
-        x_d = x_d[0].to(self.params.device)
-        x_d = self.segm_net.segm_predictor.depth_feat_extractor(x_d)
-        x_d = F.interpolate(x_d, size=(x_rgb[0].shape[-2], x_rgb[0].shape[-1]))
-        x_d = TensorList([x_d])
-
-        # Song: fuse RGBD features
-        if self.params.use_rgbd_classifier:
-            f_rgb = x_rgb[0].to(self.params.device) # B=1, 1024, 16, 16
-            f_d = x_d[0].to(self.params.device)
-            attn_d = self.segm_net.segm_predictor.depth_attn(f_d)
-            f_rgb = self.segm_net.segm_predictor.segment1(self.segm_net.segm_predictor.segment0(f_rgb)) # B=1, 64, 16, 16
-            _, attn_rgbd = self.segm_net.segm_predictor.rgbd_fusion3(f_rgb, attn_d)                     # B=1, 1, 16, 16
-
-            x_rgbd = x_rgb[0] * attn_rgbd
-            x_rgb = TensorList([x_rgbd])
-
-        return self.preprocess_sample(self.project_sample(x_rgb), x_d)
-
-    def preprocess_sample(self, x: TensorList, x_d: TensorList) -> (TensorList, TensorList):
+    def preprocess_sample(self, x: TensorList) -> (TensorList, TensorList):
         if getattr(self.params, '_feature_window', False):
             x = x * self.feature_window
-            x_d = x_d * self.feature_window_d
-        return x, x_d
+        return x
 
     def project_sample(self, x: TensorList, proj_matrix=None):
+        ''' Song, this will compress features from [1, 1024, 16, 16] to [1, compressed_dim=64, 16, 16]'''
         # Apply projection matrix
         if proj_matrix is None:
             proj_matrix = self.projection_matrix
@@ -750,12 +682,6 @@ class DepthSegmST(BaseTracker):
 
         # Filter regularization
         self.filter_reg = self.fparams.attribute('filter_reg')
-
-        if self.params.use_dual_dcf:
-            # Get window function
-            self.feature_window_d = TensorList([dcf.hann2d(sz).to(self.params.device) for sz in self.feature_sz])
-            # Filter regularization
-            self.filter_reg_d = self.fparams.attribute('filter_reg')
 
         # Activation function after the projection matrix (phi_1 in the paper)
         projection_activation = getattr(self.params, 'projection_activation', 'none')
@@ -830,33 +756,19 @@ class DepthSegmST(BaseTracker):
             self.transforms.extend([augmentation.Rotate(angle, aug_output_sz, get_rand_shift()) for angle in
                                     self.params.augmentation['rotate']])
 
-
-        init_samples, init_dp_patches = self.params.features_filter.extract_transformed(im, self.pos.round(), self.target_scale,
+        ''' init_samples : TensorList([27, 1024, 16, 16]), needs to be compressed
+            init_samples_d : [27, 64, 128, 128]
+        '''
+        init_samples, init_im_patches, init_dp_patches = self.params.features_filter.extract_transformed(im, self.pos.round(), self.target_scale,
                                                                                        aug_expansion_sz, self.transforms,
                                                                                        dp=dp)
-        # B=27, C=64, 64, 64
-        init_samples_d = self.segm_net.segm_predictor.depth_feat_extractor(init_dp_patches[0].to(self.params.device))
-        init_samples_d = F.interpolate(init_samples_d, size=(init_samples[0].shape[-2], init_samples[0].shape[-1]))
-
-        ''' RGBD features fusion '''
         if self.params.use_rgbd_classifier and init_dp_patches is not None:
-            init_rgb_samples = init_samples[0].to(self.params.device)                                                         # B=27, 1024, 16, 16
-            init_rgb_samples = self.segm_net.segm_predictor.segment1(self.segm_net.segm_predictor.segment0(init_rgb_samples)) # B=27, 64, 16, 16
-            init_attn_d = self.segm_net.segm_predictor.depth_attn(init_samples_d)  # B=27, C=1,  64, 64
-            _, init_attn = self.segm_net.segm_predictor.rgbd_fusion3(init_rgb_samples, init_attn_d) # B=27, 1, 16, 16
-
-            init_rgbd_samples = init_samples[0] * init_attn
-            init_samples = TensorList([init_rgbd_samples])
-
-        init_samples_d = TensorList([init_samples_d])
+            init_samples = self.rgbd_fusion(init_samples, init_dp_patches)
 
         # Remove augmented samples for those that shall not have
         for i, use_aug in enumerate(self.fparams.attribute('use_augmentation')):
             if not use_aug:
                 init_samples[i] = init_samples[i][0:1, ...]
-
-                if self.params.use_dual_dcf:
-                    init_samples_d[i] = init_samples_d[i][0:1, ...]
 
         # Add dropout samples
         if 'dropout' in self.params.augmentation:
@@ -867,12 +779,7 @@ class DepthSegmST(BaseTracker):
                     init_samples[i] = torch.cat([init_samples[i],
                                                  F.dropout2d(init_samples[i][0:1, ...].expand(num, -1, -1, -1), p=prob,
                                                              training=True)])
-                    if self.params.use_dual_dcf:
-                        init_samples_d[i] = torch.cat([init_samples_d[i],
-                                                     F.dropout2d(init_samples_d[i][0:1, ...].expand(num, -1, -1, -1), p=prob,
-                                                                 training=True)])
-
-        return init_samples, init_samples_d
+        return init_samples
 
     def init_projection_matrix(self, x):
         # Set if using projection matrix
@@ -890,31 +797,15 @@ class DepthSegmST(BaseTracker):
                     [None if cdim is None else torch.svd(C)[0][:, :cdim].t().unsqueeze(-1).unsqueeze(-1).clone() for
                      C, cdim in
                      zip(cov_x, self.compressed_dim)])
-
-                if self.params.use_dual_dcf:
-                    self.projection_matrix_d = TensorList(
-                        [None if cdim is None else torch.svd(C)[0][:, :cdim].t().unsqueeze(-1).unsqueeze(-1).clone() for
-                         C, cdim in
-                         zip(cov_x, self.compressed_dim)])
-
             elif proj_init_method == 'randn':
                 self.projection_matrix = TensorList(
                     [None if cdim is None else ex.new_zeros(cdim, ex.shape[1], 1, 1).normal_(0,
                                                                                              1 / math.sqrt(ex.shape[1]))
                      for ex, cdim in
                      zip(x, self.compressed_dim)])
-                if self.params.use_dual_dcf:
-                    self.projection_matrix_d = TensorList(
-                        [None if cdim is None else ex.new_zeros(cdim, ex.shape[1], 1, 1).normal_(0,
-                                                                                                 1 / math.sqrt(ex.shape[1]))
-                         for ex, cdim in
-                         zip(x, self.compressed_dim)])
         else:
             self.compressed_dim = x.size(1)
             self.projection_matrix = TensorList([None] * len(x))
-
-            if self.params.use_dual_dcf:
-                self.projection_matrix_d = TensorList([None] * len(x))
 
     def init_label_function(self, train_x):
         # Allocate label function
@@ -939,11 +830,12 @@ class DepthSegmST(BaseTracker):
         # Return only the ones to use for initial training
         return TensorList([y[:x.shape[0], ...] for y, x in zip(self.y, train_x)])
 
-    def init_memory(self, train_x, train_x_d):
+    def init_memory(self, train_x):
         # Initialize first-frame training samples
         self.num_init_samples = train_x.size(0)
         self.init_sample_weights = TensorList([x.new_ones(1) / x.shape[0] for x in train_x])
         self.init_training_samples = train_x
+        # self.init_training_samples_d = train_x_d
 
         # Sample counters and weights
         self.num_stored_samples = self.num_init_samples.copy()
@@ -957,53 +849,25 @@ class DepthSegmST(BaseTracker):
             [x.new_zeros(self.params.sample_memory_size, cdim, x.shape[2], x.shape[3]) for x, cdim in
              zip(train_x, self.compressed_dim)])
 
-        # Initialize Depth trainign samples
-        if self.params.use_dual_dcf:
-            self.init_sample_d_weights = TensorList([x.new_ones(1) / x.shape[0] for x in train_x_d])
-            self.init_training_samples_d = train_x_d
-
-            self.previous_replace_ind_d = [None] * len(self.num_stored_samples)
-            self.sample_d_weights = TensorList([x.new_zeros(self.params.sample_memory_size) for x in train_x_d])
-            for sw, init_sw, num in zip(self.sample_d_weights, self.init_sample_d_weights, self.num_init_samples):
-                sw[:num] = init_sw
-
-            # Initialize memory
-            self.training_samples_d = TensorList(
-                [x.new_zeros(self.params.sample_memory_size, x.shape[1], x.shape[2], x.shape[3]) for x, cdim in
-                 zip(train_x_d, self.compressed_dim)])
-
-    def update_memory(self, sample_x: TensorList, sample_x_d: TensorList, sample_y: TensorList, learning_rate=None):
-        replace_ind, replace_ind_d = self.update_sample_weights(self.sample_weights, self.sample_d_weights,
-                                                                self.previous_replace_ind, self.previous_replace_ind_d,
-                                                                self.num_stored_samples, self.num_init_samples, self.fparams,
-                                                                learning_rate)
+    def update_memory(self, sample_x: TensorList, sample_y: TensorList, learning_rate=None):
+        replace_ind = self.update_sample_weights(self.sample_weights, self.previous_replace_ind,
+                                                 self.num_stored_samples, self.num_init_samples, self.fparams,
+                                                 learning_rate)
         self.previous_replace_ind = replace_ind
         for train_samp, x, ind in zip(self.training_samples, sample_x, replace_ind):
             train_samp[ind:ind + 1, ...] = x
-
-        self.previous_replace_ind_d = replace_ind_d
-        for train_samp, x, ind in zip(self.training_samples_d, sample_x_d, replace_ind_d):
-            train_samp[ind:ind + 1, ...] = x
-
         for y_memory, y, ind in zip(self.y, sample_y, replace_ind):
             y_memory[ind:ind + 1, ...] = y
-
         if self.hinge_mask is not None:
             for m, y, ind in zip(self.hinge_mask, sample_y, replace_ind):
                 m[ind:ind + 1, ...] = (y >= self.params.hinge_threshold).float()
-
-        if self.hinge_mask_d is not None:
-            for m, y, ind in zip(self.hinge_mask_d, sample_y, replace_ind_d):
-                m[ind:ind + 1, ...] = (y >= self.params.hinge_threshold).float()
         self.num_stored_samples += 1
 
-    def update_sample_weights(self, sample_weights, sample_d_weights, previous_replace_ind, previous_replace_ind_d, num_stored_samples, num_init_samples, fparams,
+    def update_sample_weights(self, sample_weights, previous_replace_ind, num_stored_samples, num_init_samples, fparams,
                               learning_rate=None):
-        ''' Song, sample_d_weights did nothing here '''
         # Update weights and get index to replace in memory
         replace_ind = []
-        replace_ind_d = []
-        for sw, sw_d, prev_ind, prev_ind_d, num_samp, num_init, fpar in zip(sample_weights, sample_d_weights, previous_replace_ind, previous_replace_ind_d, num_stored_samples,
+        for sw, prev_ind, num_samp, num_init, fpar in zip(sample_weights, previous_replace_ind, num_stored_samples,
                                                           num_init_samples, fparams):
             lr = learning_rate
             if lr is None:
@@ -1013,23 +877,15 @@ class DepthSegmST(BaseTracker):
             if init_samp_weight == 0:
                 init_samp_weight = None
             s_ind = 0 if init_samp_weight is None else num_init
-            s_ind_d = s_ind
 
             if num_samp == 0 or lr == 1:
                 sw[:] = 0
                 sw[0] = 1
                 r_ind = 0
-
-                sw_d[:] = 0
-                sw_d[0] = 1
-                r_ind_d = 0
             else:
                 # Get index to replace
                 _, r_ind = torch.min(sw[s_ind:], 0)
                 r_ind = r_ind.item() + s_ind
-
-                _, r_ind_d = torch.min(sw_d[s_ind_d:], 0)
-                r_ind_d = r_ind_d.item() + s_ind_d
 
                 # Update weights
                 if prev_ind is None:
@@ -1038,12 +894,6 @@ class DepthSegmST(BaseTracker):
                 else:
                     sw[r_ind] = sw[prev_ind] / (1 - lr)
 
-                if prev_ind_d is None:
-                    sw_d /= 1 - lr
-                    sw_d[r_ind_d] = lr
-                else:
-                    sw_d[r_ind_d] = sw_d[prev_ind_d] / (1 - lr)
-
             sw /= sw.sum()
             if init_samp_weight is not None and sw[:num_init].sum() < init_samp_weight:
                 sw /= init_samp_weight + sw[num_init:].sum()
@@ -1051,14 +901,7 @@ class DepthSegmST(BaseTracker):
 
             replace_ind.append(r_ind)
 
-            sw_d /= sw_d.sum()
-            if init_samp_weight is not None and sw_d[:num_init].sum() < init_samp_weight:
-                sw_d /= init_samp_weight + sw_d[num_init:].sum()
-                sw_d[:num_init] = init_samp_weight / num_init
-
-            replace_ind_d.append(r_ind_d)
-
-        return replace_ind, replace_ind_d
+        return replace_ind
 
     def get_label_function(self, sample_pos, sample_scale):
         # Generate label function
@@ -1096,6 +939,9 @@ class DepthSegmST(BaseTracker):
         inside_offset = (inside_ratio - 0.5) * self.target_sz
         self.pos = torch.max(torch.min(new_pos, self.image_sz - inside_offset), inside_offset)
 
+        # Song, update target depth range
+        self.min_depth = max(0, self.prev_target_depth-1500)
+        self.max_depth = self.prev_target_depth + 1500
 
     # def update_state(self, new_pos, new_scale=None, new_state=None):
     #
@@ -1188,6 +1034,8 @@ class DepthSegmST(BaseTracker):
                 dist_map = self.create_dist(init_patch_crop_rgb.shape[0], init_patch_crop_rgb.shape[1])
             elif self.params.segm_dist_map_type == 'bbox':
                 # bbox-based dist map
+                ''' Song, if we want to use the same feat_rgb for localization and segment_target,
+                we need to porvide cx and cy for create_dist_gauss'''
                 dist_map = self.create_dist_gauss(self.params.segm_output_sz, bb[2] * patch_factor_init,
                                                   bb[3] * patch_factor_init)
             else:
@@ -1345,6 +1193,12 @@ class DepthSegmST(BaseTracker):
         # extract features (extracting twice on the same patch - not necessary)
         test_feat_rgb = self.segm_net.extract_backbone_features(patch_gpu_rgb)
         test_feat_d = self.segm_net.segm_predictor.depth_feat_extractor(patch_gpu_d)
+
+        ''' In the Localization, the feat_rgb is [1, 3, 256, 256] -> [1, 1024, 16, 16]
+            Here in the track, the feat_rgb is [1, 3, 384, 384] -> [1, 1024, 24, 24]
+        '''
+        # for feat in test_feat_rgb.values():
+        #     print('test_feat_rgb in track: ', feat.shape) # in Localization, x_rgb is [27, 1024, 16, 16]
 
         # prepare features in the list (format for the network)
         test_feat_segm_rgb = [feat for feat in test_feat_rgb.values()]

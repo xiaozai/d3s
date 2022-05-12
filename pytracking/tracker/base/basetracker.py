@@ -303,7 +303,7 @@ class BaseTracker:
             # masked_img = Image.fromarray(np.uint8(masked_img)).convert('RGBA')
 
             if self.attn_dcf is not None:
-                # attn_dcf = self.attn_dcf.clone().detach().cpu().numpy().squeeze()
+                attn_dcf = self.attn_dcf.clone().detach().cpu().numpy().squeeze()
                 #
                 attn_dcf = self.attn_dcf.squeeze()
 
@@ -343,7 +343,7 @@ class BaseTracker:
                 self.ax_d_patches.cla()
                 self.ax_d_patches.imshow(self.d_patches)
                 try:
-                    self.ax_d_patches.set_title('D patch: %d'%self.prev_target_depth)
+                    self.ax_d_patches.set_title('D patch: %d'%self.target_depth)
                 except:
                     pass
 
