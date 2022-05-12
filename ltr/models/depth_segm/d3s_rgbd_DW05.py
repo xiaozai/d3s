@@ -266,8 +266,8 @@ class SegmNet(nn.Module):
             train_mean = torch.mean(train_depth_pixels, dim=1)                  # [B, ]
             train_std = torch.std(train_depth_pixels, dim=1, unbiased=False)    # [B, ]
 
-            train_mean = torch.nan_to_num(train_mean, 0.5)
-            train_std = torch.nan_to_num(train_std, 0.1)
+            train_mean[torch.isnan(train_mean)] = 0.5
+            train_std[torch.isnan(train_std)] = 0.1
 
             # Gaussian probability
             std2 = train_std * train_std
