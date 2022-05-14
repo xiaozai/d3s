@@ -18,7 +18,7 @@ def parameters():
     # Patch sampling parameters
     params.max_image_sample_size = (16 * 16) ** 2  # (18 * 16) ** 2   # Maximum image sample size
     params.min_image_sample_size = (16 * 16) ** 2  # (18 * 16) ** 2   # Minimum image sample size
-    params.search_area_scale = 4.5                    # Scale relative to target size
+    params.search_area_scale = 4                    # Scale relative to target size
     params.feature_size_odd = False                 # Good to use False for even-sized kernels and vice versa
 
     # Optimization parameters
@@ -54,7 +54,7 @@ def parameters():
 
     # Init data augmentation parameters
     params.augmentation = {'fliplr': True,
-                           'rotate': [5, -5, 10, -10, 20, -20, 30, -30, 45,-45, -60, 60],
+                           'rotate': [5, -5, 10, -10, 20, -20, 30, -30, 45,-45, -60, 60, -90, 90],
                            'blur': [(2, 0.2), (0.2, 2), (3,1), (1, 3), (2, 2)],
                            'relativeshift': [(0.25, 0.25), (-0.25, 0.25), (0.25, -0.25), (-0.25, -0.25), (0.75, 0.75), (-0.75, 0.75), (0.75, -0.75), (-0.75, -0.75)]}
 
@@ -63,7 +63,7 @@ def parameters():
     deep_params.use_augmentation = True         # Whether to use augmentation for this feature
 
     # Factorized convolution parameters
-    # params.use_projection_matrix = True       # Use projection matrix, i.e. use the factorized convolution formulation
+    params.use_projection_matrix = False #True       # Use projection matrix, i.e. use the factorized convolution formulation
     params.update_projection_matrix = True      # Whether the projection matrix should be optimized or not
     params.proj_init_method = 'pca'             # Method for initializing the projection matrix  randn | pca
     params.filter_init_method = 'zeros'         # Method for initializing the spatial filter  randn | zeros
@@ -108,15 +108,13 @@ def parameters():
 
     params.use_colormap = True
     params.use_rgbd_classifier = True
-    params.use_normalized_DCF = False
+    params.use_normalized_DCF =  False
     params.use_normalized_depth = True
 
-    params.use_dal = False
-
-    params.model = 'depth_segm_rgbd_dcf'
+    params.model = 'depth_segm_rgbd_feat_dcf'
     params.constructor_module = 'ltr.models.depth_segm.depth_segm'
-    params.constructor_fun_name = 'depth_segm_D3S_DW03_MP_resnet50'
-    params.segm_net_path = '/home/yan/Data2/d3s/checkpoints/ltr/depth_segm/depth_segm_D3S_DW03/DepthSegmNet_ep0040.pth.tar'
+    params.constructor_fun_name = 'depth_segm_D3S_DW04_MP_resnet50'
+    params.segm_net_path = '/home/yan/Data2/d3s/checkpoints/ltr/depth_segm/depth_segm_D3S_DW04/DepthSegmNet_ep0040.pth.tar'
     params.segm_use_dist = True
     params.segm_normalize_mean = [0.485, 0.456, 0.406]
     params.segm_normalize_std = [0.229, 0.224, 0.225]

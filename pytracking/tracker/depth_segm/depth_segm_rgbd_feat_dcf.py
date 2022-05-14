@@ -445,6 +445,9 @@ class DepthSegmST(BaseTracker):
         self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy()
         conf_ = self.score_map.max()
 
+        ''' Song, if not_found, it may be :
+        1) real not found, 2) not found in search region, 3) false positive
+        '''
         if flag == 'not_found':
             print(self.frame_num, ' Not found target ......')
             uncert_score = 100
@@ -462,7 +465,7 @@ class DepthSegmST(BaseTracker):
             if pred_segm_region is None:
                 print(self.frame_num, ' segmentation failed ...')
                 self.pos = new_pos.clone()
-                conf_ = conf_ / 2.0
+                # conf_ = conf_ / 2.0
             else:
                 new_target_depth = self.get_target_depth(raw_depth, pred_segm_region)
                 target_depth_flag = abs(self.prev_target_depth - new_target_depth) / self.prev_target_depth

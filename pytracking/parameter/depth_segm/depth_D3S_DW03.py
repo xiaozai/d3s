@@ -12,6 +12,7 @@ def parameters():
 
     # Use GPU or not (IoUNet requires this to be True)
     params.use_gpu = True
+    params.use_dal = False
     # Feature specific parameters
     deep_params = TrackerParams()
 
@@ -105,15 +106,11 @@ def parameters():
     params.vot_anno_conversion_type = 'preserve_area'
 
     params.use_segmentation = True
-
     params.use_colormap = True
-    params.use_rgbd_classifier = True
-    params.use_normalized_DCF = False
-    params.use_normalized_depth = True
+    params.use_rgbd_classifier = False
+    params.use_normalized_DCF = True
 
-    params.use_dal = False
-
-    params.model = 'depth_segm_rgbd_dcf'
+    params.model = 'depth_segm_st'
     params.constructor_module = 'ltr.models.depth_segm.depth_segm'
     params.constructor_fun_name = 'depth_segm_D3S_DW03_MP_resnet50'
     params.segm_net_path = '/home/yan/Data2/d3s/checkpoints/ltr/depth_segm/depth_segm_D3S_DW03/DepthSegmNet_ep0040.pth.tar'
