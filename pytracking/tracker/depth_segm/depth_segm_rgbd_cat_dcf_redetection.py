@@ -104,7 +104,7 @@ class DepthSegmST(BaseTracker):
             f_rgb = x_rgb[i] # [1, 1024, 16, 16] -> 16 * [1, 64, 16, 16] ???
             f_d = x_d[i]     # [1, 64, 128, 128]
             f_d = F.interpolate(f_d, size=(f_rgb.shape[-2], f_rgb.shape[-1]))
-            f_d = f_d.repeat(1, 16, 1, 1)
+            # f_d = f_d.repeat(1, 16, 1, 1)
             x_rgb[i] = torch.cat((f_rgb, f_d), 1)
 
         return x_rgb
