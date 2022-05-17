@@ -99,7 +99,7 @@ class DepthSegmST(BaseTracker):
                 Accuracy gets improved, but Robustness gets decreased !!
         '''
         x_d = TensorList([self.segm_net.segm_predictor.depth_feat_extractor(dp.to(self.params.device)) for dp in d_patches]) # [1, 64, 128, 128]
-        
+
         for i in range(len(x_rgb)):
             f_rgb = x_rgb[i] # [1, 1024, 16, 16] -> 16 * [1, 64, 16, 16] ???
             f_d = x_d[i]     # [1, 64, 128, 128]
