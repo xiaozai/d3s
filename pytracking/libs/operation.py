@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from pytracking.libs.tensorlist import tensor_operation, TensorList
-from ltr.external.depthconv.functions import depth_conv, DepthconvFunction
+# from ltr.external.depthconv.functions import depth_conv, DepthconvFunction
 
 
 @tensor_operation

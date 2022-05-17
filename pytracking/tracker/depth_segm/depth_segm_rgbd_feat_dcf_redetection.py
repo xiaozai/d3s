@@ -445,20 +445,47 @@ class DepthSegmST(BaseTracker):
         self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy()
         conf_ = self.score_map.max()
 
-        ''' Song, if not_found, it may be :
-        1) real not found,              --- that is okay
-        2) not found in search region,  --- decrease Recall
-        3) false positive               --- decrease Recall
 
-        if found, it may be:
-            1) found and segmentation well   --- that is okay
-            2) found but segmentation partly --- decrease Precision and Recall
-            2) found but segmentation bad    --- decrease Precision and Recall
-        '''
         if flag == 'not_found':
-            print(self.frame_num, ' Not found target ......')
-            uncert_score = 100
-            conf_ = 0 # Song, decrease confidence for a higher Robust
+            print(self.frame_num, ' Not found target ...... start to redetection')
+
+            '''Re-detection'''
+            # Increase search region
+            self.params.scale_factors = self.params.scale_factors * 1.5
+
+            sample_pos = copy.deepcopy(self.pos)
+            sample_scales = self.target_scale * self.params.scale_factors
+
+            test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
+
+            # Compute scores
+            scores_raw = self.apply_filter(test_x_rgb)
+
+            translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
+            new_pos = sample_pos + translation_vec
+
+            # Localization uncertainty
+            max_score = torch.max(s).item()
+            uncert_score = 0
+            if self.frame_num > 5:
+                uncert_score = np.mean(self.scores) / max_score
+
+            if uncert_score < self.params.tracking_uncertainty_thr:
+                self.scores = np.append(self.scores, max_score)
+                if self.scores.size > self.params.response_budget_sz:
+                    self.scores = np.delete(self.scores, 0)
+
+            self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy()
+            conf_ = self.score_map.max()
+
+            if flag == 'not_found':
+                uncert_score = 100
+                conf_ = 0
+            else:
+                print('re-found tatrget ...')
+
+            self.params.scale_factors = self.params.scale_factors / 1.5
+
 
         self.uncert_score = uncert_score
 
@@ -922,12 +949,6 @@ class DepthSegmST(BaseTracker):
         return train_y
 
     def update_state(self, new_pos, new_scale=None, new_state=None):
-        ''' Song, target_scale increases, exceed the self.max_scale_factor,
-        self.target_scale = 1.05 * self.target_scale
-
-        self.target_sz = [H, W], but new_state is much larger than previous target_sz
-
-        '''
         # Update scale
         if new_state is not None:
             new_target_scale = (math.sqrt(new_state[2] * new_state[3]) * self.params.search_area_scale) / \
@@ -1043,8 +1064,6 @@ class DepthSegmST(BaseTracker):
                 dist_map = self.create_dist(init_patch_crop_rgb.shape[0], init_patch_crop_rgb.shape[1])
             elif self.params.segm_dist_map_type == 'bbox':
                 # bbox-based dist map
-                ''' Song, if we want to use the same feat_rgb for localization and segment_target,
-                we need to porvide cx and cy for create_dist_gauss'''
                 dist_map = self.create_dist_gauss(self.params.segm_output_sz, bb[2] * patch_factor_init,
                                                   bb[3] * patch_factor_init)
             else:

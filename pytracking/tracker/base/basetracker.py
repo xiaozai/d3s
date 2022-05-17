@@ -303,7 +303,7 @@ class BaseTracker:
             # masked_img = Image.fromarray(np.uint8(masked_img)).convert('RGBA')
 
             if self.attn_dcf is not None:
-                attn_dcf = self.attn_dcf.clone().detach().cpu().numpy().squeeze()
+                # attn_dcf = self.attn_dcf.clone().detach().cpu().numpy().squeeze()
                 #
                 attn_dcf = self.attn_dcf.squeeze()
 
