@@ -96,16 +96,66 @@ class DepthSegmST(BaseTracker):
                 x_rgb : Tensorlist([27, 1024, 16, 16]) or Tensorlist([1, 1024, 16, 16])
                 d_patches : depth image crops, Tensorlist([27, 3, 256, 256]) or Tensorlist([1, 3, 256, 256])
 
-                Accuracy gets improved, but Robustness gets decreased !!
+                Postion co-attention fusion module from "RGBD Co-attnetion Network for Semantic Segmentation"
         '''
         x_d = TensorList([self.segm_net.segm_predictor.depth_feat_extractor(dp.to(self.params.device)) for dp in d_patches]) # [1, 64, 128, 128]
 
         for i in range(len(x_rgb)):
-            f_rgb = x_rgb[i] # [1, 1024, 16, 16] -> 16 * [1, 64, 16, 16] ???
-            f_d = x_d[i]     # [1, 64, 128, 128]
-            f_d = F.interpolate(f_d, size=(f_rgb.shape[-2], f_rgb.shape[-1]))
-            f_d = f_d.repeat(1, 16, 1, 1)
-            x_rgb[i] = torch.cat((f_rgb, f_d), 1)
+            f_rgb = x_rgb[i] # [1, 1024, 16, 16]
+            f_d = x_d[i]     # [1, 64, 128, 128] -> 1, 64, 16, 16
+            f_d = F.interpolate(f_d, size=(f_rgb.shape[-2], f_rgb.shape[-1])) # [B, 64, 16, 16]
+            f_rgb = torch.transpose(f_rgb, 1, 2)
+            f_rgb = F.interpolate(f_rgb, size=(f_d.shape[1], f_rgb.shape[-1]))
+            f_rgb = torch.transpose(f_rgb, 1, 2)
+            # [B, j=64, 16, 16] * [B, j=64, 16, 16] => [B, 16, 16, 16, 16]
+            sim = torch.einsum('ijkl,ijmn->iklmn',
+                               F.normalize(f_d, p=2, dim=1),
+                               F.normalize(f_rgb, p=2, dim=1))
+            sim_resh = sim.view(sim.shape[0], sim.shape[1], sim.shape[2], sim.shape[3] * sim.shape[4]) # [B, 16, 16, 256]
+            # sim_resh = F.softmax(sim_resh, -1) # [B, 16*16, 256]
+            sim_resh = torch.mean(torch.topk(sim_resh, 3, dim=-1).values, dim=-1) # [B, 16, 16]
+            f_d = f_d * sim_resh.unsqueeze(1)
+            x_rgb[i] = x_rgb[i] + f_d.repeat(1, 16, 1, 1)
+
+
+            # f_d = f_d.view(f_d.shape[0], f_d.shape[1], -1) # [B, C, 256]
+            # f_d = torch.matmul(f_d, sim_resh) # [B, C, 256]
+            # f_d= f_d.view(f_d.shape[0], f_d.shape[1], f_rgb.shape[-2], f_rgb.shape[-1]) # [B, C, 16, 16]
+            # x_rgb[i] = x_rgb[i] + f_d.repeat(1, 16, 1, 1)
+
+            # C = f_rgb.clone() # [1, C1=1024, 16, 16]
+            # C = torch.transpose(C.view(f_rgb.shape[0], f_rgb.shape[1], -1), 1, 2) # [1, H*W=256, C1]
+            # C = F.interpolate(C, size=(f_d.shape[1])) # [1, HW, C1=C2=64]
+            #
+            # D = f_d.clone().view(f_d.shape[0], f_d.shape[1], -1) # [1, C2=64, H*W=256]
+            # E = f_d.clone().view(f_d.shape[0], f_d.shape[1], -1) # [1, C2=64, HW]
+            # E = torch.transpose(E, 1, 2) # [1, N_d, C]
+            #
+            # # Correlation between F_rgb and F_d, S is correlation matrix between each RGB and D pixels
+            # # if softmax(axis=1), S[0, :, i] = For each D pixel, the correlation score with RGB pixel
+            # # if sfotmax(axis=2), S[0, i, :] = For each RGB pixel, the correlation score with a D pixel
+            # ''' Wrong, it is  the Eq 1, not simple multiplication
+            #      s_ji = exp(C^T_i x D_j) / sum(exp(C^T_i dot D_j))
+            # '''
+            # S = torch.matmul(C, D) # [1, N_rgb, C] * [1, C, N_d] => [1, N_rgb, N_d]
+            # # S = torch.transpose(S, 1, 2) # [1, N_d, N_rgb]
+            # S = F.softmax(S, -1)
+            # # S = torch.transpose(S, 1, 2) # [1, N_d, N_rgb]
+            # # Fd = torch.matmul(S, E) # [1, N_rgb, N_d] * [1, N_d, C] => [1, N_rgb, C]
+            # Fd = torch.zeros((S.shape[0], S.shape[1], E.shape[-1])).to(self.params.device) # [1, N_rgb, C]
+            # # N_rgb
+            # for j in range(S.shape[1]):
+            #     # N_d
+            #     for ii in range(S.shape[2]):
+            #         # E_i = B, 1, 64
+            #         a = E[:, ii, :] * S[:, j, ii].unsqueeze(-1)
+            #         Fd[:, j, :] = Fd[:, j, :] + a
+            #
+            # Fd = torch.transpose(Fd, 1, 2)
+            # Fd = Fd.view(f_d.shape[0], f_d.shape[1], f_d.shape[2], f_d.shape[3]) #[1, 64, 16, 16]
+            #
+            # x_rgb[i] = f_rgb + Fd.repeat(1, 16, 1, 1)
+            # self.attn_dcf = S[0, ...].detach().clone().cpu().numpy().squeeze()
 
         return x_rgb
 
