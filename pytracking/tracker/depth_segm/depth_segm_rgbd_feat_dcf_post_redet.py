@@ -596,17 +596,17 @@ class DepthSegmST(BaseTracker):
         # just a sanity check so that it does not get out of image
         new_state = self.sanity_check(new_state, color.shape)
 
-        new_target_depth = self.get_target_depth(raw_depth, new_state)
-        target_depth_flag = abs(self.target_depth - new_target_depth) / (self.target_depth+1)
-
-        if target_depth_flag > 0.6:
-        # ''' if target depth suddenly move 0.5 meters '''
-        # if abs(self.target_depth - new_target_depth) > 500:
-            print(self.frame_num, 'target depth changes too much : ', self.target_depth, new_target_depth)
-            pred_segm_region = None
-            conf_ = 0
-        else:
-            self.target_depth = new_target_depth
+        if uncert_score < self.params.uncertainty_segment_thr:
+            new_target_depth = self.get_target_depth(raw_depth, new_state)
+            target_depth_flag = abs(self.target_depth - new_target_depth) / (self.target_depth+1)
+            # if target_depth_flag > 0.6:
+            ''' if target depth suddenly move 0.5 meters '''
+            if abs(self.target_depth - new_target_depth) > 500:
+                print(self.frame_num, 'target depth changes too much : ', self.target_depth, new_target_depth)
+                # pred_segm_region = None
+                conf_ = 0
+            else:
+                self.target_depth = new_target_depth
 
         conf_ = min(1.0, conf_)
         self.conf_ = conf_ # for vis only
@@ -1264,7 +1264,6 @@ class DepthSegmST(BaseTracker):
     def segment_target(self, color, depth, pos, sz, raw_depth=None):
         # pos and sz are in the image coordinates
         # construct new bounding box first
-        ''' Song, bb increase according to target sz and target scales !!!!!'''
         tlx_ = pos[1] - sz[1] / 2
         tly_ = pos[0] - sz[0] / 2
         w_ = sz[1]
