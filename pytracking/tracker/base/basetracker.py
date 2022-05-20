@@ -298,22 +298,22 @@ class BaseTracker:
             self.ax_m.set_title('predicted mask')
 
             # masked_img = np.uint8(self.masked_img)
-            masked_img = self.masked_img
-            masked_img[np.all(masked_img == (0, 0, 0), axis=-1)] = (255,255,255)
+            # masked_img = self.masked_img
+            # masked_img[np.all(masked_img == (0, 0, 0), axis=-1)] = (255,255,255)
             # masked_img = Image.fromarray(np.uint8(masked_img)).convert('RGBA')
 
-            if self.attn_dcf is not None:
-                # attn_dcf = self.attn_dcf.clone().detach().cpu().numpy().squeeze()
-                #
-                attn_dcf = self.attn_dcf.squeeze()
+            # if self.attn_dcf is not None:
+            #     # attn_dcf = self.attn_dcf.clone().detach().cpu().numpy().squeeze()
+            #     #
+            #     attn_dcf = self.attn_dcf.squeeze()
+            #
+            #     self.ax_mrgb.cla()
+            #     self.ax_mrgb.imshow(attn_dcf)
+            #     self.ax_mrgb.set_title('dcf Depth')
 
-                self.ax_mrgb.cla()
-                self.ax_mrgb.imshow(attn_dcf)
-                self.ax_mrgb.set_title('dcf Depth')
-
-            # self.ax_mrgb.cla()
-            # self.ax_mrgb.imshow(masked_img)
-            # self.ax_mrgb.set_title('predicted mask over rgb')
+            self.ax_mrgb.cla()
+            self.ax_mrgb.imshow(self.masked_img)
+            self.ax_mrgb.set_title('predicted mask over depth')
 
 
             self.ax_initmask.cla()
