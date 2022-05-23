@@ -584,7 +584,7 @@ class DepthSegmST(BaseTracker):
                 # target_depth_flag = abs(self.target_depth - new_target_depth) / (self.target_depth+1)
                 ''' if target depth suddenly move 0.5 meters '''
                 # if target_depth_flag > 0.5:
-                if abs(self.target_depth - new_target_depth) > 1000:
+                if abs(self.target_depth - new_target_depth) > max(1000, 0.5*self.target_depth):
                     print(self.frame_num, 'target depth changes too much : ', self.target_depth, new_target_depth)
                     pred_segm_region = None
                     conf_ = 0
