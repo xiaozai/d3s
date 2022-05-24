@@ -48,7 +48,7 @@ class DepthSegmST(BaseTracker):
         '''
 
         if len(peaks) > 0:
-            if len(peaks) >= 2:
+            if len(peaks) >= 2 and len(self.target_depth)>0:
                 top2_index = np.argpartition(peaks_heights, -2)[-2:]
                 top2_peaks = hist_bins[peaks[top2_index]]
                 top2_dist = [abs(tp - np.mean(self.target_depth)) for tp in top2_peaks]
@@ -67,9 +67,9 @@ class DepthSegmST(BaseTracker):
     def depth_processing(self, depth, bbox=None, use_colormap=False):
         ''' Get the depth range for the sequence, [min, max] '''
         if bbox is not None:
+            self.target_depth = np.array([])
             target_depth = self.get_target_depth(depth, bbox)
             print('target depth:', target_depth)
-
             self.target_depth = np.array([target_depth])
 
             self.min_depth = max(0, target_depth-1500)
