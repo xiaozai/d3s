@@ -40,10 +40,21 @@ class DepthSegmST(BaseTracker):
 
         depth_hist, depth_edges = np.histogram(depth_pixels, bins=20)
         hist_bins = (depth_edges[:-1] + depth_edges[1:]) / 2.0
-        peaks, _ = find_peaks(depth_hist, height=num_pixels/10)
+        peaks, peaks_properties = find_peaks(depth_hist, height=num_pixels/10)
+        peaks_heights = peaks_properties['peak_heights']
+
+        ''' Currently we use the first peak which is closest to camera as the target depth
+        Should we compare the top 3 peaks and choose the one which is closest to previous target depth ???
+        '''
 
         if len(peaks) > 0:
-            target_depth = hist_bins[peaks[0]]
+            if len(peaks) >= 2:
+                top2_index = np.argpartition(peaks_heights, -2)[-2:]
+                top2_peaks = hist_bins[peaks[top2_index]]
+                top2_dist = [abs(tp - np.mean(self.target_depth)) for tp in top2_peaks]
+                target_depth = top2_peaks[top2_dist.index(min(top2_dist))]
+            else:
+                target_depth = hist_bins[peaks[0]]
         else:
             target_depth = np.median(depth_pixels)
 
@@ -59,7 +70,7 @@ class DepthSegmST(BaseTracker):
             target_depth = self.get_target_depth(depth, bbox)
             print('target depth:', target_depth)
 
-            self.target_depth = target_depth
+            self.target_depth = np.array([target_depth])
 
             self.min_depth = max(0, target_depth-1500)
             self.max_depth = target_depth + 1500
@@ -80,21 +91,28 @@ class DepthSegmST(BaseTracker):
         h, w = depth_pixels.shape
 
         depth_pixels = depth_pixels.flatten()
-
-        num_pixels = len(depth_pixels)
         hist_depth_pixels = depth_pixels[depth_pixels > 0]
-        depth_hist, depth_edges = np.histogram(depth_pixels, bins=num_bins)
+        num_pixels = len(hist_depth_pixels)
+
+        depth_hist, depth_edges = np.histogram(hist_depth_pixels, bins=num_bins)
         hist_bins = (depth_edges[:-1] + depth_edges[1:]) / 2.0
-        peaks, peak_properties = find_peaks(depth_hist, height=num_pixels/num_bins)
+        peaks, peaks_properties = find_peaks(depth_hist, height=num_pixels/num_bins)
+        peaks_heights = peaks_properties['peak_heights']
 
         if len(peaks) > 0:
-            mean = hist_bins[peaks[0]]
+            if len(peaks) >= 2:
+                top2_index = np.argpartition(peaks_heights, -2)[-2:]
+                top2_peaks = hist_bins[peaks[top2_index]]
+                top2_dist = [abs(tp - np.mean(self.target_depth)) for tp in top2_peaks]
+                mean = top2_peaks[top2_dist.index(min(top2_dist))]
+            else:
+                mean = hist_bins[peaks[0]]
         else:
-            mean = np.mean(depth_pixels[depth_pixels>0])
-        std = np.std(depth_pixels[depth_pixels>0])
-        dist = abs(depth_pixels - mean)
+            mean = np.mean(hist_depth_pixels)
+        std = np.std(hist_depth_pixels)
 
         # exceed the 2 * std, 94%
+        dist = abs(depth_pixels - mean)
         outliers = dist >= max_deviations * std
         outliers[depth_pixels==0] = 0
 
@@ -105,56 +123,56 @@ class DepthSegmST(BaseTracker):
 
         return depth_pixels.astype(np.uint8)
 
-    def mask_post_processing(self, mask, raw_depth, num_bins=30):
-        ''' Depth Histogram based Outliers Removal '''
-        num_mask_pixels = np.sum(mask)
-        masked_depth = mask * raw_depth
-        depth_pixels = masked_depth.flatten()
-        depth_pixels = depth_pixels[depth_pixels>self.min_depth]
-        depth_pixels = depth_pixels[depth_pixels<self.max_depth]
-        num_pixels = len(depth_pixels)
-
-        if num_mask_pixels == 0 or (num_mask_pixels > 0 and num_pixels / num_mask_pixels < 0.3):
-            print('depth pixels missing too much .. ', num_mask_pixels, num_pixels)
-            return mask
-
-        try:
-            depth_hist, depth_edges = np.histogram(depth_pixels, bins=num_bins)
-            hist_bins = (depth_edges[:-1] + depth_edges[1:]) / 2.0
-            peaks, peak_properties = find_peaks(depth_hist, height=num_pixels/num_bins)
-            p_widths = peak_widths(depth_hist, peaks)
-            p_widths = p_widths[0]
-            num_peaks = len(peaks)
-
-            if num_peaks > 0:
-                # We choose the highest peak as the target
-                peak_heights = peak_properties['peak_heights']
-                target_idx = np.where(peak_heights == max(peak_heights))[0][0]
-                p_widths = p_widths[target_idx]
-                peaks = peaks[target_idx]
-
-                # Target Depth Range
-                p_widths = math.ceil(p_widths)
-                left_ips = max(0, peaks-p_widths+1)
-                right_ips = min(len(depth_edges)-1, peaks+p_widths+1)
-
-                # Remove outliers
-                min_depth = depth_edges[left_ips]
-                max_depth = depth_edges[right_ips]
-                masked_depth[masked_depth > max_depth] = 0
-                masked_depth[masked_depth < min_depth] = 0
-
-                # Only if new mask has enough pixels
-                masked_depth[masked_depth>0] = 1
-                masked_num_pixels = np.sum(masked_depth)
-
-                if masked_num_pixels / num_mask_pixels > 0.3:
-                    mask = masked_depth
-
-        except Exception as e:
-            print(e)
-
-        return mask
+    # def mask_post_processing(self, mask, raw_depth, num_bins=30):
+    #     ''' Depth Histogram based Outliers Removal '''
+    #     num_mask_pixels = np.sum(mask)
+    #     masked_depth = mask * raw_depth
+    #     depth_pixels = masked_depth.flatten()
+    #     depth_pixels = depth_pixels[depth_pixels>self.min_depth]
+    #     depth_pixels = depth_pixels[depth_pixels<self.max_depth]
+    #     num_pixels = len(depth_pixels)
+    #
+    #     if num_mask_pixels == 0 or (num_mask_pixels > 0 and num_pixels / num_mask_pixels < 0.3):
+    #         print('depth pixels missing too much .. ', num_mask_pixels, num_pixels)
+    #         return mask
+    #
+    #     try:
+    #         depth_hist, depth_edges = np.histogram(depth_pixels, bins=num_bins)
+    #         hist_bins = (depth_edges[:-1] + depth_edges[1:]) / 2.0
+    #         peaks, peak_properties = find_peaks(depth_hist, height=num_pixels/num_bins)
+    #         p_widths = peak_widths(depth_hist, peaks)
+    #         p_widths = p_widths[0]
+    #         num_peaks = len(peaks)
+    #
+    #         if num_peaks > 0:
+    #             # We choose the highest peak as the target
+    #             peak_heights = peak_properties['peak_heights']
+    #             target_idx = np.where(peak_heights == max(peak_heights))[0][0]
+    #             p_widths = p_widths[target_idx]
+    #             peaks = peaks[target_idx]
+    #
+    #             # Target Depth Range
+    #             p_widths = math.ceil(p_widths)
+    #             left_ips = max(0, peaks-p_widths+1)
+    #             right_ips = min(len(depth_edges)-1, peaks+p_widths+1)
+    #
+    #             # Remove outliers
+    #             min_depth = depth_edges[left_ips]
+    #             max_depth = depth_edges[right_ips]
+    #             masked_depth[masked_depth > max_depth] = 0
+    #             masked_depth[masked_depth < min_depth] = 0
+    #
+    #             # Only if new mask has enough pixels
+    #             masked_depth[masked_depth>0] = 1
+    #             masked_num_pixels = np.sum(masked_depth)
+    #
+    #             if masked_num_pixels / num_mask_pixels > 0.3:
+    #                 mask = masked_depth
+    #
+    #     except Exception as e:
+    #         print(e)
+    #
+    #     return mask
 
     def normalize_rgbd(self, color, depth):
         # Song, normalize input image in DCF initialize
@@ -580,16 +598,19 @@ class DepthSegmST(BaseTracker):
                 print(self.frame_num, ' segmentation failed ...')
                 self.pos = new_pos.clone()
             else:
+                ''' if target depth suddenly move 0.5 meters or 0.3*HistoryDepth '''
                 new_target_depth = self.get_target_depth(raw_depth, pred_segm_region)
-                # target_depth_flag = abs(self.target_depth - new_target_depth) / (self.target_depth+1)
-                ''' if target depth suddenly move 0.5 meters '''
-                # if target_depth_flag > 0.5:
-                if abs(self.target_depth - new_target_depth) > max(1000, 0.5*self.target_depth):
-                    print(self.frame_num, 'target depth changes too much : ', self.target_depth, new_target_depth)
+                target_depth_flag = abs(np.mean(self.target_depth) - new_target_depth)
+                target_depth_threshold = max(500, 0.3 * np.mean(self.target_depth))
+
+                if target_depth_flag > target_depth_threshold:
+                    print(self.frame_num, 'target depth changes too much : ', np.mean(self.target_depth), new_target_depth)
                     pred_segm_region = None
                     conf_ = 0
                 else:
-                    self.target_depth = new_target_depth
+                    self.target_depth = np.append(self.target_depth, new_target_depth)
+                    if self.target_depth.size > self.params.response_budget_sz:
+                        self.target_depth = np.delete(self.target_depth, 0)
 
         new_state = pred_segm_region if (self.params.use_segmentation and pred_segm_region is not None) else \
                     torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]])).tolist()
@@ -1048,10 +1069,8 @@ class DepthSegmST(BaseTracker):
         self.pos = torch.max(torch.min(new_pos, self.image_sz - inside_offset), inside_offset)
 
         # Song, update target depth range
-        # self.min_depth = max(0, self.prev_target_depth-1500)
-        # self.max_depth = self.prev_target_depth + 1500
-        self.min_depth = max(0, self.target_depth-1500)
-        self.max_depth = self.target_depth + 1500
+        self.min_depth = max(0, np.mean(self.target_depth)-1500)
+        self.max_depth = np.mean(self.target_depth) + 1500
 
     # def update_state(self, new_pos, new_scale=None, new_state=None):
     #
@@ -1325,8 +1344,18 @@ class DepthSegmST(BaseTracker):
             mask is 384 * 384 after crop and resize
             self.mask_pixels is also after crop and resize, which has the historical mask pixels
         '''
+
+        ''' Compare the taret_sz????
+        if the target_sz change more than 0.5??
+        '''
+        # new_target_sz = np.sum(mask) / f_
+        # cur_target_sz = self.target_sz[0] * self.target_sz[1]
+        # print('self.target_sz vs new_target_sz: ', cur_target_sz, new_target_sz, abs(cur_target_sz - new_target_sz) / (cur_target_sz+1))
+        # # if abs(self.target_sz - new_target_sz) / (self.target_sz+1) > 0.5:
+
         # if new mask twice larger than history masks, we try to remove outliers
         if patch_raw_d is not None:
+
             new_mask = self.outliers_remove_by_depth(mask * patch_raw_d)
             if np.sum(new_mask) / (np.sum(mask) + 1) > 0.6:
                 mask = new_mask

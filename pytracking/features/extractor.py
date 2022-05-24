@@ -131,6 +131,8 @@ class MultiResolutionExtractor(ExtractorBase):
             return feature_map, dp_patches, im_patches
         elif dp is None and raw_depth is not None:
             return feature_map, raw_dp_patches
+        elif dp is None and raw_depth is None:
+            return feature_map
 
 
     def extract_transformed(self, im, pos, scale, image_sz, transforms, dp=None, raw_depth=None):
@@ -168,3 +170,5 @@ class MultiResolutionExtractor(ExtractorBase):
             return feature_map, im_patches, dp_patches
         elif dp is None and raw_depth is not None:
             return feature_map, raw_d_patches
+        elif dp is None and raw_depth is None:
+            return feature_map

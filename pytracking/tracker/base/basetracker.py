@@ -25,7 +25,6 @@ class BaseTracker:
 
     def track_sequence(self, sequence):
         """Run tracker on a sequence."""
-
         # Initialize
         image = self._read_image(sequence.frames[0])
 
@@ -278,12 +277,14 @@ class BaseTracker:
             self.ax.cla()
             self.ax.imshow(color)
             self.ax_d.cla()
-            depth[depth > self.max_depth] = self.max_depth
-            depth[depth < self.min_depth] = self.min_depth
-            depth = (depth - self.min_depth) / (self.max_depth - self.min_depth)
-            depth = np.asarray(depth*255, dtype=np.uint8)
-            depth = cv.applyColorMap(depth, cv.COLORMAP_JET)
-            self.ax_d.imshow(depth)
+
+            if self.ax_d is not None:
+                depth[depth > self.max_depth] = self.max_depth
+                depth[depth < self.min_depth] = self.min_depth
+                depth = (depth - self.min_depth) / (self.max_depth - self.min_depth)
+                depth = np.asarray(depth*255, dtype=np.uint8)
+                depth = cv.applyColorMap(depth, cv.COLORMAP_JET)
+                self.ax_d.imshow(depth)
         else:
             if isinstance(image, dict):
                 image = image['color']
@@ -383,8 +384,9 @@ class BaseTracker:
         self.ax.set_axis_off()
         self.ax.axis('equal')
 
-        self.ax_d.set_axis_off()
-        self.ax_d.axis('equal')
+        if self.ax_d is not None:
+            self.ax_d.set_axis_off()
+            self.ax_d.axis('equal')
 
         plt.draw()
         plt.pause(0.00001)

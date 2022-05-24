@@ -773,7 +773,7 @@ class Segm(BaseTracker):
         init_patch_crop, f_ = prutils.sample_target(image, np.array(bb), self.params.segm_search_area_factor,
                                                     output_sz=self.params.segm_output_sz)
 
-        self.segmentation_task = False
+        self.segmentation_task = True # False
         if init_mask is not None:
             mask = copy.deepcopy(init_mask).astype(np.float32)
             self.segmentation_task = True
