@@ -667,12 +667,12 @@ class DepthSegmST(BaseTracker):
                 # target_depth_threshold = max(500, 0.3 * np.mean(self.target_depth))
                 target_depth_threshold =  max(500, 0.3 * np.mean(self.target_depth))
 
-                if target_depth_flag > target_depth_threshold:
+                if conf_ < 0.25 and target_depth_flag > target_depth_threshold:
                     print(self.frame_num, 'target depth changes too much : ', np.mean(self.target_depth), new_target_depth)
                     pred_segm_region = None
                     conf_ = 0
                 # elif target_depth_flag <= 0.3 * np.mean(self.target_depth):
-                else:
+                if conf_ > 0.5 or target_depth_flag <= target_depth_threshold:
                     self.target_depth = np.append(self.target_depth, new_target_depth)
                     if self.target_depth.size > self.params.response_budget_sz:
                         self.target_depth = np.delete(self.target_depth, 0)
