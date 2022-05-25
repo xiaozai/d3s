@@ -312,9 +312,9 @@ class BaseTracker:
             #     self.ax_mrgb.imshow(attn_dcf)
             #     self.ax_mrgb.set_title('dcf Depth')
 
-            self.ax_mrgb.cla()
-            self.ax_mrgb.imshow(self.masked_img)
-            self.ax_mrgb.set_title('predicted mask over depth')
+            # self.ax_mrgb.cla()
+            # self.ax_mrgb.imshow(self.masked_img)
+            # self.ax_mrgb.set_title('predicted mask over depth')
 
 
             self.ax_initmask.cla()
@@ -344,7 +344,7 @@ class BaseTracker:
                 self.ax_d_patches.cla()
                 self.ax_d_patches.imshow(self.d_patches)
                 try:
-                    self.ax_d_patches.set_title('D patch: %d'%self.target_depth)
+                    self.ax_d_patches.set_title('D patch, Target Depth :%d'%np.mean(self.target_depth))
                 except:
                     pass
 
