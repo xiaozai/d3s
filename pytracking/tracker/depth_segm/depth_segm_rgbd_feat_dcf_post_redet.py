@@ -667,6 +667,8 @@ class DepthSegmST(BaseTracker):
                 # target_depth_threshold = max(500, 0.3 * np.mean(self.target_depth))
                 target_depth_threshold =  max(500, 0.3 * np.mean(self.target_depth))
 
+                ''' Sometimes, the distractors also have high confidence !!!
+                how to decide worng target detected ? '''
                 if conf_ < 0.25 and target_depth_flag > target_depth_threshold:
                     print(self.frame_num, 'target depth changes too much : ', np.mean(self.target_depth), new_target_depth)
                     pred_segm_region = None
