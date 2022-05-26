@@ -494,10 +494,10 @@ class DepthSegmST(BaseTracker):
         if self.frame_num > 5:
             uncert_score = np.mean(self.scores) / max_score
 
-        if uncert_score < self.params.tracking_uncertainty_thr:
-            self.scores = np.append(self.scores, max_score)
-            if self.scores.size > self.params.response_budget_sz:
-                self.scores = np.delete(self.scores, 0)
+        # if uncert_score < self.params.tracking_uncertainty_thr:
+        #     self.scores = np.append(self.scores, max_score)
+        #     if self.scores.size > self.params.response_budget_sz:
+        #         self.scores = np.delete(self.scores, 0)
 
         # Song
         self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy()
@@ -506,7 +506,7 @@ class DepthSegmST(BaseTracker):
         '''Re-detection'''
         if flag == 'not_found':
             print(self.frame_num, ' Not found target ...... start to redetection')
-            for redet_scale in [1.5, 2.5]:
+            for redet_scale in [1.5, 2]:
                 # Increase search region
                 self.params.scale_factors = self.params.scale_factors * redet_scale
                 sample_pos = copy.deepcopy(self.pos)
@@ -522,10 +522,10 @@ class DepthSegmST(BaseTracker):
                 if self.frame_num > 5:
                     uncert_score = np.mean(self.scores) / max_score
 
-                if uncert_score < self.params.tracking_uncertainty_thr:
-                    self.scores = np.append(self.scores, max_score)
-                    if self.scores.size > self.params.response_budget_sz:
-                        self.scores = np.delete(self.scores, 0)
+                # if uncert_score < self.params.tracking_uncertainty_thr:
+                #     self.scores = np.append(self.scores, max_score)
+                #     if self.scores.size > self.params.response_budget_sz:
+                #         self.scores = np.delete(self.scores, 0)
 
                 self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy()
                 conf_ = self.score_map.max()
@@ -541,6 +541,11 @@ class DepthSegmST(BaseTracker):
 
 
         self.uncert_score = uncert_score
+
+        if uncert_score < self.params.tracking_uncertainty_thr:
+            self.scores = np.append(self.scores, max_score)
+            if self.scores.size > self.params.response_budget_sz:
+                self.scores = np.delete(self.scores, 0)
 
         pred_segm_region = None
         if self.segmentation_task or (
