@@ -511,6 +511,8 @@ class DepthSegmST(BaseTracker):
                 self.params.scale_factors = self.params.scale_factors * redet_scale
                 sample_pos = copy.deepcopy(self.pos)
                 sample_scales = self.target_scale * self.params.scale_factors
+
+                ''' Sometimes, RGBD classifier can not find the target???? Because of Depth????'''
                 test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
                 # Compute scores
                 scores_raw = self.apply_filter(test_x_rgb)
@@ -565,7 +567,7 @@ class DepthSegmST(BaseTracker):
 
                 if not math.isnan(new_target_depth) and len(self.target_depth) > 0:
                     target_depth_flag = abs(np.mean(self.target_depth) - new_target_depth)
-                    target_depth_threshold =  max(500, 0.3 * np.mean(self.target_depth))
+                    target_depth_threshold =  max(500, 0.25 * np.mean(self.target_depth))
 
                     if conf_ < 0.5 and target_depth_flag > target_depth_threshold:
                         print(self.frame_num, 'target depth changes too much : ', np.mean(self.target_depth), new_target_depth)
