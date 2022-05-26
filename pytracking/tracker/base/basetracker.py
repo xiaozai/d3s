@@ -344,7 +344,8 @@ class BaseTracker:
                 self.ax_d_patches.cla()
                 self.ax_d_patches.imshow(self.d_patches)
                 try:
-                    self.ax_d_patches.set_title('D patch, Target Depth :%d'%np.mean(self.target_depth))
+                    if len(self.target_depth) > 0:
+                        self.ax_d_patches.set_title('D patch, Target Depth :%d'%np.mean(self.target_depth))
                 except:
                     pass
 
