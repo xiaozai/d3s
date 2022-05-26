@@ -1185,7 +1185,6 @@ class DepthSegmST(BaseTracker):
 
         # Song : extract depth features
         train_feat_segm_d = self.segm_net.segm_predictor.depth_feat_extractor(init_patch_d)
-        # test_feat_segm_d = train_feat_segm_d.clone().detach()
 
         if init_mask is None:
             iters = 0
@@ -1227,6 +1226,7 @@ class DepthSegmST(BaseTracker):
                 self.params.device)
 
         self.init_mask = mask
+        print(mask.shape, init_patch_crop_raw_d.shape)
 
         # finetune init mask
         if raw_depth is not None:
@@ -1241,8 +1241,7 @@ class DepthSegmST(BaseTracker):
             if cur_area > 0.95 * ori_area:
                 print('update init mask')
                 mask = mask02
-
-        mask_gpu = torch.unsqueeze(torch.unsqueeze(torch.tensor(mask), dim=0), dim=0).to(self.params.device)
+                mask_gpu = torch.unsqueeze(torch.unsqueeze(torch.tensor(mask), dim=0), dim=0).to(self.params.device)
 
         # store everything that is needed for later
         # self.segm_net = segm_net
