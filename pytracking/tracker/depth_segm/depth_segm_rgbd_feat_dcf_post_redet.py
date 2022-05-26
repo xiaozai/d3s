@@ -1228,7 +1228,6 @@ class DepthSegmST(BaseTracker):
         # finetune init mask
         if raw_depth is not None:
             mask02 = self.outliers_remove_by_depth(mask*init_patch_crop_raw_d, max_deviations=0.8, num_bins=50)
-            mask02 = np.array(mask02, dtype=np.float32)
 
             if cv2.__version__[-5] == '4':
                 contours, _ = cv2.findContours(mask02, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
@@ -1255,7 +1254,7 @@ class DepthSegmST(BaseTracker):
 
                 if cur_area > 0.95 * ori_area:
                     print('update init mask')
-                    mask = mask02
+                    mask = np.array(mask02, dtype=np.float32)
                     mask_gpu = torch.unsqueeze(torch.unsqueeze(torch.tensor(mask), dim=0), dim=0).to(self.params.device)
 
         # store everything that is needed for later
@@ -1267,7 +1266,7 @@ class DepthSegmST(BaseTracker):
             self.dist_map = dist_map
 
         mask = np.array(mask, dtype=np.uint8)
-        # self.init_mask = mask
+        self.init_mask = mask
         self.mask_pixels = np.array([np.sum(mask)])
 
         self.mask = mask
