@@ -1236,7 +1236,7 @@ class DepthSegmST(BaseTracker):
             cnt_area = [cv2.contourArea(cnt) for cnt in contours]
 
             if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 50:
-                contours = contours_vis[np.argmax(cnt_area)]  # use max area polygon
+                contours = contours[np.argmax(cnt_area)]  # use max area polygon
                 polygon = contours.reshape(-1, 2)
 
                 x_, y_ = polygon[:, 0], polygon[:, 1]
@@ -1249,8 +1249,6 @@ class DepthSegmST(BaseTracker):
                 ori_area = ori_bbox[-2] * ori_bbox[-1]
                 cur_area = (x1-x0) * (y1-y0)
                 print('cur area vs ori area : ', cur_area, ori_area)
-                # new_target_pixels = np.sum(mask02).astype(np.float32)
-                # print('ori_bbox : ', target_pixels, new_target_pixels)
 
                 if cur_area > 0.95 * ori_area:
                     print('update init mask')
