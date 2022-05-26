@@ -1229,32 +1229,34 @@ class DepthSegmST(BaseTracker):
         if raw_depth is not None:
             mask02 = self.outliers_remove_by_depth(mask*init_patch_crop_raw_d, max_deviations=0.8, num_bins=50)
             mask02 = np.array(mask02, dtype=np.float32)
-            print(mask02.shape)
 
-            ori_bbox = self.get_aabb(mask)
-            ori_area = ori_bbox[-2] * ori_bbox[-1]
-            cur_bbox = self.get_aabb(mask02)
-            cur_area = cur_bbox[-2] * cur_bbox[-1]
-            print(cur_bbox)
-            x0y0 = (cur_bbox[0], cur_bbox[1])
-            x1y1 = (cur_bbox[0]+cur_bbox[2], cur_bbox[1]+cur_bbox[3])
-            print(x0y0, x1y1)
-            # mask02 = np.array(mask02, dtype=np.uint8)
-            # mask02 = cv2.rectangle(mask02,x0y0, x1y1, (255, 0, 255), 10)
-            mask02[x0y0[1]:x1y1[1], x0y0[0]] = 1
-            mask02[x0y0[1]:x1y1[1], x1y1[0]] = 1
-            mask02[x0y0[1], x0y0[0]:x1y1[0]] = 1
-            mask02[x1y1[1], x0y0[0]:x1y1[0]] = 1
+            if cv2.__version__[-5] == '4':
+                contours, _ = cv2.findContours(mask02, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            else:
+                _, contours, _ = cv2.findContours(mask02, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            cnt_area = [cv2.contourArea(cnt) for cnt in contours]
 
-            self.init_mask = mask02
+            if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 50:
+                contours = contours_vis[np.argmax(cnt_area)]  # use max area polygon
+                polygon = contours.reshape(-1, 2)
 
-            new_target_pixels = np.sum(mask02).astype(np.float32)
-            print('ori_bbox : ', target_pixels, new_target_pixels)
-            #
-            # # if cur_area > 0.95 * ori_area:
-            #     print('update init mask')
-            #     mask = mask02
-            #     mask_gpu = torch.unsqueeze(torch.unsqueeze(torch.tensor(mask), dim=0), dim=0).to(self.params.device)
+                x_, y_ = polygon[:, 0], polygon[:, 1]
+                x0 = np.min(x_)
+                y0 = np.min(y_)
+                x1 = np.max(x_)
+                y1 = np.max(y_)
+
+                ori_bbox = self.get_aabb(mask)
+                ori_area = ori_bbox[-2] * ori_bbox[-1]
+                cur_area = (x1-x0) * (y1-y0)
+                print('cur area vs ori area : ', cur_area, ori_area)
+                # new_target_pixels = np.sum(mask02).astype(np.float32)
+                # print('ori_bbox : ', target_pixels, new_target_pixels)
+
+                if cur_area > 0.95 * ori_area:
+                    print('update init mask')
+                    mask = mask02
+                    mask_gpu = torch.unsqueeze(torch.unsqueeze(torch.tensor(mask), dim=0), dim=0).to(self.params.device)
 
         # store everything that is needed for later
         # self.segm_net = segm_net
