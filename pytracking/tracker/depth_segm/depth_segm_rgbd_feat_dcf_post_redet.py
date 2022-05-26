@@ -610,7 +610,7 @@ class DepthSegmST(BaseTracker):
 
             '''Re-detection'''
             # Increase search region
-            self.params.scale_factors = self.params.scale_factors * 1.5
+            self.params.scale_factors = self.params.scale_factors * 2 # 1.5 # 2 ???
 
             sample_pos = copy.deepcopy(self.pos)
             sample_scales = self.target_scale * self.params.scale_factors
@@ -637,13 +637,15 @@ class DepthSegmST(BaseTracker):
             self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy()
             conf_ = self.score_map.max()
 
+            '''
+            Should we decide is it really re-found ???'''
             if flag == 'not_found':
                 uncert_score = 100
                 conf_ = 0
             else:
                 print('re-found tatrget ...')
 
-            self.params.scale_factors = self.params.scale_factors / 1.5
+            self.params.scale_factors = self.params.scale_factors / 2 # 1.5
 
 
         self.uncert_score = uncert_score
@@ -655,8 +657,11 @@ class DepthSegmST(BaseTracker):
             pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz, raw_depth=raw_depth)
             pred_segm_region = pred_segm_region[0] if isinstance(pred_segm_region, tuple) else pred_segm_region
 
+            ''' 1. When segmentation is none , what should we do ???
+            should we update self.target_sz ???
+            '''
             if pred_segm_region is None:
-                print(self.frame_num, ' segmentation failed ...')
+                # print(self.frame_num, ' segmentation failed ...')
                 self.pos = new_pos.clone()
             else:
                 ''' if target depth suddenly move 0.5 meters or 0.3*HistoryDepth
@@ -668,8 +673,9 @@ class DepthSegmST(BaseTracker):
                 target_depth_threshold =  max(500, 0.3 * np.mean(self.target_depth))
 
                 ''' Sometimes, the distractors also have high confidence !!!
-                how to decide worng target detected ? '''
-                if conf_ < 0.25 and target_depth_flag > target_depth_threshold:
+                how to decide worng target detected ?
+                2. - increase unreliable conf_ thresholds ? 0.25 -> 0.5???'''
+                if conf_ < 0.5 and target_depth_flag > target_depth_threshold:
                     print(self.frame_num, 'target depth changes too much : ', np.mean(self.target_depth), new_target_depth)
                     pred_segm_region = None
                     conf_ = 0
@@ -1122,7 +1128,6 @@ class DepthSegmST(BaseTracker):
 
             rel_scale_ch = (abs(new_target_scale - self.target_scale) / self.target_scale).item()
 
-            ''' if target scale change too small, then dont change, keep it as 1.05 '''
             if new_target_scale > self.params.segm_min_scale and rel_scale_ch > 0.3:
 
                 self.target_scale = max(self.target_scale * self.params.min_scale_change_factor,
@@ -1236,7 +1241,9 @@ class DepthSegmST(BaseTracker):
             cur_bbox = self.get_aabb(init_mask_patch_np02)
             cur_area = cur_bbox[-2] * cur_bbox[-1]
             print('ori_bbox : ', ori_bbox, ori_area, cur_bbox, cur_area)
-            if cur_area > 0.8 * ori_area:
+            ''' new init mask aabb should not smaller than aabb of ori mask
+            3. make sure two aabb almost same size '''
+            if cur_area > 0.95 * ori_area:
                 print('update init mask')
                 init_mask_patch_np = init_mask_patch_np02
 
@@ -1342,7 +1349,7 @@ class DepthSegmST(BaseTracker):
             cur_bbox = self.get_aabb(mask02)
             cur_area = cur_bbox[-2] * cur_bbox[-1]
             print('ori_bbox : ', ori_bbox, ori_area, cur_bbox, cur_area)
-            if cur_area > 0.8 * ori_area:
+            if cur_area > 0.95 * ori_area:
                 print('update init mask')
                 mask = mask02
 
@@ -1472,6 +1479,7 @@ class DepthSegmST(BaseTracker):
         # if new mask twice larger than history masks, we try to remove outliers
         if patch_raw_d is not None:
             new_mask = self.outliers_remove_by_depth(mask * patch_raw_d, max_deviations=0.8, num_bins=50)
+            ''' outliers just a fea, if remove too much , then dont update mask '''
             if np.sum(new_mask) / (np.sum(mask) + 1) > 0.6:
                 mask = new_mask
 
@@ -1481,7 +1489,8 @@ class DepthSegmST(BaseTracker):
             _, contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         cnt_area = [cv2.contourArea(cnt) for cnt in contours]
 
-        if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 1000:
+        # if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 1000:
+        if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 500:
             contour = contours[np.argmax(cnt_area)]  # use max area polygon
             polygon = contour.reshape(-1, 2)
 
