@@ -568,24 +568,16 @@ class DepthSegmST(BaseTracker):
             pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz, raw_depth=raw_depth)
             pred_segm_region = pred_segm_region[0] if isinstance(pred_segm_region, tuple) else pred_segm_region
 
-            ''' 1. When segmentation is none , what should we do ???
-            should we update self.target_sz ???
-            '''
             if pred_segm_region is None:
                 # print(self.frame_num, ' segmentation failed ...')
                 self.pos = new_pos.clone()
             else:
-                ''' if target depth suddenly move 0.5 meters or 0.3*HistoryDepth
-                Depth range is different from sequences, the fixed depth_threshold is not suitable
-                 '''
-                 ''' Sometimes, the distractors also have high confidence !!!
-                 how to decide worng target detected ?
-                 2. - increase unreliable conf_ thresholds ? 0.25 -> 0.5???'''
-
                 new_target_depth = self.get_target_depth(raw_depth, pred_segm_region)
                 if not math.isnan(new_target_depth) and len(self.target_depth) > 0:
                     target_depth_flag = abs(np.mean(self.target_depth) - new_target_depth)
                     target_depth_threshold =  max(500, 0.3 * np.mean(self.target_depth))
+
+                    # if conf_ < 0.25
                     if conf_ < 0.5 and target_depth_flag > target_depth_threshold:
                         print(self.frame_num, 'target depth changes too much : ', np.mean(self.target_depth), new_target_depth)
                         pred_segm_region = None
