@@ -23,6 +23,8 @@ from scipy.signal import find_peaks, peak_widths
 
 import matplotlib.pyplot as plt
 
+import warnings
+warnings.simplefilter("ignore", UserWarning)
 
 class DepthSegmST(BaseTracker):
 
