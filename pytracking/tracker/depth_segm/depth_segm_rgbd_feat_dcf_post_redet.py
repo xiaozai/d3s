@@ -1121,21 +1121,36 @@ class DepthSegmST(BaseTracker):
         init_mask_patch_np, patch_factor_init = prutils.sample_target(mask, np.array(bb),
                                                                       self.params.segm_search_area_factor,
                                                                       output_sz=self.params.segm_output_sz, pad_val=0)
-        # if raw_depth is not None:
-        #     ''' new init mask aabb should not smaller than aabb of ori mask
-        #     3. make sure two aabb almost same size '''
-        #     init_target_depth_pixels = init_mask_patch_np*init_patch_crop_raw_d
-        #     init_mask_patch_np02 = self.outliers_remove_by_depth(init_target_depth_pixels, max_deviations=0.8, num_bins=50)
-        #     ori_bbox = self.get_aabb(init_mask_patch_np)
-        #     ori_area = ori_bbox[-2] * ori_bbox[-1]
-        #     cur_bbox = self.get_aabb(init_mask_patch_np02)
-        #     cur_area = cur_bbox[-2] * cur_bbox[-1]
-        #     print('ori_bbox : ', ori_bbox, ori_area, cur_bbox, cur_area)
-        #
-        #     if cur_area > 0.95 * ori_area:
-        #         print('update init mask')
-        #         init_mask_patch_np = init_mask_patch_np02
 
+        if raw_depth is not None:
+            init_target_depth_pixels = init_mask_patch_np*init_patch_crop_raw_d
+            init_mask_patch_np02 = self.outliers_remove_by_depth(init_target_depth_pixels, max_deviations=0.8, num_bins=50)
+
+            if cv2.__version__[-5] == '4':
+                contours, _ = cv2.findContours(init_mask_patch_np02, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            else:
+                _, contours, _ = cv2.findContours(init_mask_patch_np02, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            cnt_area = [cv2.contourArea(cnt) for cnt in contours]
+
+            if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 50:
+                contours = contours[np.argmax(cnt_area)]  # use max area polygon
+                polygon = contours.reshape(-1, 2)
+
+                x_, y_ = polygon[:, 0], polygon[:, 1]
+                x0 = np.min(x_)
+                y0 = np.min(y_)
+                x1 = np.max(x_)
+                y1 = np.max(y_)
+
+                ori_bbox = self.get_aabb(init_mask_patch_np)
+                ori_area = ori_bbox[-2] * ori_bbox[-1]
+                cur_area = (x1-x0) * (y1-y0)
+                print('cur area vs ori area : ', cur_area, ori_area)
+
+                if cur_area > 0.95 * ori_area:
+                    print('update init mask')
+                    init_mask_patch_np = np.array(init_mask_patch_np02, dtype=np.float32)
+                    # mask_gpu = torch.unsqueeze(torch.unsqueeze(torch.tensor(init_mask_patch_np), dim=0), dim=0).to(self.params.device)
 
         # create distance map for discriminative segmentation
         if self.params.segm_use_dist:
