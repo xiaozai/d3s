@@ -1147,7 +1147,7 @@ class DepthSegmST(BaseTracker):
                 cur_area = (x1-x0) * (y1-y0)
                 print('cur area vs ori area : ', cur_area, ori_area)
 
-                if cur_area > 0.95 * ori_area:
+                if cur_area > 0.9 * ori_area:
                     print('update init mask')
                     init_mask_patch_np = np.array(init_mask_patch_np02, dtype=np.float32)
                     # mask_gpu = torch.unsqueeze(torch.unsqueeze(torch.tensor(init_mask_patch_np), dim=0), dim=0).to(self.params.device)
@@ -1265,7 +1265,7 @@ class DepthSegmST(BaseTracker):
                 cur_area = (x1-x0) * (y1-y0)
                 print('cur area vs ori area : ', cur_area, ori_area)
 
-                if cur_area > 0.95 * ori_area:
+                if cur_area > 0.9 * ori_area:
                     print('update init mask')
                     mask = np.array(mask02, dtype=np.float32)
                     mask_gpu = torch.unsqueeze(torch.unsqueeze(torch.tensor(mask), dim=0), dim=0).to(self.params.device)
