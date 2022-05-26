@@ -56,10 +56,6 @@ class DepthSegmST(BaseTracker):
         else:
             target_depth = np.median(depth_pixels)
 
-        # Target Depth may be Nan, because of bad quality of depth image.
-        # if math.isnan(target_depth):
-        #     target_depth = 10
-
         return target_depth
 
     def depth_processing(self, depth, bbox=None, use_colormap=False):
@@ -100,22 +96,12 @@ class DepthSegmST(BaseTracker):
 
         try:
             self.ax_mrgb.cla()
-            # self.ax_mrgb.imshow(self.masked_img)
-            # self.ax_mrgb.set_title('predicted mask over depth')
             self.ax_mrgb.plot(hist_bins, depth_hist)
             self.ax_mrgb.plot(hist_bins[peaks], depth_hist[peaks], 'rx')
             self.ax_mrgb.set_title('depth histogram of coarse predicted mask')
         except:
             pass
 
-        ''' When do we need to remove the outliers???
-        1) multiple peaks -> multiple objects
-
-
-        when we dont do?
-        1) no peaks or only one peaks??
-        '''
-        # if len(peaks) > 0:
         if len(peaks) >= 2 and len(self.target_depth) > 0:
             top2_index = np.argpartition(peaks_heights, -2)[-2:]
             top2_peaks = hist_bins[peaks[top2_index]]
@@ -132,7 +118,7 @@ class DepthSegmST(BaseTracker):
                 pass
 
 
-            # exceed the 2 * std, 94%
+            # exceed the max_deviation * std, 94%
             dist = abs(depth_pixels - mean)
             outliers = dist >= max_deviations * std
             outliers[depth_pixels==0] = 0
@@ -517,48 +503,41 @@ class DepthSegmST(BaseTracker):
         self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy()
         conf_ = self.score_map.max()
 
-
+        '''Re-detection'''
         if flag == 'not_found':
             print(self.frame_num, ' Not found target ...... start to redetection')
+            for redet_scale in [1.5, 2.5]:
+                # Increase search region
+                self.params.scale_factors = self.params.scale_factors * redet_scale
+                sample_pos = copy.deepcopy(self.pos)
+                sample_scales = self.target_scale * self.params.scale_factors
+                test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
+                # Compute scores
+                scores_raw = self.apply_filter(test_x_rgb)
+                translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
+                new_pos = sample_pos + translation_vec
+                # Localization uncertainty
+                max_score = torch.max(s).item()
+                uncert_score = 0
+                if self.frame_num > 5:
+                    uncert_score = np.mean(self.scores) / max_score
 
-            '''Re-detection'''
-            # Increase search region
-            self.params.scale_factors = self.params.scale_factors * 2 # 1.5 # 2 ???
+                if uncert_score < self.params.tracking_uncertainty_thr:
+                    self.scores = np.append(self.scores, max_score)
+                    if self.scores.size > self.params.response_budget_sz:
+                        self.scores = np.delete(self.scores, 0)
 
-            sample_pos = copy.deepcopy(self.pos)
-            sample_scales = self.target_scale * self.params.scale_factors
+                self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy()
+                conf_ = self.score_map.max()
 
-            test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
+                self.params.scale_factors = self.params.scale_factors / redet_scale
 
-            # Compute scores
-            scores_raw = self.apply_filter(test_x_rgb)
-
-            translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
-            new_pos = sample_pos + translation_vec
-
-            # Localization uncertainty
-            max_score = torch.max(s).item()
-            uncert_score = 0
-            if self.frame_num > 5:
-                uncert_score = np.mean(self.scores) / max_score
-
-            if uncert_score < self.params.tracking_uncertainty_thr:
-                self.scores = np.append(self.scores, max_score)
-                if self.scores.size > self.params.response_budget_sz:
-                    self.scores = np.delete(self.scores, 0)
-
-            self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy()
-            conf_ = self.score_map.max()
-
-            '''
-            Should we decide is it really re-found ???'''
-            if flag == 'not_found':
-                uncert_score = 100
-                conf_ = 0
-            else:
-                print('re-found tatrget ...')
-
-            self.params.scale_factors = self.params.scale_factors / 2 # 1.5
+                if flag == 'not_found':
+                    uncert_score = 100
+                    conf_ = 0
+                else:
+                    print('re-found tatrget ...')
+                    break
 
 
         self.uncert_score = uncert_score
@@ -571,21 +550,24 @@ class DepthSegmST(BaseTracker):
             pred_segm_region = pred_segm_region[0] if isinstance(pred_segm_region, tuple) else pred_segm_region
 
             if pred_segm_region is None:
-                # print(self.frame_num, ' segmentation failed ...')
                 self.pos = new_pos.clone()
             else:
+                ''' Check the new target depth from new mask '''
                 new_target_depth = self.get_target_depth(raw_depth, pred_segm_region)
+
+                if not math.isnan(new_target_depth) and len(self.target_depth) < 5 and conf_ > 0.5:
+                    self.target_depth = np.append(self.target_depth, new_target_depth)
+
                 if not math.isnan(new_target_depth) and len(self.target_depth) > 0:
                     target_depth_flag = abs(np.mean(self.target_depth) - new_target_depth)
                     target_depth_threshold =  max(500, 0.3 * np.mean(self.target_depth))
 
-                    # if conf_ < 0.25
                     if conf_ < 0.5 and target_depth_flag > target_depth_threshold:
                         print(self.frame_num, 'target depth changes too much : ', np.mean(self.target_depth), new_target_depth)
                         pred_segm_region = None
                         conf_ = 0
 
-                    if conf_ > 0.5 or target_depth_flag <= target_depth_threshold:
+                    if conf_ >= 0.5 or target_depth_flag <= target_depth_threshold:
                         self.target_depth = np.append(self.target_depth, new_target_depth)
                         if self.target_depth.size > self.params.response_budget_sz:
                             self.target_depth = np.delete(self.target_depth, 0)
@@ -1139,19 +1121,20 @@ class DepthSegmST(BaseTracker):
         init_mask_patch_np, patch_factor_init = prutils.sample_target(mask, np.array(bb),
                                                                       self.params.segm_search_area_factor,
                                                                       output_sz=self.params.segm_output_sz, pad_val=0)
-        if raw_depth is not None:
-            init_target_depth_pixels = init_mask_patch_np*init_patch_crop_raw_d
-            init_mask_patch_np02 = self.outliers_remove_by_depth(init_target_depth_pixels, max_deviations=0.8, num_bins=50)
-            ori_bbox = self.get_aabb(init_mask_patch_np)
-            ori_area = ori_bbox[-2] * ori_bbox[-1]
-            cur_bbox = self.get_aabb(init_mask_patch_np02)
-            cur_area = cur_bbox[-2] * cur_bbox[-1]
-            print('ori_bbox : ', ori_bbox, ori_area, cur_bbox, cur_area)
-            ''' new init mask aabb should not smaller than aabb of ori mask
-            3. make sure two aabb almost same size '''
-            if cur_area > 0.95 * ori_area:
-                print('update init mask')
-                init_mask_patch_np = init_mask_patch_np02
+        # if raw_depth is not None:
+        #     ''' new init mask aabb should not smaller than aabb of ori mask
+        #     3. make sure two aabb almost same size '''
+        #     init_target_depth_pixels = init_mask_patch_np*init_patch_crop_raw_d
+        #     init_mask_patch_np02 = self.outliers_remove_by_depth(init_target_depth_pixels, max_deviations=0.8, num_bins=50)
+        #     ori_bbox = self.get_aabb(init_mask_patch_np)
+        #     ori_area = ori_bbox[-2] * ori_bbox[-1]
+        #     cur_bbox = self.get_aabb(init_mask_patch_np02)
+        #     cur_area = cur_bbox[-2] * cur_bbox[-1]
+        #     print('ori_bbox : ', ori_bbox, ori_area, cur_bbox, cur_area)
+        #
+        #     if cur_area > 0.95 * ori_area:
+        #         print('update init mask')
+        #         init_mask_patch_np = init_mask_patch_np02
 
 
         # create distance map for discriminative segmentation
@@ -1235,7 +1218,6 @@ class DepthSegmST(BaseTracker):
 
                 iters += 1
         else:
-            # Song , we use init box as init mask to prevent bad init mask
             init_mask_patch_np = (init_mask_patch_np > 0.1).astype(np.float32)
             mask = init_mask_patch_np
 
