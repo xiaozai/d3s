@@ -569,6 +569,7 @@ class DepthSegmST(BaseTracker):
                     target_depth_flag = abs(np.mean(self.target_depth) - new_target_depth)
                     target_depth_threshold =  max(500, 0.25 * np.mean(self.target_depth))
 
+                    ''' How to make sure it is real wrong object '''
                     if conf_ < 0.5 and target_depth_flag > target_depth_threshold:
                         print(self.frame_num, 'target depth changes too much : ', np.mean(self.target_depth), new_target_depth)
                         pred_segm_region = None
