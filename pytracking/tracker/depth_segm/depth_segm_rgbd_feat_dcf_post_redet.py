@@ -1225,9 +1225,7 @@ class DepthSegmST(BaseTracker):
             mask_gpu = torch.unsqueeze(torch.unsqueeze(torch.tensor(init_mask_patch_np), dim=0), dim=0).to(
                 self.params.device)
 
-        self.init_mask = mask
-        print(mask.shape, init_patch_crop_raw_d.shape)
-
+        self.init_mask = mask*init_patch_crop_raw_d
         # finetune init mask
         if raw_depth is not None:
             mask02 = self.outliers_remove_by_depth(mask*init_patch_crop_raw_d, max_deviations=0.8, num_bins=50)
