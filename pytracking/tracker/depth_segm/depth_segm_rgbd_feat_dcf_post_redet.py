@@ -1225,21 +1225,36 @@ class DepthSegmST(BaseTracker):
             mask_gpu = torch.unsqueeze(torch.unsqueeze(torch.tensor(init_mask_patch_np), dim=0), dim=0).to(
                 self.params.device)
 
-        self.init_mask = mask*init_patch_crop_raw_d
         # finetune init mask
         if raw_depth is not None:
             mask02 = self.outliers_remove_by_depth(mask*init_patch_crop_raw_d, max_deviations=0.8, num_bins=50)
             mask02 = np.array(mask02, dtype=np.float32)
+            print(mask02.shape)
 
             ori_bbox = self.get_aabb(mask)
             ori_area = ori_bbox[-2] * ori_bbox[-1]
             cur_bbox = self.get_aabb(mask02)
             cur_area = cur_bbox[-2] * cur_bbox[-1]
-            print('ori_bbox : ', ori_bbox, ori_area, cur_bbox, cur_area)
-            if cur_area > 0.95 * ori_area:
-                print('update init mask')
-                mask = mask02
-                mask_gpu = torch.unsqueeze(torch.unsqueeze(torch.tensor(mask), dim=0), dim=0).to(self.params.device)
+            print(cur_bbox)
+            x0y0 = (cur_bbox[0], cur_bbox[1])
+            x1y1 = (cur_bbox[0]+cur_bbox[2], cur_bbox[1]+cur_bbox[3])
+            print(x0y0, x1y1)
+            # mask02 = np.array(mask02, dtype=np.uint8)
+            # mask02 = cv2.rectangle(mask02,x0y0, x1y1, (255, 0, 255), 10)
+            mask02[x0y0[1]:x1y1[1], x0y0[0]] = 1
+            mask02[x0y0[1]:x1y1[1], x1y1[0]] = 1
+            mask02[x0y0[1], x0y0[0]:x1y1[0]] = 1
+            mask02[x1y1[1], x0y0[0]:x1y1[0]] = 1
+
+            self.init_mask = mask02
+
+            new_target_pixels = np.sum(mask02).astype(np.float32)
+            print('ori_bbox : ', target_pixels, new_target_pixels)
+            #
+            # # if cur_area > 0.95 * ori_area:
+            #     print('update init mask')
+            #     mask = mask02
+            #     mask_gpu = torch.unsqueeze(torch.unsqueeze(torch.tensor(mask), dim=0), dim=0).to(self.params.device)
 
         # store everything that is needed for later
         # self.segm_net = segm_net
