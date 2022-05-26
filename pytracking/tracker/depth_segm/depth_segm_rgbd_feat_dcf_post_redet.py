@@ -574,7 +574,7 @@ class DepthSegmST(BaseTracker):
                         pred_segm_region = None
                         conf_ = 0
 
-                    if conf_ >= 0.5 or target_depth_flag <= target_depth_threshold:
+                    if conf_ >= 0.5 and target_depth_flag <= target_depth_threshold:
                         self.target_depth = np.append(self.target_depth, new_target_depth)
                         if self.target_depth.size > self.params.response_budget_sz:
                             self.target_depth = np.delete(self.target_depth, 0)
