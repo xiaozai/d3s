@@ -55,8 +55,8 @@ class DepthSegmST(BaseTracker):
             target_depth = np.median(depth_pixels)
 
         # Target Depth may be Nan, because of bad quality of depth image.
-        if math.isnan(target_depth):
-            target_depth = 10
+        # if math.isnan(target_depth):
+        #     target_depth = 10
 
         return target_depth
 
@@ -66,10 +66,11 @@ class DepthSegmST(BaseTracker):
             self.target_depth = np.array([])
             target_depth = self.get_target_depth(depth, bbox)
             print('target depth:', target_depth)
-            self.target_depth = np.array([target_depth])
 
-            self.min_depth = max(0, target_depth-1500)
-            self.max_depth = target_depth + 1500
+            if not math.isnan(target_depth):
+                self.target_depth = np.array([target_depth])
+                self.min_depth = max(0, target_depth-1500)
+                self.max_depth = target_depth + 1500
 
         depth = (depth - self.min_depth) / (self.max_depth - self.min_depth) * 1.0
         depth = np.clip(depth, 0, 1.0)
@@ -577,23 +578,23 @@ class DepthSegmST(BaseTracker):
                 ''' if target depth suddenly move 0.5 meters or 0.3*HistoryDepth
                 Depth range is different from sequences, the fixed depth_threshold is not suitable
                  '''
-                new_target_depth = self.get_target_depth(raw_depth, pred_segm_region)
-                target_depth_flag = abs(np.mean(self.target_depth) - new_target_depth)
-                # target_depth_threshold = max(500, 0.3 * np.mean(self.target_depth))
-                target_depth_threshold =  max(500, 0.3 * np.mean(self.target_depth))
+                 ''' Sometimes, the distractors also have high confidence !!!
+                 how to decide worng target detected ?
+                 2. - increase unreliable conf_ thresholds ? 0.25 -> 0.5???'''
 
-                ''' Sometimes, the distractors also have high confidence !!!
-                how to decide worng target detected ?
-                2. - increase unreliable conf_ thresholds ? 0.25 -> 0.5???'''
-                if conf_ < 0.5 and target_depth_flag > target_depth_threshold:
-                    print(self.frame_num, 'target depth changes too much : ', np.mean(self.target_depth), new_target_depth)
-                    pred_segm_region = None
-                    conf_ = 0
-                # elif target_depth_flag <= 0.3 * np.mean(self.target_depth):
-                if conf_ > 0.5 or target_depth_flag <= target_depth_threshold:
-                    self.target_depth = np.append(self.target_depth, new_target_depth)
-                    if self.target_depth.size > self.params.response_budget_sz:
-                        self.target_depth = np.delete(self.target_depth, 0)
+                new_target_depth = self.get_target_depth(raw_depth, pred_segm_region)
+                if not math.isnan(new_target_depth) and len(self.target_depth) > 0:
+                    target_depth_flag = abs(np.mean(self.target_depth) - new_target_depth)
+                    target_depth_threshold =  max(500, 0.3 * np.mean(self.target_depth))
+                    if conf_ < 0.5 and target_depth_flag > target_depth_threshold:
+                        print(self.frame_num, 'target depth changes too much : ', np.mean(self.target_depth), new_target_depth)
+                        pred_segm_region = None
+                        conf_ = 0
+
+                    if conf_ > 0.5 or target_depth_flag <= target_depth_threshold:
+                        self.target_depth = np.append(self.target_depth, new_target_depth)
+                        if self.target_depth.size > self.params.response_budget_sz:
+                            self.target_depth = np.delete(self.target_depth, 0)
 
         new_state = pred_segm_region if (self.params.use_segmentation and pred_segm_region is not None) else \
                     torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]])).tolist()
@@ -1051,8 +1052,9 @@ class DepthSegmST(BaseTracker):
         self.pos = torch.max(torch.min(new_pos, self.image_sz - inside_offset), inside_offset)
 
         # Song, update target depth range
-        self.min_depth = max(0, np.mean(self.target_depth)-1500)
-        self.max_depth = np.mean(self.target_depth) + 1500
+        if len(self.target_depth) > 0:
+            self.min_depth = max(0, np.mean(self.target_depth)-1500)
+            self.max_depth = np.mean(self.target_depth) + 1500
 
     # def update_state(self, new_pos, new_scale=None, new_state=None):
     #
