@@ -45,6 +45,14 @@ class DepthSegmST(BaseTracker):
         peaks, peaks_properties = find_peaks(depth_hist, height=num_pixels/num_bins)
         peaks_heights = peaks_properties['peak_heights']
 
+        try:
+            self.ax_mrgb.cla()
+            self.ax_mrgb.plot(hist_bins, depth_hist)
+            self.ax_mrgb.plot(hist_bins[peaks], depth_hist[peaks], 'rx')
+            self.ax_mrgb.set_title('depth histogram of coarse predicted mask')
+        except:
+            pass
+
         if len(peaks) > 0:
             if len(peaks) >= 2 and len(self.target_depth)>0:
                 top2_index = np.argpartition(peaks_heights, -2)[-2:]
