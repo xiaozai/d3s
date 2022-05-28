@@ -68,8 +68,9 @@ class DepthSegmST(BaseTracker):
             target_depth = self.get_target_depth(depth, bbox)
             print('target depth:', target_depth)
 
+            self.target_depth = target_depth
+            
             if not math.isnan(target_depth):
-                self.target_depth = target_depth
                 self.min_depth = max(0, target_depth-1500)
                 self.max_depth = target_depth + 1500
 
