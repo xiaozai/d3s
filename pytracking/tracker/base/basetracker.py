@@ -344,8 +344,10 @@ class BaseTracker:
                 self.ax_d_patches.cla()
                 self.ax_d_patches.imshow(self.d_patches)
                 try:
-                    if len(self.target_depth) > 0:
+                    if type(self.target_depth) is np.ndarray and len(self.target_depth) > 0:
                         self.ax_d_patches.set_title('D patch, Target Depth :%d'%np.mean(self.target_depth))
+                    else:
+                        self.ax_d_patches.set_title('D patch, Target Depth :%d'%self.target_depth)
                 except:
                     pass
 
