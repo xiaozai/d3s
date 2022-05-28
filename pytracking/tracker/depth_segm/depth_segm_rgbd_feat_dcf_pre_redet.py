@@ -36,6 +36,8 @@ class DepthSegmST(BaseTracker):
         num_pixels = bbox[2]*bbox[3]
         depth_crop = depth[bbox[1]:bbox[1]+bbox[3], bbox[0]:bbox[0]+bbox[2]]
         depth_pixels = depth_crop.flatten()
+        depth_pixels[depth_pixels < self.min_depth] = 0
+        depth_pixels[depth_pixels > self.max_depth] = 0
         depth_pixels = depth_pixels[depth_pixels>0]
 
         depth_hist, depth_edges = np.histogram(depth_pixels, bins=20)
