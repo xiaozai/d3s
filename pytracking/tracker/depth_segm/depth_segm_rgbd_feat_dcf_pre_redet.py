@@ -100,7 +100,7 @@ class DepthSegmST(BaseTracker):
             top2_index = np.argpartition(peaks_heights, -2)[-2:]
             top2_peaks = hist_bins[peaks[top2_index]]
             # top2_dist = [abs(tp - np.mean(self.target_depth)) for tp in top2_peaks]
-            top2_dist = [abs(tp - self.target_depth)) for tp in top2_peaks]
+            top2_dist = [abs(tp - self.target_depth) for tp in top2_peaks]
             mean = top2_peaks[top2_dist.index(min(top2_dist))]
 
             std = np.std(hist_depth_pixels)
@@ -1370,7 +1370,7 @@ class DepthSegmST(BaseTracker):
 
         if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 1000:
             contour = contours[np.argmax(cnt_area)]  # use max area polygon
-            polygon = contour.reshape(-1, 2) 
+            polygon = contour.reshape(-1, 2)
 
             prbox = self.poly_to_prbox(polygon) # return 4 points
 
@@ -1479,6 +1479,18 @@ class DepthSegmST(BaseTracker):
 
         return None
 
+
+    def get_aabb(self, mask):
+        ''' Song, get axis-aligned bbox from mask '''
+        row_sum = np.sum(mask, axis=1)
+        col_sum = np.sum(mask, axis=0)
+        y0 = np.min(np.nonzero(row_sum))
+        y1 = np.max(np.nonzero(row_sum))
+        x0 = np.min(np.nonzero(col_sum))
+        x1 = np.max(np.nonzero(col_sum))
+
+        return [x0, y0, x1-x0, y1-y0]
+        
     def poly_to_prbox(self, polygon):
         ''' Song, get axis aligned bbox from polygon , return 4 points'''
         x_, y_ = polygon[:, 0], polygon[:, 1]
