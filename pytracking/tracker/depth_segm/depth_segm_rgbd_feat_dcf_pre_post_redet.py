@@ -1375,7 +1375,7 @@ class DepthSegmST(BaseTracker):
 
         ''' do the post processing on the predicted mask'''
         if patch_raw_d is not None:
-            new_mask = self.outliers_remove_by_depth(mask*patch_raw_d, max_deviations=1, num_bins=30)
+            new_mask = self.outliers_remove_by_depth(mask*patch_raw_d, max_deviations=1, num_bins=50)
             if np.sum(new_mask) / (np.sum(mask)+1.0) > 0.6:
                 mask = new_mask
 
