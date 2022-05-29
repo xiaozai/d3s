@@ -216,6 +216,7 @@ class DepthSegmST(BaseTracker):
                 state = np.array([np.min(x_), np.min(y_), np.max(x_) - np.min(x_), np.max(y_) - np.min(y_)])
 
             self.target_sz = torch.Tensor([state[3], state[2]]) # H, W
+            self.init_target_sz = state[3]*state[2]
 
             if init_mask is not None:
                 self.rotated_bbox = False
@@ -227,6 +228,7 @@ class DepthSegmST(BaseTracker):
             self.pos = torch.Tensor([state[1] + state[3] / 2, state[0] + state[2] / 2])
             # self.pos_prev = [state[1] + state[3] / 2, state[0] + state[2] / 2]
             self.target_sz = torch.Tensor([state[3], state[2]]) # H, W
+            self.init_target_sz = state[3]*state[2]
             self.gt_poly = np.array([state[0], state[1],
                                      state[0] + state[2] - 1, state[1],
                                      state[0] + state[2] - 1, state[1] + state[3] - 1,
@@ -234,6 +236,7 @@ class DepthSegmST(BaseTracker):
 
             self.prev_box = state # song
             self.rotated_bbox = False
+
 
 
         # Check if image is color
@@ -597,12 +600,12 @@ class DepthSegmST(BaseTracker):
 
         ''' Consider the target size, it sometimes model drift to small region '''
         new_target_sz = new_state[-2]*new_state[-1]
-        cur_target_sz = self.target_sz[0]*self.target_sz[1]
-        if new_target_sz <= cur_target_sz.item():
+        # cur_target_sz = self.target_sz[0]*self.target_sz[1]
+        if new_target_sz <= 0.3 * self.init_target_sz:
             print('target_sz : ', new_target_sz, cur_target_sz.item())
 
         # if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.5 and update_flag:
-        if uncert_score < self.params.tracking_uncertainty_thr and update_flag and new_target_sz > 0.3*cur_target_sz.item():
+        if uncert_score < self.params.tracking_uncertainty_thr and update_flag and new_target_sz > 0.3 * self.init_target_sz:
             # Get train sample
             train_x_rgb = TensorList([x[scale_ind:scale_ind + 1, ...] for x in test_x_rgb])
             # Create label for sample
@@ -619,7 +622,7 @@ class DepthSegmST(BaseTracker):
 
         # Update position and scale
         # if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.7:
-        if uncert_score < self.params.tracking_uncertainty_thr and new_target_sz > 0.5 * cur_target_sz.item():
+        if uncert_score < self.params.tracking_uncertainty_thr and new_target_sz > 0.5 * self.init_target_sz:
             if getattr(self.params, 'use_classifier', True):
                 self.update_state(new_pos, sample_scales[scale_ind], new_state)
 
