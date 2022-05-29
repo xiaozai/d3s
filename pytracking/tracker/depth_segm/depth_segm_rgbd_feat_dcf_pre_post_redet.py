@@ -597,7 +597,8 @@ class DepthSegmST(BaseTracker):
 
         ''' Consider the target size, it sometimes model drift to small region '''
         new_target_sz = new_state[-2]*new_state[-1]
-        target_sz_threshold = 0.2*self.target_sz[0]*self.target_sz[1]
+        target_sz_threshold = 0.3*self.target_sz[0]*self.target_sz[1]
+        print('target_sz : ', new_target_sz, target_sz_threshold.item())
         # if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.5 and update_flag:
         if uncert_score < self.params.tracking_uncertainty_thr and update_flag and new_target_sz > target_sz_threshold.item():
             # Get train sample
