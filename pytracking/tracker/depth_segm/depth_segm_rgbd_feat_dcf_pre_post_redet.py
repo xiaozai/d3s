@@ -602,7 +602,7 @@ class DepthSegmST(BaseTracker):
         new_target_sz = new_state[-2]*new_state[-1]
         # cur_target_sz = self.target_sz[0]*self.target_sz[1]
         if new_target_sz <= 0.3 * self.init_target_sz:
-            print('target_sz : ', new_target_sz, cur_target_sz.item())
+            print('target_sz : ', new_target_sz, self.init_target_sz)
 
         # if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.5 and update_flag:
         if uncert_score < self.params.tracking_uncertainty_thr and update_flag and new_target_sz > 0.3 * self.init_target_sz:
