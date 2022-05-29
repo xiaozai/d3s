@@ -113,11 +113,11 @@ class DepthSegmST(BaseTracker):
         here, self.target_depth is actually the previous target depth
         '''
         if len(peaks) >= 2 and (not math.isnan(self.target_depth)): #len(self.target_depth) > 0:
-            top2_index = np.argpartition(peaks_heights, -2)[-2:]
-            top2_peaks = hist_bins[peaks[top2_index]]
-            top2_dist = [abs(tp - self.target_depth) for tp in top2_peaks]
-            mean = top2_peaks[top2_dist.index(min(top2_dist))]
-
+            # top2_index = np.argpartition(peaks_heights, -2)[-2:]
+            # top2_peaks = hist_bins[peaks[top2_index]]
+            # top2_dist = [abs(tp - self.target_depth) for tp in top2_peaks]
+            # mean = top2_peaks[top2_dist.index(min(top2_dist))]
+            mean = hist_bins[peaks[0]]
             std = np.std(hist_depth_pixels)
 
             try:
