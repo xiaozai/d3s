@@ -109,8 +109,8 @@ class DepthSegmST(BaseTracker):
             pass
 
         ''' In self.get_target_depth, we choose the hist[peaks[0]] as target depth
-        So here, do we still need to choose the peaks closest to the self.target_depth?
-        here, self.target_depth is actually the previous target depth
+        1) So here, do we still need to choose the peaks closest to the self.target_depth?
+        2) here, self.target_depth is actually the previous target depth ??
         '''
         if len(peaks) >= 2 and (not math.isnan(self.target_depth)): #len(self.target_depth) > 0:
             # top2_index = np.argpartition(peaks_heights, -2)[-2:]
@@ -511,6 +511,7 @@ class DepthSegmST(BaseTracker):
         conf_ = self.score_map.max()
 
 
+        ''' Re-detect sometimes does not work '''
         if flag == 'not_found':
             print(self.frame_num, ' Not found target ...... start to redetection')
 
@@ -568,7 +569,7 @@ class DepthSegmST(BaseTracker):
                 new_target_depth = self.get_target_depth(raw_depth, pred_segm_region)
                 if (not math.isnan(new_target_depth)) and (not math.isnan(self.target_depth)):
                     target_depth_flag = abs(self.target_depth - new_target_depth) / self.target_depth
-                    if target_depth_flag > 0.5:
+                    if target_depth_flag > 0.4:
                         print(self.frame_num, 'target depth changes too much : ', self.target_depth, new_target_depth)
                         pred_segm_region = None
                         conf_ = 0
@@ -594,7 +595,7 @@ class DepthSegmST(BaseTracker):
         hard_negative = (flag == 'hard_negative')
         learning_rate = self.params.hard_negative_learning_rate if hard_negative else None
 
-        if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.6 and update_flag:
+        if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.5 and update_flag:
             # Get train sample
             train_x_rgb = TensorList([x[scale_ind:scale_ind + 1, ...] for x in test_x_rgb])
             # Create label for sample
@@ -605,7 +606,7 @@ class DepthSegmST(BaseTracker):
         # Train filter
         if hard_negative:
             self.filter_optimizer.run(self.params.hard_negative_CG_iter)
-        elif (self.frame_num - 1) % self.params.train_skipping == 0 and conf_ > 0.6:
+        elif (self.frame_num - 1) % self.params.train_skipping == 0 and conf_ > 0.5:
             self.filter_optimizer.run(self.params.CG_iter)
 
         # Update position and scale
