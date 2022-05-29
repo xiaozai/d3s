@@ -1027,45 +1027,50 @@ class DepthSegmST(BaseTracker):
             train_y.append(dcf.label_function_spatial(sz, sig, center))
         return train_y
 
+    # def update_state(self, new_pos, new_scale=None, new_state=None):
+    #     # Update scale
+    #     if new_state is not None:
+    #         new_target_scale = (math.sqrt(new_state[2] * new_state[3]) * self.params.search_area_scale) / \
+    #                            self.img_sample_sz[0]
+    #
+    #         rel_scale_ch = (abs(new_target_scale - self.target_scale) / self.target_scale).item()
+    #
+    #         ''' if target scale change too small, then dont change, keep it as 1.05 '''
+    #         if new_target_scale > self.params.segm_min_scale and rel_scale_ch > 0.3:
+    #
+    #             self.target_scale = max(self.target_scale * self.params.min_scale_change_factor,
+    #                                         min(self.target_scale * self.params.max_scale_change_factor,
+    #                                             new_target_scale))
+    #             self.target_sz = self.base_target_sz * self.target_scale
+    #
+    #     # Update pos
+    #     inside_ratio = 0.2
+    #     inside_offset = (inside_ratio - 0.5) * self.target_sz
+    #     self.pos = torch.max(torch.min(new_pos, self.image_sz - inside_offset), inside_offset)
+    #
+    #     # Song, update target depth range
+    #     if not math.isnan(self.target_depth):
+    #         self.min_depth = max(0, self.target_depth-1500)
+    #         self.max_depth = self.target_depth + 1500
+
     def update_state(self, new_pos, new_scale=None, new_state=None):
+
         # Update scale
-        if new_state is not None:
-            new_target_scale = (math.sqrt(new_state[2] * new_state[3]) * self.params.search_area_scale) / \
-                               self.img_sample_sz[0]
-
-            rel_scale_ch = (abs(new_target_scale - self.target_scale) / self.target_scale).item()
-
-            ''' if target scale change too small, then dont change, keep it as 1.05 '''
-            if new_target_scale > self.params.segm_min_scale and rel_scale_ch > 0.3:
-
-                self.target_scale = max(self.target_scale * self.params.min_scale_change_factor,
-                                            min(self.target_scale * self.params.max_scale_change_factor,
-                                                new_target_scale))
-                self.target_sz = self.base_target_sz * self.target_scale
+        if new_scale is not None:
+            self.target_scale = new_scale.clamp(self.min_scale_factor, self.max_scale_factor)
+            self.target_sz = self.base_target_sz * self.target_scale
+            # print('update_state target scale 22 : ', self.target_scale, self.target_sz)
 
         # Update pos
         inside_ratio = 0.2
         inside_offset = (inside_ratio - 0.5) * self.target_sz
+        # print(self.frame_num, 'update pos')
         self.pos = torch.max(torch.min(new_pos, self.image_sz - inside_offset), inside_offset)
 
         # Song, update target depth range
         if not math.isnan(self.target_depth):
             self.min_depth = max(0, self.target_depth-1500)
             self.max_depth = self.target_depth + 1500
-
-    # def update_state(self, new_pos, new_scale=None, new_state=None):
-    #
-    #     # Update scale
-    #     if new_scale is not None:
-    #         self.target_scale = new_scale.clamp(self.min_scale_factor, self.max_scale_factor)
-    #         self.target_sz = self.base_target_sz * self.target_scale
-    #         # print('update_state target scale 22 : ', self.target_scale, self.target_sz)
-    #
-    #     # Update pos
-    #     inside_ratio = 0.2
-    #     inside_offset = (inside_ratio - 0.5) * self.target_sz
-    #     # print(self.frame_num, 'update pos')
-    #     self.pos = torch.max(torch.min(new_pos, self.image_sz - inside_offset), inside_offset)
 
 
     def create_dist(self, width, height, cx=None, cy=None):
