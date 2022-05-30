@@ -613,7 +613,9 @@ class DepthSegmST(BaseTracker):
         hard_negative = (flag == 'hard_negative')
         learning_rate = self.params.hard_negative_learning_rate if hard_negative else None
 
-        if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.6 and update_flag:
+        conf_flag = conf_ > 0.5
+
+        if uncert_score < self.params.tracking_uncertainty_thr and conf_flag and update_flag:
             # Get train sample
             train_x_rgb = TensorList([x[scale_ind:scale_ind + 1, ...] for x in test_x_rgb])
             # Create label for sample
@@ -624,11 +626,11 @@ class DepthSegmST(BaseTracker):
         # Train filter
         if hard_negative:
             self.filter_optimizer.run(self.params.hard_negative_CG_iter)
-        elif (self.frame_num - 1) % self.params.train_skipping == 0 and conf_ > 0.6:
+        elif (self.frame_num - 1) % self.params.train_skipping == 0 and conf_flag:
             self.filter_optimizer.run(self.params.CG_iter)
 
         # Update position and scale
-        if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.7:
+        if uncert_score < self.params.tracking_uncertainty_thr and conf_flag:
             if getattr(self.params, 'use_classifier', True):
                 self.update_state(new_pos, sample_scales[scale_ind], new_state)
 
