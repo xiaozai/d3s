@@ -615,7 +615,7 @@ class DepthSegmST(BaseTracker):
 
         conf_flag = conf_ > 0.5
 
-        if uncert_score < self.params.tracking_uncertainty_thr and conf_flag and update_flag:
+        if uncert_score < self.params.tracking_uncertainty_thr and update_flag:
             # Get train sample
             train_x_rgb = TensorList([x[scale_ind:scale_ind + 1, ...] for x in test_x_rgb])
             # Create label for sample
@@ -630,7 +630,7 @@ class DepthSegmST(BaseTracker):
             self.filter_optimizer.run(self.params.CG_iter)
 
         # Update position and scale
-        if uncert_score < self.params.tracking_uncertainty_thr and conf_flag:
+        if uncert_score < self.params.tracking_uncertainty_thr and conf_flag and pred_segm_region is not None:
             if getattr(self.params, 'use_classifier', True):
                 self.update_state(new_pos, sample_scales[scale_ind], new_state)
 
