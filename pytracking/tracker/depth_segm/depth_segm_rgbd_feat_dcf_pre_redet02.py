@@ -575,6 +575,7 @@ class DepthSegmST(BaseTracker):
         if flag == 'not_found':
             uncert_score = 100
             conf_ = 0
+            # new_pos = self.pos.clone()
 
         self.uncert_score = uncert_score
 
@@ -592,7 +593,7 @@ class DepthSegmST(BaseTracker):
                 new_target_depth = self.get_target_depth(raw_depth, pred_segm_region)
                 if (not math.isnan(new_target_depth)) and (not math.isnan(self.target_depth)):
                     target_depth_flag = abs(self.target_depth - new_target_depth) / self.target_depth
-                    if target_depth_flag > 0.5:
+                    if target_depth_flag > 0.35:
                         print(self.frame_num, 'target depth changes too much : ', self.target_depth, new_target_depth)
                         pred_segm_region = None
                         conf_ = 0
