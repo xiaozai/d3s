@@ -11,6 +11,7 @@ from .depth_segm_rgbd_cat_dcf_redetection import DepthSegmST as DepthSegmRGBDDCF
 from .depth_segm_pos_coatten_rgbd_dcf_redet import DepthSegmST as DepthSegmPosCoAttenDCFRedet
 from .depth_segm_rgbd_feat_dcf_post_redet import DepthSegmST as DepthSegmRGBDFeatDCFPostRedet
 from .depth_segm_rgbd_feat_dcf_pre_redet import DepthSegmST as DepthSegmRGBDFeatDCFPreRedet
+from .depth_segm_rgbd_feat_dcf_pre_redet02 import DepthSegmST as DepthSegmRGBDFeatDCFPreRedet02
 from .depth_segm_rgbd_feat_dcf_pre_post_redet import DepthSegmST as DepthSegmRGBDFeatDCFPrePostRedet
 
 def get_tracker_class(model="depthsegm_st"):
@@ -38,6 +39,8 @@ def get_tracker_class(model="depthsegm_st"):
         return DepthSegmRGBDFeatDCFPostRedet
     elif model == 'depth_segm_rgbd_feat_dcf_pre_redet':
         return DepthSegmRGBDFeatDCFPreRedet
+    elif model == 'depth_segm_rgbd_feat_dcf_pre_redet02':
+        return DepthSegmRGBDFeatDCFPreRedet02
     elif model == 'depth_segm_rgbd_feat_dcf_pre_post_redet':
         return DepthSegmRGBDFeatDCFPrePostRedet
     else:

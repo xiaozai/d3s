@@ -44,10 +44,23 @@ class DepthSegmST(BaseTracker):
         hist_bins = (depth_edges[:-1] + depth_edges[1:]) / 2.0
         peaks, _ = find_peaks(depth_hist, height=num_pixels/10)
 
+        try:
+            self.ax_mrgb.cla()
+            self.ax_mrgb.plot(hist_bins, depth_hist)
+            self.ax_mrgb.plot(hist_bins[peaks], depth_hist[peaks], 'rx')
+            self.ax_mrgb.plot(hist_bins[peaks[0]], depth_hist[peaks[0]], 'bo')
+            self.ax_mrgb.set_title('depth histogram of coarse predicted mask')
+        except:
+            pass
+
         if len(peaks) > 0:
             target_depth = hist_bins[peaks[0]]
         else:
             target_depth = np.median(depth_pixels)
+
+        # Target Depth may be Nan, because of bad quality of depth image.
+        # if target_depth is None:
+        #     target_depth = 10
 
         return target_depth
 
@@ -95,16 +108,13 @@ class DepthSegmST(BaseTracker):
         except:
             pass
 
-        ''' In self.get_target_depth, we choose the hist[peaks[0]] as target depth
-        1) So here, do we still need to choose the peaks closest to the self.target_depth?
-        2) here, self.target_depth is actually the previous target depth ??
-        '''
         if len(peaks) >= 2 and (not math.isnan(self.target_depth)): #len(self.target_depth) > 0:
-            # top2_index = np.argpartition(peaks_heights, -2)[-2:]
-            # top2_peaks = hist_bins[peaks[top2_index]]
-            # top2_dist = [abs(tp - self.target_depth) for tp in top2_peaks]
-            # mean = top2_peaks[top2_dist.index(min(top2_dist))]
-            mean = hist_bins[peaks[0]]
+            top2_index = np.argpartition(peaks_heights, -2)[-2:]
+            top2_peaks = hist_bins[peaks[top2_index]]
+            # top2_dist = [abs(tp - np.mean(self.target_depth)) for tp in top2_peaks]
+            top2_dist = [abs(tp - self.target_depth) for tp in top2_peaks]
+            mean = top2_peaks[top2_dist.index(min(top2_dist))]
+
             std = np.std(hist_depth_pixels)
 
             try:
@@ -113,6 +123,7 @@ class DepthSegmST(BaseTracker):
                 self.ax_mrgb.vlines(mean-max_deviations*std, 0, max(depth_hist), 'b')
             except:
                 pass
+
 
             # exceed the max_deviation * std, 94%
             dist = abs(depth_pixels - mean)
@@ -203,7 +214,6 @@ class DepthSegmST(BaseTracker):
                 state = np.array([np.min(x_), np.min(y_), np.max(x_) - np.min(x_), np.max(y_) - np.min(y_)])
 
             self.target_sz = torch.Tensor([state[3], state[2]]) # H, W
-            self.init_target_sz = state[3]*state[2]
 
             if init_mask is not None:
                 self.rotated_bbox = False
@@ -215,7 +225,6 @@ class DepthSegmST(BaseTracker):
             self.pos = torch.Tensor([state[1] + state[3] / 2, state[0] + state[2] / 2])
             # self.pos_prev = [state[1] + state[3] / 2, state[0] + state[2] / 2]
             self.target_sz = torch.Tensor([state[3], state[2]]) # H, W
-            self.init_target_sz = state[3]*state[2]
             self.gt_poly = np.array([state[0], state[1],
                                      state[0] + state[2] - 1, state[1],
                                      state[0] + state[2] - 1, state[1] + state[3] - 1,
@@ -223,7 +232,6 @@ class DepthSegmST(BaseTracker):
 
             self.prev_box = state # song
             self.rotated_bbox = False
-
 
 
         # Check if image is color
@@ -501,18 +509,16 @@ class DepthSegmST(BaseTracker):
         conf_ = self.score_map.max()
 
 
-        ''' Re-detect sometimes does not work '''
         if flag == 'not_found':
             print(self.frame_num, ' Not found target ...... start to redetection')
 
-            '''Re-detection'''
-            # Increase search region
-            self.params.scale_factors = self.params.scale_factors * 1.5
-
+            ''' Re-detection with RGB DCF '''
             sample_pos = copy.deepcopy(self.pos)
             sample_scales = self.target_scale * self.params.scale_factors
 
+            self.params.use_rgbd_classifier = False
             test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
+            self.params.use_rgbd_classifier = True
 
             # Compute scores
             scores_raw = self.apply_filter(test_x_rgb)
@@ -522,26 +528,53 @@ class DepthSegmST(BaseTracker):
 
             # Localization uncertainty
             max_score = torch.max(s).item()
-            uncert_score = 0
-            if self.frame_num > 5:
-                uncert_score = np.mean(self.scores) / max_score
-
-            if uncert_score < self.params.tracking_uncertainty_thr:
-                self.scores = np.append(self.scores, max_score)
-                if self.scores.size > self.params.response_budget_sz:
-                    self.scores = np.delete(self.scores, 0)
 
             self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy()
             conf_ = self.score_map.max()
 
             if flag == 'not_found':
-                uncert_score = 100
-                conf_ = 0
+                '''Re-detection with RGBD DCF + 1.5 larger search scale factors'''
+                # Increase search region
+                self.params.scale_factors = self.params.scale_factors * 1.5
+
+                sample_pos = copy.deepcopy(self.pos)
+                sample_scales = self.target_scale * self.params.scale_factors
+
+                test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
+
+                # Compute scores
+                scores_raw = self.apply_filter(test_x_rgb)
+
+                translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
+                new_pos = sample_pos + translation_vec
+
+                # Localization uncertainty
+                max_score = torch.max(s).item()
+
+                self.score_map = s[scale_ind, ...].squeeze().cpu().detach().numpy()
+                conf_ = self.score_map.max()
+
+                self.params.scale_factors = self.params.scale_factors / 1.5
+
+                if flag not in ['not_found', 'uncertain']:
+                    print('re-found tatrget by RGBD DCF and 1.5 scarch factors ...')
+
             else:
-                print('re-found tatrget ...')
+                print('re-found tatrget by RGB DCF ...')
 
-            self.params.scale_factors = self.params.scale_factors / 1.5
 
+        uncert_score = 0
+        if self.frame_num > 5:
+            uncert_score = np.mean(self.scores) / max_score
+
+        if uncert_score < self.params.tracking_uncertainty_thr:
+            self.scores = np.append(self.scores, max_score)
+            if self.scores.size > self.params.response_budget_sz:
+                self.scores = np.delete(self.scores, 0)
+
+        if flag == 'not_found':
+            uncert_score = 100
+            conf_ = 0
 
         self.uncert_score = uncert_score
 
@@ -549,7 +582,7 @@ class DepthSegmST(BaseTracker):
         if self.segmentation_task or (
             self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
 
-            pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz, raw_depth=raw_depth)
+            pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
             pred_segm_region = pred_segm_region[0] if isinstance(pred_segm_region, tuple) else pred_segm_region
 
             if pred_segm_region is None:
@@ -559,18 +592,13 @@ class DepthSegmST(BaseTracker):
                 new_target_depth = self.get_target_depth(raw_depth, pred_segm_region)
                 if (not math.isnan(new_target_depth)) and (not math.isnan(self.target_depth)):
                     target_depth_flag = abs(self.target_depth - new_target_depth) / self.target_depth
-                    if target_depth_flag > 0.4:
+                    if target_depth_flag > 0.5:
                         print(self.frame_num, 'target depth changes too much : ', self.target_depth, new_target_depth)
                         pred_segm_region = None
                         conf_ = 0
                     else:
                         self.target_depth = new_target_depth
-        # else:
-        #     print('update self.pos using localize_target, because of uncert_score: ', uncert_score)
-        #
-        #     ''' if uncertainty > threshold, it may be "not found", should not update self.pos with new_pos '''
-        #     self.pos = new_pos.clone()
-        #     # self.pos = self.prev_pos
+
 
         new_state = pred_segm_region if (self.params.use_segmentation and pred_segm_region is not None) else \
                     torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]])).tolist()
@@ -585,14 +613,7 @@ class DepthSegmST(BaseTracker):
         hard_negative = (flag == 'hard_negative')
         learning_rate = self.params.hard_negative_learning_rate if hard_negative else None
 
-        ''' Consider the target size, it sometimes model drift to small region '''
-        new_target_sz = new_state[-2]*new_state[-1]
-        # cur_target_sz = self.target_sz[0]*self.target_sz[1]
-        if new_target_sz <= 0.3 * self.init_target_sz:
-            print('target_sz : ', new_target_sz, self.init_target_sz)
-
-        # if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.5 and update_flag:
-        if uncert_score < self.params.tracking_uncertainty_thr and update_flag and new_target_sz > 0.3 * self.init_target_sz:
+        if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.6 and update_flag:
             # Get train sample
             train_x_rgb = TensorList([x[scale_ind:scale_ind + 1, ...] for x in test_x_rgb])
             # Create label for sample
@@ -603,20 +624,13 @@ class DepthSegmST(BaseTracker):
         # Train filter
         if hard_negative:
             self.filter_optimizer.run(self.params.hard_negative_CG_iter)
-        # elif (self.frame_num - 1) % self.params.train_skipping == 0 and conf_ > 0.5:
-        elif (self.frame_num - 1) % self.params.train_skipping == 0:
+        elif (self.frame_num - 1) % self.params.train_skipping == 0 and conf_ > 0.6:
             self.filter_optimizer.run(self.params.CG_iter)
 
         # Update position and scale
-        # if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.7:
-        if uncert_score < self.params.tracking_uncertainty_thr and new_target_sz > 0.5 * self.init_target_sz:
+        if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.7:
             if getattr(self.params, 'use_classifier', True):
                 self.update_state(new_pos, sample_scales[scale_ind], new_state)
-
-
-        ''' Song, should we update the Segment network ??? self.train_feat ???
-        self.init_segmentation(self, color, depth, bb, init_mask=None, raw_depth=None):
-        '''
 
         return new_state, conf_
 
@@ -1019,50 +1033,45 @@ class DepthSegmST(BaseTracker):
             train_y.append(dcf.label_function_spatial(sz, sig, center))
         return train_y
 
-    # def update_state(self, new_pos, new_scale=None, new_state=None):
-    #     # Update scale
-    #     if new_state is not None:
-    #         new_target_scale = (math.sqrt(new_state[2] * new_state[3]) * self.params.search_area_scale) / \
-    #                            self.img_sample_sz[0]
-    #
-    #         rel_scale_ch = (abs(new_target_scale - self.target_scale) / self.target_scale).item()
-    #
-    #         ''' if target scale change too small, then dont change, keep it as 1.05 '''
-    #         if new_target_scale > self.params.segm_min_scale and rel_scale_ch > 0.3:
-    #
-    #             self.target_scale = max(self.target_scale * self.params.min_scale_change_factor,
-    #                                         min(self.target_scale * self.params.max_scale_change_factor,
-    #                                             new_target_scale))
-    #             self.target_sz = self.base_target_sz * self.target_scale
-    #
-    #     # Update pos
-    #     inside_ratio = 0.2
-    #     inside_offset = (inside_ratio - 0.5) * self.target_sz
-    #     self.pos = torch.max(torch.min(new_pos, self.image_sz - inside_offset), inside_offset)
-    #
-    #     # Song, update target depth range
-    #     if not math.isnan(self.target_depth):
-    #         self.min_depth = max(0, self.target_depth-1500)
-    #         self.max_depth = self.target_depth + 1500
-
     def update_state(self, new_pos, new_scale=None, new_state=None):
-
         # Update scale
-        if new_scale is not None:
-            self.target_scale = new_scale.clamp(self.min_scale_factor, self.max_scale_factor)
-            self.target_sz = self.base_target_sz * self.target_scale
-            # print('update_state target scale 22 : ', self.target_scale, self.target_sz)
+        if new_state is not None:
+            new_target_scale = (math.sqrt(new_state[2] * new_state[3]) * self.params.search_area_scale) / \
+                               self.img_sample_sz[0]
+
+            rel_scale_ch = (abs(new_target_scale - self.target_scale) / self.target_scale).item()
+
+            ''' if target scale change too small, then dont change, keep it as 1.05 '''
+            if new_target_scale > self.params.segm_min_scale and rel_scale_ch > 0.3:
+
+                self.target_scale = max(self.target_scale * self.params.min_scale_change_factor,
+                                            min(self.target_scale * self.params.max_scale_change_factor,
+                                                new_target_scale))
+                self.target_sz = self.base_target_sz * self.target_scale
 
         # Update pos
         inside_ratio = 0.2
         inside_offset = (inside_ratio - 0.5) * self.target_sz
-        # print(self.frame_num, 'update pos')
         self.pos = torch.max(torch.min(new_pos, self.image_sz - inside_offset), inside_offset)
 
         # Song, update target depth range
         if not math.isnan(self.target_depth):
             self.min_depth = max(0, self.target_depth-1500)
             self.max_depth = self.target_depth + 1500
+
+    # def update_state(self, new_pos, new_scale=None, new_state=None):
+    #
+    #     # Update scale
+    #     if new_scale is not None:
+    #         self.target_scale = new_scale.clamp(self.min_scale_factor, self.max_scale_factor)
+    #         self.target_sz = self.base_target_sz * self.target_scale
+    #         # print('update_state target scale 22 : ', self.target_scale, self.target_sz)
+    #
+    #     # Update pos
+    #     inside_ratio = 0.2
+    #     inside_offset = (inside_ratio - 0.5) * self.target_sz
+    #     # print(self.frame_num, 'update pos')
+    #     self.pos = torch.max(torch.min(new_pos, self.image_sz - inside_offset), inside_offset)
 
 
     def create_dist(self, width, height, cx=None, cy=None):
@@ -1309,7 +1318,7 @@ class DepthSegmST(BaseTracker):
 
         self.polygon = None
 
-    def segment_target(self, color, depth, pos, sz, raw_depth=None):
+    def segment_target(self, color, depth, pos, sz):
         # pos and sz are in the image coordinates
         # construct new bounding box first
         ''' Song, bb increase according to target sz and target scales !!!!!'''
@@ -1326,10 +1335,6 @@ class DepthSegmST(BaseTracker):
                                           output_sz=self.params.segm_output_sz, pad_val=0)
         if not self.params.use_colormap:
             patch_d = np.expand_dims(patch_d, axis=-1)
-
-        if raw_depth is not None:
-            patch_raw_d, _ = prutils.sample_target(raw_depth, np.array(bb), self.params.segm_search_area_factor,
-                                              output_sz=self.params.segm_output_sz, pad_val=0)
 
         segm_crop_sz = math.ceil(math.sqrt(bb[2] * bb[3]) * self.params.segm_search_area_factor)
 
@@ -1382,12 +1387,6 @@ class DepthSegmST(BaseTracker):
         if self.params.save_mask:
             mask_real = copy.copy(mask)
         mask = (mask > self.params.segm_mask_thr).astype(np.uint8)
-
-        ''' do the post processing on the predicted mask'''
-        if patch_raw_d is not None:
-            new_mask = self.outliers_remove_by_depth(mask*patch_raw_d, max_deviations=0.8, num_bins=30)
-            if np.sum(new_mask) / (np.sum(mask)+1.0) > 0.6:
-                mask = new_mask
 
         # self.mask = mask # predicted segmentation
         self.masked_img = patch_rgb
