@@ -461,6 +461,8 @@ class DepthSegmST(BaseTracker):
         # Convert image
         color, depth = image['color'], image['depth']
         raw_depth = copy.deepcopy(depth) # use to check target depth
+        raw_depth[raw_depth < self.min_depth] = 0
+        raw_depth[raw_depth > self.max_depth] = 0
         depth = self.depth_processing(depth, use_colormap=self.params.use_colormap)
 
         if self.params.use_normalized_DCF:
