@@ -493,7 +493,7 @@ class DepthSegmST(BaseTracker):
             print(self.frame_num, ' Not found target ...... start to redetection')
 
             '''Re-detection'''
-            for redetect_factor in [1.2, 1.4, 1.6， 2]:
+            for redetect_factor in [1.2, 1.4, 1.6, 2]:
                 # Increase search region
                 self.params.scale_factors = self.params.scale_factors * redetect_factor
 
