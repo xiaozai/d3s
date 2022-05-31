@@ -31,6 +31,7 @@ class BaseTracker:
         times = []
         start_time = time.time()
         self.sequence_name = sequence.name
+        ''' We can save the initial mask here'''
         self.initialize(image, sequence.init_state, init_mask=sequence.init_mask)
         init_time = getattr(self, 'time', time.time() - start_time)
         times.append(init_time)
