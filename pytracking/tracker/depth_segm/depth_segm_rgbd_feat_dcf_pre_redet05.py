@@ -478,43 +478,28 @@ class DepthSegmST(BaseTracker):
         # ------- LOCALIZATION ------- #
         # Get sample
         sample_pos = copy.deepcopy(self.pos)
-        sample_scales = self.target_scale * self.params.scale_factors
 
-        ''' test_x_rgb is fused rgbd features if use_rgbd_classifier '''
-        test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
+        for redetect_factor in [1.0, 1.2, 1.5, 1.8]:
+            # Increase search region
+            self.params.scale_factors = self.params.scale_factors * redetect_factor
 
-        # Compute scores
-        scores_raw = self.apply_filter(test_x_rgb)
+            # sample_pos = copy.deepcopy(self.pos)
+            sample_scales = self.target_scale * self.params.scale_factors
 
-        translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
-        new_pos = sample_pos + translation_vec
+            test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
 
-        if flag == 'not_found':
-            print(self.frame_num, ' Not found target ...... start to redetection')
+            # Compute scores
+            scores_raw = self.apply_filter(test_x_rgb)
 
-            '''Re-detection'''
-            # for redetect_factor in [1.2, 1.5, 1.8]:
-            for redetect_factor in [0.8, 1.1, 1.25, 1.5]:
-                # Increase search region
-                self.params.scale_factors = self.params.scale_factors * redetect_factor
+            translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
+            new_pos = sample_pos + translation_vec
 
-                sample_pos = copy.deepcopy(self.pos)
-                sample_scales = self.target_scale * self.params.scale_factors
+            self.params.scale_factors = self.params.scale_factors / redetect_factor
 
-                test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
-
-                # Compute scores
-                scores_raw = self.apply_filter(test_x_rgb)
-
-                translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
-                new_pos = sample_pos + translation_vec
-
-                self.params.scale_factors = self.params.scale_factors / redetect_factor
-
-                if flag not in ['not_found', 'uncertain']:
+            if flag not in ['not_found']:
+                if redetect_factor > 1.0:
                     print('re-found tatrget by %f redtect factor...'%redetect_factor)
-                    break
-
+                break
 
         # Localization uncertainty
         max_score = torch.max(s).item()
@@ -542,8 +527,7 @@ class DepthSegmST(BaseTracker):
             self.params.use_segmentation and uncert_score < self.params.uncertainty_segment_thr):
 
             pred_segm_region = self.segment_target(color, depth, new_pos, self.target_sz)
-            pred_segm_region = pred_segm_region[0] if isinstance(pred_segm_region, tuple) else pred_segm_region
-
+            
             if pred_segm_region is None:
                 print(self.frame_num, ' segmentation failed ...')
                 self.pos = new_pos.clone()
@@ -566,13 +550,17 @@ class DepthSegmST(BaseTracker):
         self.conf_ = conf_ # for vis only
 
         # ------- UPDATE ------- #
-
+        ''' Song,
+        update memory and filter_optimizer will affect the DCF localization,
+            more new sample_x, more precise
+        update_state will affect the target scale !!!
+        '''
         # Check flags and set learning rate if hard negative
         update_flag = flag not in ['not_found', 'uncertain']
         hard_negative = (flag == 'hard_negative')
         learning_rate = self.params.hard_negative_learning_rate if hard_negative else None
 
-        if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.6 and update_flag:
+        if uncert_score < self.params.tracking_uncertainty_thr and update_flag: #  and conf_ > 0.6 and update_flag:
             # Get train sample
             train_x_rgb = TensorList([x[scale_ind:scale_ind + 1, ...] for x in test_x_rgb])
             # Create label for sample
@@ -583,7 +571,7 @@ class DepthSegmST(BaseTracker):
         # Train filter
         if hard_negative:
             self.filter_optimizer.run(self.params.hard_negative_CG_iter)
-        elif (self.frame_num - 1) % self.params.train_skipping == 0 and conf_ > 0.6:
+        elif (self.frame_num - 1) % self.params.train_skipping == 0: # and conf_ > 0.6:
             self.filter_optimizer.run(self.params.CG_iter)
 
         # Update position and scale
@@ -1017,19 +1005,17 @@ class DepthSegmST(BaseTracker):
         if not math.isnan(self.target_depth):
             self.min_depth = max(0, self.target_depth-1500)
             self.max_depth = self.target_depth + 1500
-
+    #
     # def update_state(self, new_pos, new_scale=None, new_state=None):
     #
     #     # Update scale
     #     if new_scale is not None:
     #         self.target_scale = new_scale.clamp(self.min_scale_factor, self.max_scale_factor)
     #         self.target_sz = self.base_target_sz * self.target_scale
-    #         # print('update_state target scale 22 : ', self.target_scale, self.target_sz)
     #
     #     # Update pos
     #     inside_ratio = 0.2
     #     inside_offset = (inside_ratio - 0.5) * self.target_sz
-    #     # print(self.frame_num, 'update pos')
     #     self.pos = torch.max(torch.min(new_pos, self.image_sz - inside_offset), inside_offset)
 
 
@@ -1360,7 +1346,8 @@ class DepthSegmST(BaseTracker):
             _, contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         cnt_area = [cv2.contourArea(cnt) for cnt in contours]
 
-        if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 1000:
+        # if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 1000:
+        if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 600:
             contour = contours[np.argmax(cnt_area)]  # use max area polygon
             polygon = contour.reshape(-1, 2)
 
