@@ -36,25 +36,34 @@ class DepthSegmST(BaseTracker):
         num_pixels = bbox[2]*bbox[3]
         depth_crop = depth[bbox[1]:bbox[1]+bbox[3], bbox[0]:bbox[0]+bbox[2]]
         depth_pixels = depth_crop.flatten()
+        old_num_depth_pixels = len(depth_pixels)
+
         depth_pixels[depth_pixels < self.min_depth] = 0
         depth_pixels[depth_pixels > self.max_depth] = 0
         depth_pixels = depth_pixels[depth_pixels>0]
 
-        depth_hist, depth_edges = np.histogram(depth_pixels, bins=20)
-        hist_bins = (depth_edges[:-1] + depth_edges[1:]) / 2.0
-        peaks, _ = find_peaks(depth_hist, height=num_pixels/10)
+        num_depth_pixels= len(depth_pixels)
 
-        try:
-            self.ax_mrgb.cla()
-            self.ax_mrgb.plot(hist_bins, depth_hist)
-            self.ax_mrgb.plot(hist_bins[peaks], depth_hist[peaks], 'rx')
-            self.ax_mrgb.plot(hist_bins[peaks[0]], depth_hist[peaks[0]], 'bo')
-            self.ax_mrgb.set_title('depth histogram of coarse predicted mask')
-        except:
-            pass
+        # print('old vs new depth_pixels: ', old_num_depth_pixels, num_depth_pixels)
+        if num_depth_pixels > 0.2 * old_num_depth_pixels:
 
-        if len(peaks) > 0:
-            target_depth = hist_bins[peaks[0]]
+            depth_hist, depth_edges = np.histogram(depth_pixels, bins=20)
+            hist_bins = (depth_edges[:-1] + depth_edges[1:]) / 2.0
+            peaks, _ = find_peaks(depth_hist, height=num_pixels/10)
+
+            try:
+                self.ax_mrgb.cla()
+                self.ax_mrgb.plot(hist_bins, depth_hist)
+                self.ax_mrgb.plot(hist_bins[peaks], depth_hist[peaks], 'rx')
+                self.ax_mrgb.plot(hist_bins[peaks[0]], depth_hist[peaks[0]], 'bo')
+                self.ax_mrgb.set_title('depth histogram of coarse predicted mask')
+            except:
+                pass
+
+            if len(peaks) > 0:
+                target_depth = hist_bins[peaks[0]]
+            else:
+                target_depth = np.median(depth_pixels)
         else:
             target_depth = np.median(depth_pixels)
 
@@ -482,38 +491,94 @@ class DepthSegmST(BaseTracker):
 
         ''' test_x_rgb is fused rgbd features if use_rgbd_classifier '''
         test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
-
         # Compute scores
         scores_raw = self.apply_filter(test_x_rgb)
-
+        #
         translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
         new_pos = sample_pos + translation_vec
 
         if flag == 'not_found':
             print(self.frame_num, ' Not found target ...... start to redetection')
 
-            '''Re-detection'''
-            # for redetect_factor in [1.2, 1.5, 1.8]:
-            for redetect_factor in [0.8, 1.1, 1.25, 1.5, 2, 2.5]:
-                # Increase search region
-                self.params.scale_factors = self.params.scale_factors * redetect_factor
+            shift_base =  0.75 * self.params.search_area_scale * max(self.target_sz[0].item(), self.target_sz[1].item())
+            pos_y, pos_x = self.pos[0].item(), self.pos[1].item()
 
-                sample_pos = copy.deepcopy(self.pos)
-                sample_scales = self.target_scale * self.params.scale_factors
+            sample_scales = self.target_scale * self.params.scale_factors
 
-                test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
-
+            '''Re-detection with different sample pos'''
+            for shift in [[0, 0], [1,1], [-1, -1], [1, -1], [-1, 1]]:
+                # sample_pos = copy.deepcopy(self.pos)
+                x_shift = shift_base * shift[0]
+                y_shift = shift_base * shift[1]
+                temp_pos_y = min(max(0, pos_y + y_shift), color.shape[0])
+                temp_pos_x = min(max(0, pos_x + x_shift), color.shape[1])
+                temp_pos = torch.Tensor([temp_pos_y, temp_pos_x])
+                # Crop and extract features
+                test_x_rgb = self.extract_processed_sample(im, dp, temp_pos, sample_scales, self.img_sample_sz)
                 # Compute scores
                 scores_raw = self.apply_filter(test_x_rgb)
-
+                # Localize
                 translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
-                new_pos = sample_pos + translation_vec
 
+                if flag not in ['not_found', 'uncertain']:
+                    print('re-found tatrget by pos shift and redetect scale...', shift, redetect_factor)
+                    new_pos = temp_pos + translation_vec
+                    break
+
+            if flag not in ['not_found', 'uncertain']:
+                break
+
+
+        if flag == 'not_found':
+            print(self.frame_num, ' Not found target ...... start to redetection with different scale')
+            
+            for redetect_factor in [0.8, 1.1, 1.25, 1.5, 2]:
+                # Increase search region
+                self.params.scale_factors = self.params.scale_factors * redetect_factor
+                #
+                sample_pos = copy.deepcopy(self.pos)
+                sample_scales = self.target_scale * self.params.scale_factors
+                #
+                test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
+                # Compute scores
+                scores_raw = self.apply_filter(test_x_rgb)
+                # Localize
+                translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
+                # Decrease search region back
                 self.params.scale_factors = self.params.scale_factors / redetect_factor
 
                 if flag not in ['not_found', 'uncertain']:
                     print('re-found tatrget by %f redtect factor...'%redetect_factor)
+                    new_pos = sample_pos + translation_vec
                     break
+
+        ''' RGB only DCF '''
+        # if flag == 'not_found':
+        #     print(self.frame_num, ' Not found target ...... start to redetection with different scale')
+        #
+        #     '''Re-detection'''
+        #     # for redetect_factor in [1.2, 1.5, 1.8]:
+        #     for redetect_factor in [0.6, 0.8, 1.1, 1.25, 1.5, 2, 2.5]:
+        #         # Increase search region
+        #         self.params.scale_factors = self.params.scale_factors * redetect_factor
+        #         #
+        #         sample_pos = copy.deepcopy(self.pos)
+        #         sample_scales = self.target_scale * self.params.scale_factors
+        #         #
+        #         self.params.use_rgbd_classifier = False
+        #         test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
+        #         self.params.use_rgbd_classifier = True
+        #         # Compute scores
+        #         scores_raw = self.apply_filter(test_x_rgb)
+        #         # Localize
+        #         translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
+        #         # Decrease search region back
+        #         self.params.scale_factors = self.params.scale_factors / redetect_factor
+        #
+        #         if flag not in ['not_found', 'uncertain']:
+        #             print('re-found tatrget by %f redtect factor...'%redetect_factor)
+        #             new_pos = sample_pos + translation_vec
+        #             break
 
         # Localization uncertainty
         max_score = torch.max(s).item()
@@ -841,6 +906,9 @@ class DepthSegmST(BaseTracker):
         init_samples, init_im_patches, init_dp_patches = self.params.features_filter.extract_transformed(im, self.pos.round(), self.target_scale,
                                                                                        aug_expansion_sz, self.transforms,
                                                                                        dp=dp)
+        ''' Decide if we use the depth feature or not
+        when depth missing too much -> self.params.use_rgbd_classifier = False
+        '''
         if self.params.use_rgbd_classifier and init_dp_patches is not None:
             init_samples = self.rgbd_fusion(init_samples, init_dp_patches)
 
