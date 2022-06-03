@@ -3,7 +3,7 @@ import torch.nn as nn
 from collections import OrderedDict
 import torch.utils.model_zoo as model_zoo
 from torchvision.models.resnet import BasicBlock, Bottleneck, model_urls
-
+import torch
 
 class ResNet(nn.Module):
     """ ResNet network module. Allows extracting specific feature blocks."""
@@ -121,7 +121,7 @@ def resnet18(output_layers=None, pretrained=False):
     return model
 
 
-def resnet50(output_layers=None, pretrained=False):
+def resnet50(output_layers=None, pretrained=False, net_path=None):
     """Constructs a ResNet-50 model.
     """
 
@@ -134,5 +134,17 @@ def resnet50(output_layers=None, pretrained=False):
 
     model = ResNet(Bottleneck, [3, 4, 6, 3], output_layers)
     if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls['resnet50']))
+        if net_path is not None:
+            print('Backbone Resnet50 use the pretrained parameters: ', net_path)
+            pretrained_dict = torch.load(net_path)
+            depth_resnet_dict = {}
+            for k, v in pretrained_dict['net'].items():
+                if k.startswith('feature_extractor_depth.'):
+                    depth_resnet_dict[k[24:]] = v
+
+            model_dict = model.state_dict()
+            model_dict.update(depth_resnet_dict)
+            model.load_state_dict(model_dict)
+        else:
+            model.load_state_dict(model_zoo.load_url(model_urls['resnet50']))
     return model

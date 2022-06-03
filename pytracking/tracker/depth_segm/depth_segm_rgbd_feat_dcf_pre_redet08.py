@@ -29,6 +29,10 @@ class DepthSegmST(BaseTracker):
     def initialize_features(self):
         if not getattr(self, 'features_initialized', False):
             self.params.features_filter.initialize()
+
+            if self.params.use_rgbd_classifier:
+                self.params.depth_features_filter.initialize()
+
         self.features_initialized = True
 
     def get_target_depth(self, depth, bbox):
@@ -157,30 +161,30 @@ class DepthSegmST(BaseTracker):
             depth = depth.astype(np.float32)
 
         return color, depth
-
-    def rgbd_fusion(self, x_rgb, d_patches):
-        ''' Song, simply fuse RGBD features for DCF
-                x_rgb : Tensorlist([27, 1024, 16, 16]) or Tensorlist([1, 1024, 16, 16])
-                d_patches : depth image crops, Tensorlist([27, 3, 256, 256]) or Tensorlist([1, 3, 256, 256])
-
-                Accuracy gets improved, but Robustness gets decreased !!
-        '''
-        x_d = TensorList([self.segm_net.segm_predictor.depth_feat_extractor(dp.to(self.params.device)) for dp in d_patches]) # [1, 64, 128, 128]
-        attn_d = TensorList([self.segm_net.segm_predictor.depth_attn(xd) for xd in x_d]) # [1, 1, 128, 128]
-
-        for i in range(len(x_rgb)):
-            f_rgb = x_rgb[i] # [1, 1024, 16, 16] -> 16 * [1, 64, 16, 16] ???
-            f_d = x_d[i]     # [1, 64, 128, 128]
-            a_d = attn_d[i]  # [1, 1, 128, 128]
-
-            f_rgb = F.interpolate(f_rgb, size=(f_d.shape[-2], f_d.shape[-1]))
-            f_rgb = f_rgb *a_d + f_rgb
-
-            x_rgb[i] = F.interpolate(f_rgb, size=(x_rgb[i].shape[-2], x_rgb[i].shape[-1]))
-
-            self.attn_dcf = a_d[0, 0, ...].detach().clone().cpu().numpy().squeeze()
-
-        return x_rgb
+    #
+    # def rgbd_fusion(self, x_rgb, d_patches):
+    #     ''' Song, simply fuse RGBD features for DCF
+    #             x_rgb : Tensorlist([27, 1024, 16, 16]) or Tensorlist([1, 1024, 16, 16])
+    #             d_patches : depth image crops, Tensorlist([27, 3, 256, 256]) or Tensorlist([1, 3, 256, 256])
+    #
+    #             Accuracy gets improved, but Robustness gets decreased !!
+    #     '''
+    #     x_d = TensorList([self.segm_net.segm_predictor.depth_feat_extractor(dp.to(self.params.device)) for dp in d_patches]) # [1, 64, 128, 128]
+    #     attn_d = TensorList([self.segm_net.segm_predictor.depth_attn(xd) for xd in x_d]) # [1, 1, 128, 128]
+    #
+    #     for i in range(len(x_rgb)):
+    #         f_rgb = x_rgb[i] # [1, 1024, 16, 16] -> 16 * [1, 64, 16, 16] ???
+    #         f_d = x_d[i]     # [1, 64, 128, 128]
+    #         a_d = attn_d[i]  # [1, 1, 128, 128]
+    #
+    #         f_rgb = F.interpolate(f_rgb, size=(f_d.shape[-2], f_d.shape[-1]))
+    #         f_rgb = f_rgb *a_d + f_rgb
+    #
+    #         x_rgb[i] = F.interpolate(f_rgb, size=(x_rgb[i].shape[-2], x_rgb[i].shape[-1]))
+    #
+    #         self.attn_dcf = a_d[0, 0, ...].detach().clone().cpu().numpy().squeeze()
+    #
+    #     return x_rgb
 
     def initialize(self, image, state, init_mask=None, *args, **kwargs):
         # Initialize some stuff
@@ -199,6 +203,8 @@ class DepthSegmST(BaseTracker):
 
         # Get feature specific params
         self.fparams = self.params.features_filter.get_fparams('feature_params')
+        if self.params.use_rgbd_classifier:
+            self.depth_fparams = self.params.depth_features_filter.get_fparams('feature_params')
 
         self.time = 0
         tic = time.time()
@@ -244,6 +250,9 @@ class DepthSegmST(BaseTracker):
         raw_depth = copy.deepcopy(depth)
         depth = self.depth_processing(depth, bbox=state, use_colormap=self.params.use_colormap)
         self.params.features_filter.set_is_color(color.shape[2] == 3)
+
+        if self.params.use_rgbd_classifier:
+            self.params.depth_features_filter.set_is_color(depth.shape[2] == 3)
 
         # Set search area
         self.target_scale = 1.0
@@ -489,7 +498,9 @@ class DepthSegmST(BaseTracker):
         sample_pos = copy.deepcopy(self.pos)
         sample_scales = self.target_scale * self.params.scale_factors
 
-        ''' test_x_rgb is fused rgbd features if use_rgbd_classifier '''
+        ''' test_x_rgb is fused rgbd features if use_rgbd_classifier
+        sample size = sample_scale * img_sample_sz = 4.5 * sample_sz in default
+        '''
         test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
         # Compute scores
         scores_raw = self.apply_filter(test_x_rgb)
@@ -498,7 +509,7 @@ class DepthSegmST(BaseTracker):
         new_pos = sample_pos + translation_vec
 
         if flag == 'not_found':
-            print(self.frame_num, ' Not found target ...... start to redetection with different sample pos')
+            print(self.frame_num, ' Not found target ...... start to redetection')
 
             shift_base =  0.75 * self.params.search_area_scale * max(self.target_sz[0].item(), self.target_sz[1].item())
             pos_y, pos_x = self.pos[0].item(), self.pos[1].item()
@@ -506,7 +517,7 @@ class DepthSegmST(BaseTracker):
             sample_scales = self.target_scale * self.params.scale_factors
 
             '''Re-detection with different sample pos'''
-            for shift in [[0, 0], [1,1], [-1, -1], [1, -1], [-1, 1]]:
+            for shift in [[1,1], [-1, -1], [1, -1], [-1, 1], [0, 1], [0, -1], [1, 0], [-1, 0]]:
                 # sample_pos = copy.deepcopy(self.pos)
                 x_shift = shift_base * shift[0]
                 y_shift = shift_base * shift[1]
@@ -521,14 +532,14 @@ class DepthSegmST(BaseTracker):
                 translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
 
                 if flag not in ['not_found', 'uncertain']:
-                    print('re-found tatrget by pos shift and redetect scale...', shift)
+                    print('re-found tatrget by pos shift : ', shift)
                     new_pos = temp_pos + translation_vec
                     break
 
         if flag == 'not_found':
-            print(self.frame_num, ' Not found target ...... start to redetection with different scale')
+            # print(self.frame_num, ' Not found target ...... start to redetection with different scale')
 
-            for redetect_factor in [0.8, 1.1, 1.25, 1.5, 2]:
+            for redetect_factor in [0.6, 0.8, 1.1, 1.25, 1.5, 2]:
                 # Increase search region
                 self.params.scale_factors = self.params.scale_factors * redetect_factor
                 #
@@ -544,37 +555,9 @@ class DepthSegmST(BaseTracker):
                 self.params.scale_factors = self.params.scale_factors / redetect_factor
 
                 if flag not in ['not_found', 'uncertain']:
-                    print('re-found tatrget by %f redtect factor...'%redetect_factor)
+                    print('re-found tatrget by %f redtect factor.'%redetect_factor)
                     new_pos = sample_pos + translation_vec
                     break
-
-        ''' RGB only DCF '''
-        # if flag == 'not_found':
-        #     print(self.frame_num, ' Not found target ...... start to redetection with different scale')
-        #
-        #     '''Re-detection'''
-        #     # for redetect_factor in [1.2, 1.5, 1.8]:
-        #     for redetect_factor in [0.6, 0.8, 1.1, 1.25, 1.5, 2, 2.5]:
-        #         # Increase search region
-        #         self.params.scale_factors = self.params.scale_factors * redetect_factor
-        #         #
-        #         sample_pos = copy.deepcopy(self.pos)
-        #         sample_scales = self.target_scale * self.params.scale_factors
-        #         #
-        #         self.params.use_rgbd_classifier = False
-        #         test_x_rgb = self.extract_processed_sample(im, dp, sample_pos, sample_scales, self.img_sample_sz)
-        #         self.params.use_rgbd_classifier = True
-        #         # Compute scores
-        #         scores_raw = self.apply_filter(test_x_rgb)
-        #         # Localize
-        #         translation_vec, scale_ind, s, flag = self.localize_target(scores_raw)
-        #         # Decrease search region back
-        #         self.params.scale_factors = self.params.scale_factors / redetect_factor
-        #
-        #         if flag not in ['not_found', 'uncertain']:
-        #             print('re-found tatrget by %f redtect factor...'%redetect_factor)
-        #             new_pos = sample_pos + translation_vec
-        #             break
 
         # Localization uncertainty
         max_score = torch.max(s).item()
@@ -611,7 +594,7 @@ class DepthSegmST(BaseTracker):
                 new_target_depth = self.get_target_depth(raw_depth, pred_segm_region)
                 if (not math.isnan(new_target_depth)) and (not math.isnan(self.target_depth)):
                     target_depth_flag = abs(self.target_depth - new_target_depth) / self.target_depth
-                    if target_depth_flag > 0.5:
+                    if target_depth_flag > 0.5 and self.target_depth > 1000 and new_target_depth > 1000:
                         print(self.frame_num, 'target depth changes too much : ', self.target_depth, new_target_depth)
                         pred_segm_region = None
                         conf_ = 0
@@ -776,7 +759,13 @@ class DepthSegmST(BaseTracker):
 
     ''' Song, another way to improve DCF is use the DOT Resnet50 for depth'''
     def extract_sample(self, color: torch.Tensor, depth: torch.Tensor, pos: torch.Tensor, scales, sz: torch.Tensor):
-        return self.params.features_filter.extract(color, pos, scales, sz, dp=depth)
+        x_rgb, rgb_patches = self.params.features_filter.extract(color, pos, scales, sz)
+
+        x_d, d_patches = None, None
+        if self.params.use_rgbd_classifier:
+            x_d, d_patches = self.params.depth_features_filter.extract(depth, pos, scales, sz)
+
+        return x_rgb, x_d, rgb_patches, d_patches
 
     def extract_processed_sample(self, color: torch.Tensor, depth: torch.Tensor, pos: torch.Tensor, scales, sz: torch.Tensor) -> (
     TensorList, TensorList):
@@ -784,10 +773,13 @@ class DepthSegmST(BaseTracker):
             x_d  : depth image crops
             rgb_patches : rgb image crops
         '''
-        x_rgb, d_patches, rgb_patches = self.extract_sample(color, depth, pos, scales, sz)
+        x_rgb, x_d, rgb_patches, d_patches = self.extract_sample(color, depth, pos, scales, sz)
 
+        ''' same as DeT, pixel-wise max pooling operation '''
         if self.params.use_rgbd_classifier:
-            x_rgb = self.rgbd_fusion(x_rgb, d_patches)
+            for i in range(len(x_rgb)):
+                x_rgb[i] = torch.max(x_rgb[i], x_d[i])
+                # x_rgb[i] + x_rgb[i] + x_d[i]
 
         # Song, for vis only
         self.rgb_patches = rgb_patches.clone().detach().cpu().numpy().squeeze()
@@ -900,14 +892,14 @@ class DepthSegmST(BaseTracker):
         ''' init_samples : TensorList([27, 1024, 16, 16]), needs to be compressed
             init_samples_d : [27, 64, 128, 128]
         '''
-        init_samples, init_im_patches, init_dp_patches = self.params.features_filter.extract_transformed(im, self.pos.round(), self.target_scale,
-                                                                                       aug_expansion_sz, self.transforms,
-                                                                                       dp=dp)
-        ''' Decide if we use the depth feature or not
-        when depth missing too much -> self.params.use_rgbd_classifier = False
-        '''
-        if self.params.use_rgbd_classifier and init_dp_patches is not None:
-            init_samples = self.rgbd_fusion(init_samples, init_dp_patches)
+        if self.params.use_rgbd_classifier:
+            init_samples = self.params.features_filter.extract_transformed(im, self.pos.round(), self.target_scale, aug_expansion_sz, self.transforms)
+            init_samples_d = self.params.depth_features_filter.extract_transformed(dp, self.pos.round(), self.target_scale, aug_expansion_sz, self.transforms)
+            for i in range(len(init_samples)):
+                init_samples[i] = torch.max(init_samples[i], init_samples_d[i])
+                # init_samples[i] = init_samples[i] + init_samples_d[i]
+        else:
+            init_samples = self.params.features_filter.extract_transformed(im, self.pos.round(), self.target_scale, aug_expansion_sz, self.transforms)
 
         # Remove augmented samples for those that shall not have
         for i, use_aug in enumerate(self.fparams.attribute('use_augmentation')):
@@ -1509,8 +1501,8 @@ class DepthSegmST(BaseTracker):
                                                     min(self.target_scale * self.params.max_scale_change_factor,
                                                         new_target_scale))
 
-                    else:
-                        print('pred_mask too large or too small, ', mask_pixels_, np.mean(self.mask_pixels), np.sum(self.init_mask))
+                    # else:
+                    #     print('pred_mask too large or too small, ', mask_pixels_, np.mean(self.mask_pixels), np.sum(self.init_mask))
 
             if not self.params.segm_scale_estimation or pixels_ratio < self.params.consider_segm_pixels_ratio:
                 self.pos[0] = np.mean(prbox[:, 1])

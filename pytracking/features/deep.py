@@ -164,7 +164,8 @@ class ATOMResNet50(MultiFeatureBase):
         net_path: Relative or absolute net path (default should be fine).
         use_gpu: Use GPU or CPU.
     """
-    def __init__(self, output_layers=('layer3',), net_path='atom_iou', use_gpu=True, *args, **kwargs):
+    # def __init__(self, output_layers=('layer3',), net_path='atom_iou', use_gpu=True, *args, **kwargs):
+    def __init__(self, output_layers=('layer3',), net_path=None, use_gpu=True, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.output_layers = list(output_layers)
@@ -178,7 +179,7 @@ class ATOMResNet50(MultiFeatureBase):
         #     net_path_full = os.path.join(env_settings().network_path, self.net_path)
 
         # self.net, _ = load_network(net_path_full, backbone_pretrained=False)
-        self.net = backbone_resnet.resnet50(output_layers=self.output_layers, pretrained=True)
+        self.net = backbone_resnet.resnet50(output_layers=self.output_layers, pretrained=True, net_path=self.net_path)
 
         if self.use_gpu:
             self.net.cuda()
@@ -235,4 +236,3 @@ class ATOMResNet50(MultiFeatureBase):
         #     self.iounet_features = TensorList(self.iou_predictor.get_iou_feat(self.iounet_backbone_features))
 
         return TensorList([output_features[layer] for layer in self.output_layers])
-

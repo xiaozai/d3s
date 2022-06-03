@@ -13,6 +13,7 @@ class ExtractorBase:
     def __init__(self, features):
         self.features = features
 
+    # Song, add the pretrained_path
     def initialize(self):
         for f in self.features:
             f.initialize()
@@ -132,7 +133,7 @@ class MultiResolutionExtractor(ExtractorBase):
         elif dp is None and raw_depth is not None:
             return feature_map, raw_dp_patches
         elif dp is None and raw_depth is None:
-            return feature_map
+            return feature_map, im_patches
 
 
     def extract_transformed(self, im, pos, scale, image_sz, transforms, dp=None, raw_depth=None):
