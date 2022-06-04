@@ -87,8 +87,8 @@ class DepthSegmST(BaseTracker):
             self.target_depth = target_depth
 
             if not math.isnan(target_depth):
-                self.min_depth = max(0, target_depth-1500)
-                self.max_depth = target_depth + 1500
+                self.min_depth = max(0, target_depth-2000)
+                self.max_depth = target_depth + 2000
 
         depth = (depth - self.min_depth) / (self.max_depth - self.min_depth) * 1.0
         depth = np.clip(depth, 0, 1.0)
@@ -1080,8 +1080,8 @@ class DepthSegmST(BaseTracker):
 
         # Song, update target depth range
         if not math.isnan(self.target_depth):
-            self.min_depth = max(0, self.target_depth-1500)
-            self.max_depth = self.target_depth + 1500
+            self.min_depth = max(0, self.target_depth-2000)
+            self.max_depth = self.target_depth + 2000
 
     # def update_state(self, new_pos, new_scale=None, new_state=None):
     #
