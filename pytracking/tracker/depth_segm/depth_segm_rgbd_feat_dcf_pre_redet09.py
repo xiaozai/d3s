@@ -1425,30 +1425,30 @@ class DepthSegmST(BaseTracker):
         self.masked_img = self.masked_img.astype(int) * np.expand_dims(mask, axis=-1)
 
 
-        ''' --------------------------------------------------------------------
-        Check new prbox target sz,
-        if new_target_sz > 1.25 * self.prev_target_sz, then do post_processing'''
-
-        if raw_depth is not None:
-            if cv2.__version__[-5] == '4':
-                temp_contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-            else:
-                _, temp_contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-            temp_cnt_area = [cv2.contourArea(cnt) for cnt in temp_contours]
-            # if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 1000:
-            if len(temp_cnt_area) > 0 and len(temp_contours) != 0 and np.max(temp_cnt_area) > 100:
-                temp_contour = temp_contours[np.argmax(temp_cnt_area)]  # use max area polygon
-                temp_polygon = temp_contour.reshape(-1, 2)
-                temp_prbox = self.poly_to_prbox(temp_polygon) # return 4 points
-                new_state_in_crop, _ = self.poly_to_aabbox_noscale(temp_prbox[:, 0], temp_prbox[:, 1])
-                # scale back to Image
-                new_target_sz = new_state_in_crop[2] * new_state_in_crop[3] / (f_ * f_)
-                if new_target_sz >= 2 * self.prev_target_sz:
-                    new_mask = self.outliers_remove_by_depth(mask * patch_raw_d, max_deviations=0.8, num_bins=20)
-                    if np.sum(new_mask) > 0.6 * np.sum(mask):
-                        print('remove outliers in mask')
-                        mask = new_mask
-        ''' -----------------------------------------------------------------'''
+        # ''' --------------------------------------------------------------------
+        # Check new prbox target sz,
+        # if new_target_sz > 1.25 * self.prev_target_sz, then do post_processing'''
+        #
+        # if raw_depth is not None:
+        #     if cv2.__version__[-5] == '4':
+        #         temp_contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        #     else:
+        #         _, temp_contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        #     temp_cnt_area = [cv2.contourArea(cnt) for cnt in temp_contours]
+        #     # if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 1000:
+        #     if len(temp_cnt_area) > 0 and len(temp_contours) != 0 and np.max(temp_cnt_area) > 100:
+        #         temp_contour = temp_contours[np.argmax(temp_cnt_area)]  # use max area polygon
+        #         temp_polygon = temp_contour.reshape(-1, 2)
+        #         temp_prbox = self.poly_to_prbox(temp_polygon) # return 4 points
+        #         new_state_in_crop, _ = self.poly_to_aabbox_noscale(temp_prbox[:, 0], temp_prbox[:, 1])
+        #         # scale back to Image
+        #         new_target_sz = new_state_in_crop[2] * new_state_in_crop[3] / (f_ * f_)
+        #         if new_target_sz >= 2 * self.prev_target_sz:
+        #             new_mask = self.outliers_remove_by_depth(mask * patch_raw_d, max_deviations=0.8, num_bins=20)
+        #             if np.sum(new_mask) > 0.6 * np.sum(mask):
+        #                 print('remove outliers in mask')
+        #                 mask = new_mask
+        # ''' -----------------------------------------------------------------'''
 
         if cv2.__version__[-5] == '4':
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
