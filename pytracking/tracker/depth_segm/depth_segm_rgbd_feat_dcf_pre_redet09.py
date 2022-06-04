@@ -1429,7 +1429,7 @@ class DepthSegmST(BaseTracker):
 
         ''' --------------------------------------------------------------------
         Check new prbox target sz,
-        if new_target_sz > 1.25 * self.prev_targe_sz, then do post_processing'''
+        if new_target_sz > 1.25 * self.prev_target_sz, then do post_processing'''
 
         if raw_depth is not None:
             if cv2.__version__[-5] == '4':
@@ -1445,7 +1445,7 @@ class DepthSegmST(BaseTracker):
                 new_state_in_crop, _ = self.poly_to_aabbox_noscale(temp_prbox[:, 0], temp_prbox[:, 1])
                 # scale back to Image
                 new_target_sz = new_state_in_crop[2] * new_state_in_crop[3] / (f_ * f_)
-                if new_target_sz >= 1.25 * self.prev_targe_sz:
+                if new_target_sz >= 1.25 * self.prev_target_sz:
                     new_mask = self.outliers_remove_by_depth(mask * patch_raw_d, max_deviations=0.8, num_bins=20)
                     if np.sum(new_mask) > 0.6 * np.sum(mask):
                         print('remove outliers in mask')
