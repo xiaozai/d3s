@@ -636,12 +636,10 @@ class DepthSegmST(BaseTracker):
             self.filter_optimizer.run(self.params.CG_iter)
 
         # Update position and scale
-        if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.6:
+        if uncert_score < self.params.tracking_uncertainty_thr and conf_ > 0.7:
             if getattr(self.params, 'use_classifier', True):
                 self.update_state(new_pos, sample_scales[scale_ind], new_state)
-        #
-        # if conf_ > 0.6:
-        #     self.prev_target_sz = new_state[-1] * new_state[-2]
+
 
         return new_state, conf_
 
@@ -1078,7 +1076,7 @@ class DepthSegmST(BaseTracker):
         inside_offset = (inside_ratio - 0.5) * self.target_sz
         self.pos = torch.max(torch.min(new_pos, self.image_sz - inside_offset), inside_offset)
 
-        self.prev_target_sz = new_state[-1] * new_state[-2]
+        self.prev_target_sz = new_state[3] * new_state[2]
 
         # Song, update target depth range
         if not math.isnan(self.target_depth):
