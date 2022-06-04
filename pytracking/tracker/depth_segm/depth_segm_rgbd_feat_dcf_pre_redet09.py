@@ -632,7 +632,7 @@ class DepthSegmST(BaseTracker):
         # Train filter
         if hard_negative:
             self.filter_optimizer.run(self.params.hard_negative_CG_iter)
-        elif (self.frame_num - 1) % self.params.train_skipping == 0 and conf_ > 0.5:
+        elif (self.frame_num - 1) % self.params.train_skipping == 0 and conf_ > 0.4:
             self.filter_optimizer.run(self.params.CG_iter)
 
         # Update position and scale
@@ -1436,14 +1436,14 @@ class DepthSegmST(BaseTracker):
                 _, temp_contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
             temp_cnt_area = [cv2.contourArea(cnt) for cnt in temp_contours]
             # if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 1000:
-            if len(temp_cnt_area) > 0 and len(temp_contours) != 0 and np.max(temp_cnt_area) > 400:
+            if len(temp_cnt_area) > 0 and len(temp_contours) != 0 and np.max(temp_cnt_area) > 100:
                 temp_contour = temp_contours[np.argmax(temp_cnt_area)]  # use max area polygon
                 temp_polygon = temp_contour.reshape(-1, 2)
                 temp_prbox = self.poly_to_prbox(temp_polygon) # return 4 points
                 new_state_in_crop, _ = self.poly_to_aabbox_noscale(temp_prbox[:, 0], temp_prbox[:, 1])
                 # scale back to Image
                 new_target_sz = new_state_in_crop[2] * new_state_in_crop[3] / (f_ * f_)
-                if new_target_sz >= 1.25 * self.prev_target_sz:
+                if new_target_sz >= 1.4 * self.prev_target_sz:
                     new_mask = self.outliers_remove_by_depth(mask * patch_raw_d, max_deviations=0.8, num_bins=20)
                     if np.sum(new_mask) > 0.6 * np.sum(mask):
                         print('remove outliers in mask')
@@ -1457,7 +1457,7 @@ class DepthSegmST(BaseTracker):
         cnt_area = [cv2.contourArea(cnt) for cnt in contours]
 
         # if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 1000:
-        if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 400:
+        if len(cnt_area) > 0 and len(contours) != 0 and np.max(cnt_area) > 100:
             contour = contours[np.argmax(cnt_area)]  # use max area polygon
             polygon = contour.reshape(-1, 2)
 
