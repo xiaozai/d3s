@@ -228,8 +228,7 @@ class SegmNet(nn.Module):
         if not debug:
             return (out0, pred1, pred2, pred3)
         else:
-            return (out0, pred1, pred2, pred3), (f_test[:, 0, :, :], f_test_rgbd2[:, 0, :, :], f_test_rgbd1[:, 0, :, :], f_test_rgbd0[:, 0, :, :])
-
+            return (out0, pred1, pred2, pred3), None
 
     def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg):
         '''Song's comments:

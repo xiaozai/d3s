@@ -17,7 +17,7 @@ class DepthSegmNet(nn.Module):
         super(DepthSegmNet, self).__init__()
 
         self.feature_extractor = feature_extractor
-        self.depth_feat_extractor = depth_feature_extractor
+        self.depth_feature_extractor = depth_feature_extractor
         self.segm_predictor = segm_predictor
         self.segm_layers = segm_layers
 
@@ -41,8 +41,8 @@ class DepthSegmNet(nn.Module):
             train_feat_d = self.segm_predictor.depth_feat_extractor(train_depths)
             test_feat_d = self.segm_predictor.depth_feat_extractor(test_depths)
         else:
-            train_feat_d = self.extract_backbone_features(train_depths) # B * C * H * W -> B * C * H * W
-            test_feat_d = self.extract_backbone_features(test_depths)
+            train_feat_d = self.extract_depth_backbone_features(train_depths) # B * C * H * W -> B * C * H * W
+            test_feat_d = self.extract_depth_backbone_features(test_depths)
             train_feat_d = [feat for feat in train_feat_d.values()] # layer 0 - 3
             test_feat_d = [feat for feat in test_feat_d.values()]
 
@@ -69,6 +69,11 @@ class DepthSegmNet(nn.Module):
         if layers is None:
             layers = self.segm_layers
         return self.feature_extractor(im, layers)
+
+    def extract_depth_backbone_features(self, dp, layers=None):
+        if layers is None:
+            layers = self.segm_layers
+        return self.depth_feature_extractor(dp, layers)
 
     def extract_features(self, im, layers):
         return self.feature_extractor(im, layers)
