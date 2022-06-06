@@ -938,7 +938,8 @@ def depth_segm_D3S_DW03_RGBD_resnet50(segm_input_dim=(256,256), segm_inter_dim=(
                         backbone_pretrained=True, topk_pos=3, topk_neg=3, mixer_channels=2):
     # backbone
     backbone_net = backbones.resnet50(pretrained=backbone_pretrained)
-    depth_backbone_net = backbones.resnet50(pretrained=backbone_pretrained, net_path='/home/yan/Data2/DeT-models/DeT_DiMP50_Max.pth')
+    depth_backbone_net = backbones.resnet50(pretrained=backbone_pretrained,
+                                            net_path='/home/sgn/Data1/yan/d3s/checkpoints/ltr/DeT/DeT_DiMP50_Max.pth')
 
     # segmentation dimensions
     segm_input_dim = (64, 256, 512, 1024)
