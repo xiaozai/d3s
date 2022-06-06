@@ -53,6 +53,7 @@ from .d3s_rgbd_Attention import SegmNet as D3S_Attention_RGBD
 from .d3s_rgbd_DWeight import SegmNet as D3S_DW_RGBD
 from .d3s_rgbd_DW02 import SegmNet as D3S_DW02_RGBD
 from .d3s_rgbd_DW03 import SegmNet as D3S_DW03_RGBD
+from .d3s_rgbd_DW03_RGBD_Resnet_Feat import SegmNet as D3S_DW03_RGBD_Resnet_feat
 from .d3s_rgbd_DW03_1 import SegmNet as D3S_DW03_1_RGBD
 from .d3s_rgbd_DW04 import SegmNet as D3S_DW04_RGBD
 from .d3s_rgbd_DW05 import SegmNet as D3S_DW05_RGBD

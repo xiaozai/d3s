@@ -6,7 +6,7 @@ from ltr import model_constructor
 
 class DepthSegmNet(nn.Module):
     """ Segmentation network module"""
-    def __init__(self, feature_extractor, segm_predictor, segm_layers, extractor_grad=True):
+    def __init__(self, feature_extractor, segm_predictor, segm_layers, extractor_grad=True, depth_feature_extractor=None):
         """
         args:
             feature_extractor - backbone feature extractor - RGB
@@ -17,6 +17,7 @@ class DepthSegmNet(nn.Module):
         super(DepthSegmNet, self).__init__()
 
         self.feature_extractor = feature_extractor
+        self.depth_feat_extractor = depth_feature_extractor
         self.segm_predictor = segm_predictor
         self.segm_layers = segm_layers
 
@@ -36,8 +37,14 @@ class DepthSegmNet(nn.Module):
         train_feat_rgb = [feat for feat in train_feat_rgb.values()] # layer 0 - 3
         test_feat_rgb = [feat for feat in test_feat_rgb.values()]
 
-        train_feat_d = self.segm_predictor.depth_feat_extractor(train_depths)
-        test_feat_d = self.segm_predictor.depth_feat_extractor(test_depths)
+        if self.depth_feature_extractor is None:
+            train_feat_d = self.segm_predictor.depth_feat_extractor(train_depths)
+            test_feat_d = self.segm_predictor.depth_feat_extractor(test_depths)
+        else:
+            train_feat_d = self.extract_backbone_features(train_depths) # B * C * H * W -> B * C * H * W
+            test_feat_d = self.extract_backbone_features(test_depths)
+            train_feat_d = [feat for feat in train_feat_d.values()] # layer 0 - 3
+            test_feat_d = [feat for feat in test_feat_d.values()]
 
         train_masks = [train_masks]
 
@@ -921,6 +928,29 @@ def depth_segm_D3S_DW03_MP_resnet50(segm_input_dim=(256,256), segm_inter_dim=(25
 
     net = DepthSegmNet(feature_extractor=backbone_net, segm_predictor=segm_predictor,
                        segm_layers=['conv1', 'layer1', 'layer2', 'layer3'], extractor_grad=False)  # extractor_grad=False
+
+    return net
+
+
+
+@model_constructor
+def depth_segm_D3S_DW03_RGBD_resnet50(segm_input_dim=(256,256), segm_inter_dim=(256,256),
+                        backbone_pretrained=True, topk_pos=3, topk_neg=3, mixer_channels=2):
+    # backbone
+    backbone_net = backbones.resnet50(pretrained=backbone_pretrained)
+    depth_backbone_net = backbones.resnet50(pretrained=backbone_pretrained, net_path='/home/yan/Data2/DeT-models/DeT_DiMP50_Max.pth')
+
+    # segmentation dimensions
+    segm_input_dim = (64, 256, 512, 1024)
+    segm_inter_dim = (4, 16, 32, 64)
+    segm_dim = (64, 64)  # convolutions before cosine similarity
+
+    # segmentation
+    segm_predictor = segmmodels.D3S_DW03_RGBD_Resnet_feat()
+
+    net = DepthSegmNet(feature_extractor=backbone_net, segm_predictor=segm_predictor,
+                       segm_layers=['conv1', 'layer1', 'layer2', 'layer3'], extractor_grad=False,
+                       depth_feature_extractor=depth_backbone_net)
 
     return net
 
