@@ -212,9 +212,9 @@ class SegmNet(nn.Module):
 
         out = self.mixer(segm_layers)
 
-        f_test_rgbd2 = torch.max(self.f2(feat_test[2]), self.d2(feat_test[2]))
-        f_test_rgbd1 = torch.max(self.f1(feat_test[1]), self.d1(feat_test[1]))
-        f_test_rgbd0 = torch.max(self.f0(feat_test[0]), self.d0(feat_test[0]))
+        f_test_rgbd2 = torch.max(self.f2(feat_test[2]), self.d2(feat_test[2]))  # Bx32xHxW
+        f_test_rgbd1 = torch.max(self.f1(feat_test[1]), self.d1(feat_test[1]))  # Bx16xHxW
+        f_test_rgbd0 = torch.max(self.f0(feat_test[0]), self.d0(feat_test[0]))  # Bx4xHxW
 
         out3 = self.s3(F.interpolate(out, size=(f_test_rgbd2.shape[-2], f_test_rgbd2.shape[-1])))
         out2 = self.post2(F.interpolate(self.m2(f_test_rgbd2) + self.s2(out3), size=(f_test_rgbd1.shape[-2], f_test_rgbd1.shape[-1])))
@@ -228,7 +228,7 @@ class SegmNet(nn.Module):
         if not debug:
             return (out0, pred1, pred2, pred3)
         else:
-            return (out0, pred1, pred2, pred3), None
+            return (out0, pred1, pred2, pred3), (f_test[:, 0, :, :], f_test_rgbd2[:, 0, :, :], f_test_rgbd1[:, 0, :, :], f_test_rgbd0[:, 0, :, :])
 
 
     def similarity_segmentation(self, f_test, f_train, mask_pos, mask_neg):
